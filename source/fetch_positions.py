@@ -7,7 +7,9 @@ fielding numbers already in the pools stay exactly as they are. Then run source/
 
   poss  {position: games}
         MLB:  MLB Stats API, season fielding by position.
-        CPBL: 中華職棒官網 stats/recordall, games by defensive position.
+        CPBL: 中華職棒官網 stats/recordall, games by defensive position. That site turns away
+              connections from outside Taiwan (GitHub's servers get a 404), so if it can't be reached
+              the games come from 野球革命's innings by position instead, 9 innings to a game.
   pdef  {position: fielding runs at that position}, for positions other than his main one,
         in the same units the pools already use for the main position:
         MLB:  Baseball Savant fielding runs prevented (from OAA) by position; catcher framing runs.
@@ -109,30 +111,42 @@ def mlb_fielding_runs():
     return out
 
 
-def cpbl_fielding_runs():
-    """{rebas player id: {position: runs}}: UZR by position, framing runs for catchers."""
+def rebas_rows(kind):
     league = json.loads(get('https://www.rebas.tw/api/leagues/CPBL'))['data']
     sid = next(s for s in league['seasons'] if s['year'] == int(YEAR) and s['type'] == 'LEAGUE_MATCHES')['uniqid']
+    return json.loads(get(f'https://www.rebas.tw/api/{kind}?season_id={sid}'))['data']
+
+
+def cpbl_fielding_runs():
+    """{rebas player id: {position: runs}} and {rebas player id: {position: games}}:
+    UZR by position, framing runs for catchers, and innings at each position turned into games."""
     name = {v: k for k, v in POSNUM.items()}
-    out = {}
-    for r in json.loads(get(f'https://www.rebas.tw/api/uzr?season_id={sid}'))['data']:
+    runs, games = {}, {}
+    for r in rebas_rows('uzr'):
         pos = name.get(str(r['position']))
-        if pos and r.get('UZR') is not None:
-            out.setdefault(r['id'], {})[pos] = r['UZR']
-    for r in json.loads(get(f'https://www.rebas.tw/api/catcher_framing?season_id={sid}'))['data']:
+        if not pos:
+            continue
+        if r.get('UZR') is not None:
+            runs.setdefault(r['id'], {})[pos] = r['UZR']
+        if r.get('innings'):
+            games.setdefault(r['id'], {})[pos] = round(float(r['innings']) / 9)
+    for r in rebas_rows('catcher_framing'):
         if r.get('framingRuns') is not None:
-            out.setdefault(r['id'], {})['C'] = r['framingRuns']
-    print('  rebas: fielding by position for', len(out), 'players')
-    return out
+            runs.setdefault(r['id'], {})['C'] = r['framingRuns']
+        inn = r.get('innings') or r.get('IP')
+        if inn:
+            games.setdefault(r['id'], {})['C'] = round(float(inn) / 9)
+    print('  rebas: fielding by position for', len(runs), 'players')
+    return runs, games
 
 
-def update(fname, key, table, runs=None, runs_key=None):
+def update(fname, key, table, runs=None, runs_key=None, games_by=None):
     path = os.path.join(SRC, fname)
     pool = json.load(open(path, encoding='utf-8'))
     hit = [p for p in pool if p.get('type') == 'H']
     n = 0
     for p in hit:
-        d = table.get(p[key])
+        d = games_by(p) if games_by else table.get(p[key])
         if d:
             p['poss'] = dict(sorted(d.items(), key=lambda kv: -kv[1]))
             n += 1
@@ -156,4 +170,14 @@ if __name__ == '__main__':
            '&sportId=1&playerPool=ALL&limit=5000')
     update('pool.json', 'id', mlb_positions(json.loads(get(url))['stats'][0]['splits']), mlb_fielding_runs())
     if os.path.exists(os.path.join(SRC, 'pool_cpbl.json')):
-        update('pool_cpbl.json', 'n', cpbl_positions(), cpbl_fielding_runs(), lambda p: p['id'][1:])   # pool ids are 'c' + the rebas id
+        rid = lambda p: p['id'][1:]   # pool ids are 'c' + the rebas id
+        try:
+            runs, rgames = cpbl_fielding_runs()
+        except Exception as e:
+            print('CPBL skipped: 野球革命 could not be reached:', e)
+            sys.exit(0)
+        try:
+            update('pool_cpbl.json', 'n', cpbl_positions(), runs, rid)
+        except Exception as e:
+            print('  cpbl.com.tw could not be reached (' + str(e) + '); using 野球革命 innings, 9 innings to a game')
+            update('pool_cpbl.json', 'rid', {}, runs, rid, games_by=lambda p: rgames.get(rid(p)))
