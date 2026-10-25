@@ -6,10 +6,10 @@ Only the "poss" field of each hitter is written; the batting, pitching and field
 numbers already in the pools stay exactly as they are. Then run source/build.py.
 
   MLB:  MLB Stats API, season fielding by position: games played at each position.
-  CPBL: 中華職棒官網 stats/recordall, plate appearances by defensive position
+  CPBL: 中華職棒官網 stats/recordall, games by defensive position
         (the same page fetch_cpbl.py uses to find each hitter's main position).
 
-The game counts a position as playable from 10 games (MLB) or 30 plate appearances (CPBL).
+The game counts a position as a secondary position from 30 games, in both leagues.
 """
 import json, os, re, sys, urllib.parse, urllib.request, http.cookiejar
 
@@ -42,7 +42,7 @@ def mlb_positions(splits):
 
 
 def cpbl_positions():
-    """{player name: {position: plate appearances}} from cpbl.com.tw, one defensive position at a time."""
+    """{player name: {position: games}} from cpbl.com.tw, one defensive position at a time."""
     page = get('https://www.cpbl.com.tw/stats/recordall')
     tok = re.search(r'name="__RequestVerificationToken" type="hidden" value="([^"]+)"', page).group(1)
     code_of = {'2': 'C', '3': '1B', '4': '2B', '5': '3B', '6': 'SS', '7': 'LF', '8': 'CF', '9': 'RF'}
@@ -62,7 +62,7 @@ def cpbl_positions():
                     continue
                 name = m.group(1).strip()
                 seen.add(name)
-                out.setdefault(name, {})[pos] = int(cells[2])
+                out.setdefault(name, {})[pos] = int(cells[1])
                 new += 1
             if len(rows) < 60 or new == 0:
                 break
