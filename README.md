@@ -49,6 +49,18 @@
 
 ## 第二部分：把網站放上網路（免費，約 3 分鐘）
 
+### 用 GitHub Pages（目前使用的方式）
+
+這個 GitHub 專案已經開啟 GitHub Pages，`main` 分支更新後，大約一分鐘網站就會自動跟著更新：
+
+- 棒球（多人版）：https://simba0812.github.io/MLB/
+- 棒球單機版：https://simba0812.github.io/MLB/大聯盟盲標對決單機.html
+- 英超版：https://simba0812.github.io/MLB/epl/
+
+線上對戰要先到 Firebase：Authentication →「設定」分頁 →「已授權網域」→「新增網域」，填入 `simba0812.github.io`（不要加 `https://`）。根目錄的 `.nojekyll` 是告訴 GitHub 直接發布檔案、不要另外處理，不要刪掉。
+
+### 用 Netlify
+
 最簡單的是 Netlify Drop：
 
 1. 到 https://app.netlify.com/drop ，註冊或登入。

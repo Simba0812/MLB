@@ -33,6 +33,7 @@
 
 ## 目前狀態
 
+- 網站：GitHub Pages，從 `main` 根目錄發布，網址是 https://simba0812.github.io/MLB/ （英超版在 `/epl/`）。Firebase 的已授權網域要有 `simba0812.github.io`。
 - GitHub：`simba0812/mlb`。2026-10-25 起 repo 根目錄就是 `mlb-auction-site` 的內容（原本根目錄只有單機版 `index.html`，`source/` 曾被刪掉，已從使用者上傳的檔案還原）。
 - `source/build.py` 原本的檔案遺失，以 Git 歷史版本為底補上「產生 `../mlb-auction-單機版/index.html`」那幾行；四個產生的網頁都和使用者手上的版本逐位元相同。
 - Firebase 專案 `mlbb-e98d2`，設定已填進 `firebase-config.js`。apiKey 是公開識別碼，不是密碼。
