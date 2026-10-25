@@ -42,6 +42,12 @@
   - 把 `mlb-auction-site` 拖到 Netlify，再用 `mlb-auction-單機版` 另外建一個 Netlify 網站
   - 可以順便刪掉舊資料夾
 
+## 動漫大亂鬥（anime/）
+
+- 2026-10-25 新增，中英文都有，玩法有單人對電腦和同一台輪流玩。說明在 `anime/source/README.md`。
+- 角色數值放在 `anime/source/roster.json`，是依原作自訂的。綜合評價會在開啟網頁時，用固定種子跑兩兩單挑，依勝率算出來。
+- 不能用官方圖片：網站是公開的。
+
 ## 英超版（epl/）
 
 - 2026-10-25 新增，英文介面，玩法只有單人對電腦和同一台輪流玩，沒有線上對戰。說明在 `epl/source/README.md`。
