@@ -314,7 +314,12 @@ function computeDef(pool){
   const scale=g=>{const v=g.map(raw).filter(x=>x!=null),m=v.reduce((a,b)=>a+b,0)/(v.length||1),sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/(v.length||1))||1;
     return x=>x==null?0:clamp((x-m)/sd*6,-15,18)};
   const fc=scale(H.filter(p=>p.pos==='C')),ff=scale(H.filter(p=>p.pos!=='C'&&p.pos!=='DH'));
-  H.forEach(p=>{p.def=p.pos==='DH'?0:Math.round((p.pos==='C'?fc:ff)(raw(p))*10)/10});
+  H.forEach(p=>{p.def=p.pos==='DH'?0:Math.round((p.pos==='C'?fc:ff)(raw(p))*10)/10;
+    // fielding at his other positions, from that position's own numbers. A short stint is pulled toward average
+    // (60 games of average fielding mixed in), then scaled up to as many games as he played at his main position.
+    p.defAt={};const gref=(p.poss&&p.poss[p.pos])||120;
+    for(const [k,v] of Object.entries(p.pdef||{})){const g=(p.poss&&p.poss[k])||0;
+      p.defAt[k]=Math.round((k==='C'?fc:ff)(v*gref/(g+60))*10)/10}});
 }
 // the rating is a player's rank among his own kind in this league (hitters, starters, relievers),
 // read off a curve: top 3% about 93, top 10% about 86, top 20% about 80, median 68
@@ -363,9 +368,16 @@ PRS.H.uzr=mk(POOL.filter(p=>p.type==='H'&&p.pos!=='C'),'uzr');PRS.H.frm=mk(POOL.
   PRS.SP={};PRS.RP={};
   ['era','ip','w','so','whip','kr','bbr'].forEach(k=>{PRS.SP['t_'+k]=mk(P.filter(p=>p.pos==='SP'),k);PRS.RP['t_'+k]=mk(P.filter(p=>p.pos!=='SP'),k)});})();
 }
+// secondary positions: besides his main position, where a hitter played at least 30 games (MLB)
+// or 150 innings (CPBL, where the numbers come as innings) last season
+const FIELDPOS=['C','1B','2B','3B','SS','LF','CF','RF'];
+const ALT_MIN={MLB:30,CPBL:150};
+const playedAt=(p,k)=>p.pinn?p.pinn[k]||0:(p.poss&&p.poss[k])||0;
+function setAlt(pool,lg){pool.forEach(p=>{p.alt=p.type==='H'&&!p.twp?FIELDPOS.filter(k=>k!==p.pos&&playedAt(p,k)>=ALT_MIN[lg]).sort((a,b)=>playedAt(p,b)-playedAt(p,a)):[]})}
+const posTag=p=>[p.pos,...(p.alt||[])].join('/');
 function setLeague(lg){
   if(!POOLS[lg]||!POOLS[lg].length) lg='MLB';
-  S.league=lg;POOL=POOLS[lg];PARKS=PARKSETS[lg];if(!POOL.defDone){computeDef(POOL);POOL.defDone=1}LG=computeLG();LGP=computeLGP();buildPRS();buildOvr();
+  S.league=lg;POOL=POOLS[lg];PARKS=PARKSETS[lg];if(!POOL.defDone){computeDef(POOL);setAlt(POOL,lg);POOL.defDone=1}LG=computeLG();LGP=computeLGP();buildPRS();buildOvr();
   fixSlots();   // CPBL has fewer closers, so the allowed range can shrink
 }
 // traditional stats are ranked within role: hitters vs hitters, starters vs starters, relievers vs relievers
@@ -401,7 +413,7 @@ function slotCount(t,k){return t.roster.filter(r=>r.slot===k||(r.slot2===k)).len
 function minRemaining(t){return SLOTS.reduce((s,sl)=>s+Math.max(0,slotMin(sl)-slotCount(t,sl.k)),0)}
 function openSlotsFor(t,p,ignoreDone){
   if(t.done&&!ignoreDone) return [];
-  const ks = p.twp? ['DH','SP','BN'] : p.type==='H'? [...new Set([p.pos,'DH','BN'])] : [p.pos];   // own position first, then DH, then bench
+  const ks = p.twp? ['DH','SP','BN'] : p.type==='H'? [...new Set([p.pos,...(p.alt||[]),'DH','BN'])] : [p.pos];   // own position first, then the others he played, then DH, then bench
   return ks.filter(k=>slotCount(t,k)<slotMax(SLOTS.find(s=>s.k===k)));
 }
 function needsCovered(t,p,slots){ // how many required slots this player fills
@@ -661,7 +673,7 @@ function lotCard(p){
     </div>
     <div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div>
    </div>
-   <div class="meta"><span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}</span><span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
+   <div class="meta">${p.alt&&p.alt.length?`<span>${TR('主守位','Main')}</span>`:''}<span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}${p.alt&&p.alt.length&&playedAt(p,p.pos)?` ${playedAt(p,p.pos)}${p.pinn?TR(' 局',' inn'):TR(' 場',' G')}`:''}</span>${p.alt&&p.alt.length?`<span>${TR('副守位 ','also plays ')}${p.alt.map(k=>`<span class="pos">${k}</span> ${p.pinn?p.pinn[k]+TR(' 局',' inn'):p.poss[k]+TR(' 場',' G')}${p.defAt&&p.defAt[k]!=null?TR(`（守備 ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)}）`,` (fielding ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)})`):''}`).join(' ')}</span>`:''}<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
    ${p.type==='H'?hitterStats(p):pitcherStats(p)}
    ${p.twp?pitcherStats({...p.twp},TR('投手成績','Pitching')):''}
   </div>`;
@@ -673,7 +685,7 @@ function teamPanel(i){
     const lines=[];
     for(let n=0;n<slotMax(sl);n++){
       const r=got[n];
-      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v">${esc(nm(r.p))}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
+      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v">${esc(nm(r.p))}${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
       else if(n<slotMin(sl)) lines.push(`<span class="k">${sl.k}</span><span class="v empty">${TR('（必填）','(required)')}</span><span class="p"></span>`);
     }
     return lines.join('');
@@ -812,10 +824,14 @@ function validLineup(i,lu){
   return lu.every(x=>ids.has(sid(x.id)))&&new Set(lu.map(x=>sid(x.id))).size===9&&POSLIST.every(k=>lu.some(x=>x.pos===k));
 }
 const lineupFor=(i,lu)=>validLineup(i,lu)?lu:defaultLineup(i);
-// fielding value at a position: a player's own rating at his position, a penalty anywhere else
+// fielding value at a position. Main position: his own rating. Secondary position: his rating from that position's own
+// numbers; if the source had none, 70% of a good main-position rating (a poor one stays poor), or -2 where catcher is involved,
+// since framing and range don't carry over. Anywhere else: a big penalty.
 function defOf(p,pos){
   if(pos==='DH') return 0;
   if(p.pos===pos) return p.def||0;
+  if(p.alt&&p.alt.includes(pos)){if(p.defAt&&p.defAt[pos]!=null)return p.defAt[pos];
+    if(pos==='C'||p.pos==='C'||p.pos==='DH')return -2;const d=p.def||0;return d>0?d*.7:d}
   return pos==='C'?-12:Math.min(p.def||0,0)-5;
 }
 function buildTeam(i,lu){
@@ -1142,12 +1158,12 @@ function ensureLued(g){
 }
 function lineupEditor(i){
   const lu=LUED[i],hit=teamHitters(i).map(r=>r.p),byId=new Map(hit.map(p=>[sid(p.id),p]));
-  const rows=lu.map((x,r)=>{const p=byId.get(sid(x.id)),off=x.pos!=='DH'&&p.pos!==x.pos;
+  const rows=lu.map((x,r)=>{const p=byId.get(sid(x.id)),alt=x.pos!=='DH'&&p.pos!==x.pos&&(p.alt||[]).includes(x.pos),off=x.pos!=='DH'&&p.pos!==x.pos&&!alt;
     return `<div class="lurow ${LUPICK&&LUPICK[0]===i&&LUPICK[1]===r?'picked':''}"><button class="lunum mono" data-pick="${i},${r}" aria-label="${TR(`第 ${r+1} 棒，點選後再點另一棒互換`,`Batting ${ord(r+1)}: tap, then tap another spot to swap`)}">${r+1}</button><span class="mono lupos">${x.pos}</span>
-      <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${h.pos} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
-      ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:'<span></span>'}</div>`}).join('');
+      <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
+      ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:alt?`<span class="hint">${TR('副守位','secondary')}</span>`:'<span></span>'}</div>`}).join('');
   return `<div class="eyebrow" style="margin-top:14px">${TR('打序與守位','Batting order and positions')}</div><div class="lued">${rows}</div>
-    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到不是自己的守位，守備會變差。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. A player out of position fields worse.')}</p>
+    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場，中職是 150 局），用他在那個位置的真實守備數據；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season; 150+ innings in the CPBL) he fields as his numbers there say; anywhere else, much worse.')}</p>
     <button class="ghost mini" data-lureset="${i}" style="margin-top:6px">${TR('恢復建議打序','Reset to suggested lineup')}</button>`;
 }
 const PICK_DEADLINE={};let pickTick=null;

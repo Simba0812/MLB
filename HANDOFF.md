@@ -2,7 +2,7 @@
 
 給下一個聊天室看的。開新對話時，請它先讀這個檔案，再讀 `README.md` 和 `source/README.md`。
 
-更新日期：2026-10-25
+更新日期：2026-10-25（下午）
 
 ## 專案是什麼
 
@@ -33,15 +33,23 @@
 
 ## 目前狀態
 
-- Git 有兩個 commit，`2a528f6`（全部檔案）和 `0084cb0`（README 更新），**都還沒 push**。使用者用 GitHub Desktop 上傳。
-- 這份 `HANDOFF.md` 還沒 commit。
-- 四個產生的網頁都和原始檔一致，已確認過。
+- 網站：GitHub Pages，從 `main` 根目錄發布，網址是 https://simba0812.github.io/MLB/ （英超版在 `/epl/`）。Firebase 的已授權網域要有 `simba0812.github.io`。
+- GitHub：`simba0812/mlb`。2026-10-25 起 repo 根目錄就是 `mlb-auction-site` 的內容（原本根目錄只有單機版 `index.html`，`source/` 曾被刪掉，已從使用者上傳的檔案還原）。
+- `source/build.py` 原本的檔案遺失，以 Git 歷史版本為底補上「產生 `../mlb-auction-單機版/index.html`」那幾行；四個產生的網頁都和使用者手上的版本逐位元相同。
 - Firebase 專案 `mlbb-e98d2`，設定已填進 `firebase-config.js`。apiKey 是公開識別碼，不是密碼。
 - 使用者還要自己做的事：
   - 在 Firebase 重新發布 `firestore.rules`（如果還是舊規則）
-  - push 到 GitHub
   - 把 `mlb-auction-site` 拖到 Netlify，再用 `mlb-auction-單機版` 另外建一個 Netlify 網站
   - 可以順便刪掉舊資料夾
+
+## 英超版（epl/）
+
+- 2026-10-25 新增，英文介面，玩法只有單人對電腦和同一台輪流玩，沒有線上對戰。說明在 `epl/source/README.md`。
+- 和棒球版一樣：只改 `epl/source/template.html`，改完執行 `python3 epl/source/build.py`。
+- 數據是 2025-26 FPL 的整季數據，從 vaastav/Fantasy-Premier-League 的 GitHub 存檔抓取（雲端環境只連得到 GitHub）。
+- 賽制：單場（淘汰賽，平手就踢延長賽、再踢 PK）、主客場兩回合（看總比分）、三戰兩勝。
+- 每隊 13 人（11 名先發加 2 名替補），各位置人數自己決定，只要能排出合法先發就好（`canComplete`）。有五段戰術，比賽中切換時記錄在 `gm.tac` 的 `{t:分鐘序號, i:隊伍, v:戰術}`，重播時會從同一分鐘開始套用。比賽畫面有 SVG 球場和 xG 走勢圖。
+- 測試：jsdom 跑過三種賽制的完整流程（選秀、交易、排陣容、換人決定、延長賽、PK），重播結果一致；Playwright 截過桌機和手機畫面，沒有出現橫向捲動。還沒在真的手機上測過。
 
 ## 已做好的功能
 
@@ -52,6 +60,7 @@
 - **數據分級**：傳統數據（含 OPS）和 Savant 數據都只分 PR90+ 金框、PR75+ 紅框、PR50 綠框三級。
 - **總評**：按同類球員（打者 / 先發 / 中繼＋終結者）的排名換算成百分位，再套 `OVR_CURVE`。二刀流取兩者較高的再加 4。
 - **守備**：有 OAA/UZR 和捕手框界值，`computeDef` 換算成同一個尺度。任何守位的打者都能放 DH。
+- **多重守位**（2026-10-25）：pool 裡每位打者都有 `poss` 欄位，由 `source/fetch_positions.py` 產生。`poss` 是 `{守位: 出賽場數}`；中職另外有 `pinn`（`{守位: 局數}`），資料來自野球革命，因為中職官網只讓台灣連線。`setAlt` 會把主守位以外、MLB 滿 30 場或中職滿 150 局的守位列進 `p.alt`，作為副守位。資料由 GitHub Actions 的 `fetch-positions.yml` 抓取，改到 `fetch_positions.py` 並推上去就會自動重抓。`openSlotsFor` 會依序放：主守位 → 副守位 → DH → 板凳。副守位的守備值用 `pdef`，也就是那個守位本身的跑分。`computeDef` 會先把它拉回平均：乘上主守位場數，除以（副守位場數 + 60），再用和主守位相同的尺度換算，存進 `p.defAt`。抓不到數據時才退回：正的乘 0.7、負的不變；牽涉捕手或主守位是 DH 的，一律算 -2；沒有 `poss` 時，行為和以前完全相同（已用固定 seed 比對過）。**目前的 pool 還沒有 `poss`，因為雲端環境連不上 MLB 和中職官網，要在 Mac 上執行一次 `fetch_positions.py` 才會生效。**
 - **投手**：
   - 有體力條，前三場的用球數會造成疲勞。
   - 先發輪值休息天數：`restN`。
@@ -93,12 +102,14 @@
 
     python3 source/fetch_stats.py 2027
     python3 source/fetch_cpbl.py 2027
+    python3 source/fetch_positions.py 2027
     python3 source/build.py
 
 ## 使用者偏好
 
 - 用繁體中文溝通，遊戲介面同時有中英文。
-- 使用者自己 commit 和 push（用 GitHub Desktop）。只有在使用者要求時才 commit，而且不要 push。
+- 雲端對話（claude.ai/code）：Claude 改完後 commit 並 push 到指定的 `claude/...` 分支，使用者在 GitHub 合併到 `main`，再用 GitHub Desktop 拉回 Mac。Claude 不直接動 `main`。
+- 本機對話：使用者自己 commit 和 push（用 GitHub Desktop）。
 - 不要動家目錄 `/Users/simba` 那個 Git 專案。
 - 使用者說「先不要改，只是詢問」時，就只回答問題。
 - 計費無法由我控制（使用者曾要求從 cloud session credit 扣款）。

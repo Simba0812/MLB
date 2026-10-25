@@ -5,7 +5,7 @@
 Writes:
   ../index.html        多人版: single-player, same device, and online play (Firebase)
   ../大聯盟盲標對決單機.html  單機版: single-player and same device only; one file, no Firebase, opens by double-click
-  ../../mlb-auction-單機版/index.html  the same 單機版, alone in its own folder for a separate Netlify site
+  ../../mlb-auction-單機版/index.html  the same 單機版, as the second Netlify site (outside the Git project)
   claude-artifact.html the claude.ai version (online play through claude.ai)
 """
 import os
@@ -35,7 +35,6 @@ open(os.path.join(SITE, 'index.html'), 'w', encoding='utf-8').write(
     standalone('<script>window.STANDALONE=true</script>\n<script src="firebase-config.js"></script>'))
 offline = standalone('<script>window.STANDALONE=true;window.OFFLINE=true</script>')
 open(os.path.join(SITE, '大聯盟盲標對決單機.html'), 'w', encoding='utf-8').write(offline)
-# the offline-only site lives next to this folder, as index.html, for its own Netlify site
 OFFLINE_SITE = os.path.join(os.path.dirname(SITE), 'mlb-auction-單機版')
 os.makedirs(OFFLINE_SITE, exist_ok=True)
 open(os.path.join(OFFLINE_SITE, 'index.html'), 'w', encoding='utf-8').write(offline)
