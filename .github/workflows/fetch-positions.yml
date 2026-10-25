@@ -1,0 +1,33 @@
+# 抓多重守位資料（MLB 官方 API、Baseball Savant、中職官網、野球革命），重建網頁後存回同一個分支。
+# 在 GitHub 的 Actions 分頁選這個流程，按「Run workflow」就會執行。
+name: Fetch fielding positions
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: Season
+        default: '2026'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch positions
+        run: python3 source/fetch_positions.py "${{ inputs.year }}"
+      - name: Rebuild pages
+        run: python3 source/build.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add source/pool.json source/pool_cpbl.json source/claude-artifact.html index.html "大聯盟盲標對決單機.html"
+          git diff --cached --quiet || git commit -m "更新多重守位資料（${{ inputs.year }}）"
+          git push
