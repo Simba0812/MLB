@@ -1,0 +1,581 @@
+<title>動漫大亂鬥</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: shared with the baseball version (source/template.html): panels, chalk numerals, two team colors.
+   Single dark look by choice; the brawl-only rules and the night-purple palette are at the end. */
+:root{
+  --board:#0d3326; --panel:#14463a; --panel2:#1b5546; --line:#2c6b5a;
+  --chalk:#f1ede0; --dim:#a9c2b6; --amber:#f2b134; --sky:#7cc7ea; --red:#e0664f; --good:#7fd38a;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--board);color:var(--chalk);font-family:var(--body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;
+  background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 2px,transparent 2px 46px)}
+.wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+/* draft screen: everything, bid box included, should fit one screen */
+.wrap:has(.draft){gap:10px}
+.wrap:has(.draft) header.top{padding-bottom:6px}
+.wrap:has(.draft) h1{font-size:clamp(26px,3vw,34px)}
+.wrap:has(.draft) h1 small{font-size:13px;margin-top:2px}
+.draft .panel{padding:12px 14px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--chalk);padding-bottom:10px}
+h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,58px);line-height:.95;margin:0;letter-spacing:.01em;text-transform:uppercase}
+h1 small{display:block;font-family:var(--body);font-size:15px;font-weight:500;color:var(--dim);letter-spacing:0;text-transform:none;margin-top:6px}
+h2{font-family:var(--display);font-weight:800;font-size:28px;margin:0;letter-spacing:.02em;text-transform:uppercase;text-wrap:balance}
+h3{margin:0;font-size:16px;font-weight:700}
+.src{font-size:12px;color:var(--dim);text-align:right}
+.hdr-r{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.src a{color:var(--dim)}
+.panel{background:var(--panel);border:2px solid var(--line);border-radius:4px;padding:18px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--dim)}
+input,select{font:inherit;color:var(--chalk);background:var(--board);border:2px solid var(--line);border-radius:3px;padding:8px 10px;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+button{font:inherit;font-weight:700;cursor:pointer;border:2px solid var(--chalk);background:transparent;color:var(--chalk);padding:9px 16px;border-radius:3px}
+button.solid{background:var(--chalk);color:var(--board)}
+button.a{border-color:var(--amber);color:var(--amber)} button.a.solid{background:var(--amber);color:#1d1606}
+button.b{border-color:var(--sky);color:var(--sky)} button.b.solid{background:var(--sky);color:#06202c}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ta{color:var(--amber)} .tb{color:var(--sky)}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hint{font-size:13px;color:var(--dim);margin:0}
+
+/* draft */
+.draft{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.8fr) minmax(0,.8fr);gap:12px;align-items:start}
+@media (max-width:960px){.draft{grid-template-columns:1fr}.draft .lotcol{order:-1}}
+.teamcard{border-top:6px solid var(--amber)} .teamcard.B{border-top-color:var(--sky)}
+.teamcard .money{font-family:var(--display);font-weight:900;font-size:clamp(30px,2.6vw,40px);line-height:1}
+.slotpick{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--chalk)}
+.slotpick select{padding:4px 8px}
+.slots{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;font-size:12.5px;line-height:1.4;margin-top:8px}
+.slots .k{font-family:var(--mono);color:var(--dim)} .slots .v{min-width:0;overflow-wrap:anywhere} .slots .p{font-family:var(--mono);color:var(--dim);text-align:right}
+.slots .empty{color:#6f9686}
+.need{font-size:12px;color:var(--dim);margin-top:8px}
+.lot{position:relative;perspective:1200px}
+.card{background:var(--chalk);color:#10261d;border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;transform-origin:50% 50%}
+.card.flip{animation:flip .6s ease}
+@keyframes flip{from{transform:rotateY(90deg);opacity:.2}to{transform:rotateY(0);opacity:1}}
+@media (prefers-reduced-motion:reduce){.card.flip{animation:none}}
+.card .lotno{font-family:var(--mono);font-size:12px;color:#4d6a5d}
+.card .name{font-family:var(--display);font-weight:900;font-size:clamp(26px,3vw,38px);line-height:.95;text-transform:uppercase}
+.card .zh{font-size:17px;font-weight:900}
+.card .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px}
+.pos{display:inline-block;background:#10261d;color:var(--chalk);font-family:var(--mono);font-weight:600;padding:2px 8px;border-radius:2px}
+.ovr{margin-left:auto;font-family:var(--display);font-weight:900;font-size:34px;line-height:1;text-align:right}
+.ovr span{display:block;font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.1em;color:#4d6a5d}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:4px}
+.stat{border:1.5px solid #c9c2a8;border-radius:3px;padding:3px 6px;line-height:1.3}
+.stat b{display:block;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
+.stat i{display:block;font-style:normal;font-size:10.5px;line-height:1.2;color:#4d6a5d;overflow-wrap:anywhere}
+.stat.sv{border-color:#d0571f}
+.stat.sv i{color:#a8441a}
+.stat.wide{grid-column:span 2}
+.stat em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;color:#4d6a5d}
+.stat.t90{border:3px solid #c99a1e;background:#fbefc8}
+.stat.t75{border:3px solid #c8372d}
+.stat.t50{border:3px solid #2f8f4e}
+.legend{display:inline-flex;gap:8px;flex-wrap:wrap;margin-left:8px;letter-spacing:0;text-transform:none;font-weight:500}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;border:3px solid}
+.spopt{flex-direction:row;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line);cursor:pointer;color:var(--chalk);font-size:14px}
+.spopt .spn{flex:1;min-width:8em;font-weight:700}
+.spopt:has(input:disabled){opacity:.45;cursor:not-allowed}
+.statlabel{font-size:10.5px;letter-spacing:.1em;margin-top:2px;font-weight:700;color:#4d6a5d;text-transform:uppercase}
+.facedown{background:repeating-linear-gradient(45deg,#1b5546 0 12px,#174c3e 12px 24px);border:2px dashed var(--line);border-radius:6px;min-height:340px;display:grid;place-items:center;text-align:center;padding:20px}
+.facedown .q{font-family:var(--display);font-size:120px;font-weight:900;line-height:1;color:var(--line)}
+/* the bid box stays on screen even when a long card pushes it down */
+.bidbox{display:flex;flex-direction:column;gap:8px;margin-top:8px;position:sticky;bottom:0;z-index:5;box-shadow:0 -6px 16px rgba(0,0,0,.35)}
+.price{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.price .big{font-family:var(--display);font-weight:900;font-size:40px;line-height:1}
+.turn{font-weight:700}
+.log{max-height:180px;overflow:auto;font-size:13px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
+.log div b{color:var(--chalk);font-weight:500}
+
+/* game */
+.linescore{overflow-x:auto}
+.linescore table{border-collapse:collapse;font-family:var(--mono);font-variant-numeric:tabular-nums;min-width:100%}
+.linescore th,.linescore td{padding:6px 8px;text-align:center;border:1px solid var(--line);min-width:34px}
+.linescore td.tn{text-align:left;font-family:var(--body);font-weight:700;white-space:nowrap}
+.linescore th{color:var(--dim);font-weight:400;font-size:12px}
+.linescore td.tot{font-weight:600;background:var(--panel2)}
+.pbp{background:var(--board);border:2px solid var(--line);border-radius:4px;padding:14px;max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.pbp .half{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.03em;margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}
+.pbp .half:first-child{margin-top:0;border-top:0}
+.pbp .pa{padding-left:12px;border-left:3px solid transparent}
+.pbp .pa.run{border-left-color:var(--good)}
+.pbp .pa.hr{border-left-color:var(--red);font-weight:700}
+.pbp .note{color:var(--dim);font-size:13px;padding-left:12px}
+.pbp .sc{font-family:var(--mono);font-size:12px;color:var(--good);margin-left:6px}
+.reveal{text-align:center;padding:28px 18px;border:3px solid var(--chalk);border-radius:4px;background:var(--panel2)}
+.reveal .w{font-family:var(--display);font-weight:900;font-size:clamp(40px,8vw,84px);line-height:1;text-transform:uppercase}
+.reveal.flash{animation:pop .7s ease}
+@keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.reveal.flash{animation:none}}
+.box{overflow-x:auto}
+.box table{border-collapse:collapse;width:100%;font-size:13px}
+.box th,.box td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.box th:first-child,.box td:first-child{text-align:left;font-family:var(--body)}
+.box th{color:var(--dim);font-weight:400}
+.lineup{display:grid;grid-template-columns:auto auto 1fr auto;gap:2px 10px;font-size:14px}
+.lineup .k{font-family:var(--mono);color:var(--dim)}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:3px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 12px;font-weight:500;color:var(--dim)}
+.seg button[aria-pressed="true"]{background:var(--chalk);color:var(--board);font-weight:700}
+.panel.soon{border-style:dashed;opacity:.75}
+.lobbybar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.lobbybar #lobbyask{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-weight:700}
+.lobbybar #lobbyask[hidden]{display:none}
+.lobbybar button{padding:6px 12px}
+.netbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:13px;background:var(--panel);border:2px solid var(--line);border-radius:3px;padding:6px 12px}
+.netbar .dot{width:9px;height:9px;border-radius:50%;background:var(--good)}
+.netbar .warn{color:var(--amber)}
+.netbar .sync{color:var(--amber);font-family:var(--mono);font-size:12px}
+.netbar .sync.ok{color:var(--dim)}
+.follow{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--panel2);border-top:3px solid var(--amber);
+  padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));font-weight:700}
+.waiting{color:var(--dim);font-weight:500}
+.sta{display:inline-block;width:64px;height:8px;border-radius:4px;background:var(--board);border:1px solid var(--line);overflow:hidden;vertical-align:middle}
+.sta i{display:block;height:100%}
+.stan{font-size:12px;color:var(--dim);min-width:3.2em}
+.penlist{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;align-items:center;font-size:13px}
+.lued{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.lurow{display:grid;grid-template-columns:2.4em 2.4em minmax(0,1fr) auto;gap:6px;align-items:center;border-radius:3px}
+.lurow.picked{background:var(--panel2);outline:2px solid var(--amber)}
+.lunum{padding:5px 0;border-color:var(--line);font-weight:700}
+.lurow.picked .lunum{background:var(--amber);color:#1d1606;border-color:var(--amber)}
+.lurow select{padding:5px 6px;font-size:13px}
+.lupos{color:var(--amber)}
+.warn{font-size:12px;color:var(--red);white-space:nowrap}
+button.mini{padding:3px 8px;font-size:13px}
+.gstat{display:flex;gap:10px 22px;flex-wrap:wrap;margin-top:10px;font-size:13px}
+.gp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.decide{border-color:var(--amber)}
+.optlist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.opt{display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;text-align:left;border-color:var(--line);font-weight:700}
+.opt:hover{border-color:var(--amber)}
+.opt .hint{font-weight:400}
+.sugg{font-size:11px;font-weight:700;background:var(--amber);color:#1d1606;padding:1px 6px;border-radius:2px}
+.autolbl{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+.series{font-family:var(--mono);color:var(--dim);font-size:13px}
+/* ---------- same device, touch screen: roster | bid | card | bid | roster ---------- */
+.draft.duo{grid-template-columns:minmax(0,.9fr) minmax(0,.8fr) minmax(0,1.6fr) minmax(0,.8fr) minmax(0,.9fr);gap:8px;align-items:start}
+.draft.duo .lotcol{order:0}
+.draft.duo .duoside{position:sticky;top:8px;align-self:start;margin-top:40px}
+.draft.duo .duobid{position:static;box-shadow:none;margin-top:0;padding:10px;gap:6px}
+.draft.duo .duobid .price .big{font-size:32px}
+.draft.duo .duobid.active{border-color:var(--amber)}
+.draft.duo .duobid.B.active{border-color:var(--sky)}
+.draft.duo .duobid:not(.active){opacity:.7}
+.draft.duo .duobid .bidrow{flex-wrap:wrap;gap:6px}
+.draft.duo .duobid .bidrow input{width:100%!important}
+.draft.duo .duobid .bidrow button{flex:1 1 40%;padding:8px 4px}
+.draft.duo .duobid .hint{font-size:11.5px}
+.draft.duo .teamcard{padding:8px 10px}
+.draft.duo .teamcard h2{font-size:17px}
+.draft.duo .teamcard .money{font-size:28px}
+.draft.duo .slots{font-size:11px;gap:0 5px}
+.draft.duo .card{padding:8px 10px}
+.draft.duo .card .stats{grid-template-columns:repeat(auto-fill,minmax(62px,1fr))}
+/* phone held sideways: little height, so the header shrinks and the bid area tightens */
+@media (max-height:520px){
+  body:has(.draft.duo){padding-block:6px 16px}
+  .wrap:has(.draft.duo){gap:6px}
+  .wrap:has(.draft.duo) header.top{padding-bottom:2px;border-bottom-width:2px}
+  .wrap:has(.draft.duo) h1{font-size:18px}
+  .wrap:has(.draft.duo) h1 small,.wrap:has(.draft.duo) .src{display:none}
+  .wrap:has(.draft.duo) .lobbybar button{padding:2px 8px;font-size:12px}
+  .draft.duo .duoside{margin-top:0;top:4px}
+  .draft.duo .duobid{padding:7px 8px;gap:3px}
+  .draft.duo .duobid .price .big{font-size:24px}
+  .draft.duo .duobid .bidrow+.hint{display:none}
+  .draft.duo .duobid .bidrow{gap:4px}
+  .draft.duo .duobid .bidrow input{padding:4px 6px}
+  .draft.duo .duobid .bidrow button{padding:5px 4px;font-size:13px}
+  .draft.duo .teamcard h2{font-size:15px}
+  .draft.duo .teamcard .money{font-size:22px}
+}
+/* ---------- phones ---------- */
+.mobonly{display:none}
+@media (pointer:coarse){input,select{font-size:16px}}   /* iOS zooms into smaller inputs */
+@media (max-width:700px){
+  body{padding-block:10px 24px}
+  .wrap{gap:12px}
+  header.top{gap:6px 10px;align-items:center;padding-bottom:6px}
+  h1{font-size:24px}
+  h1 small{font-size:11.5px;margin-top:3px}
+  .src{font-size:10.5px}
+  .wrap:has(.draft) .src,.wrap:has(.pbp) .src,.wrap:has(.lued) .src{display:none}
+  .lobbybar button{padding:4px 10px;font-size:13px}
+  .panel{padding:12px}
+  .mobonly{display:block}
+  .budgets{font-size:13px;font-weight:700}
+  .card{padding:10px 12px}
+  .stats{grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+  .stat b{font-size:13px}
+  .stat i{font-size:10px}
+  .bidbox{padding:10px 12px;gap:6px}
+  .bidbox .row{flex-wrap:nowrap;gap:5px}
+  .bidbox input{width:58px!important;padding:6px;min-width:0}
+  .bidbox button{padding:7px 8px;font-size:14px}
+  .price{gap:6px}
+  .price .big{font-size:30px}
+  .turn{font-size:14px}
+  .bidbox .hint{font-size:11.5px}
+  .linescore th,.linescore td{padding:4px 2px;min-width:19px;font-size:12px}
+  .linescore td.tn{max-width:62px;overflow:hidden;text-overflow:ellipsis}
+  .box{padding:10px 8px}
+  .box th,.box td{padding:4px 2px;font-size:11px;letter-spacing:-.02em}
+  .box th:first-child,.box td:first-child{max-width:84px;overflow:hidden;text-overflow:ellipsis}
+  .opt{padding:8px 10px}
+  .reveal{padding:18px 12px}
+}
+/* ---------- brawl ---------- */
+:root{--board:#17122a;--panel:#221a3b;--panel2:#2c2250;--line:#45386e;--dim:#b4a9d6;--good:#7fe0a0}
+body{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.02) 0 2px,transparent 2px 40px)}
+.card{background:#f6f1ff;color:#1e1636}
+.card .lotno,.ovr span,.stat i,.stat em,.statlabel{color:#5b4f80}
+.pos{background:#1e1636}
+.bars{display:grid;grid-template-columns:4.6em 1fr 2.6em;gap:4px 8px;align-items:center;font-size:13px;margin-top:4px}
+.bars .bar{height:10px;border-radius:5px;background:#e2dbf3;overflow:hidden}
+.bars .bar i{display:block;height:100%;background:#6b4fd8}
+.bars .bar i.hi{background:#d8432e}
+.bars .n{font-family:var(--mono);text-align:right}
+.special{margin-top:8px;padding:8px 10px;border:2px solid #6b4fd8;border-radius:4px;font-weight:700}
+.special small{display:block;font-weight:500;color:#5b4f80}
+.order{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.orow{display:grid;grid-template-columns:4.4em minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border:2px solid var(--line);border-radius:4px;background:var(--board);cursor:pointer;text-align:left;font-weight:500}
+.orow.picked{border-color:var(--amber);background:var(--panel2)}
+.orow .rk{font-family:var(--mono);color:var(--amber);font-size:13px}
+.arena{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:14px;align-items:center;margin-top:14px;background:var(--board);border:2px solid var(--line);border-radius:4px;padding:14px}
+.fighter .fn{font-family:var(--display);font-weight:900;font-size:clamp(22px,3.4vw,36px);line-height:1;text-transform:uppercase}
+.fighter .fs{font-size:12.5px;color:var(--dim);margin-top:2px}
+.fighter.r{text-align:right}
+.vs{font-family:var(--display);font-weight:900;font-size:32px;color:var(--dim)}
+.hp{height:16px;border-radius:3px;background:#0e0a1a;border:1px solid var(--line);overflow:hidden;margin-top:8px;display:flex}
+.fighter.r .hp{flex-direction:row-reverse}
+.hp i{display:block;height:100%;transition:width .35s ease,background .35s}
+.gauge{height:6px;border-radius:3px;background:#0e0a1a;overflow:hidden;margin-top:4px;display:flex}
+.fighter.r .gauge{flex-direction:row-reverse}
+.gauge i{display:block;height:100%;background:var(--sky);transition:width .35s}
+.hpn{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:2px}
+.fighter.hit{animation:shake .35s}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+.fighter.ko .fn{text-decoration:line-through;opacity:.5}
+@media (prefers-reduced-motion:reduce){.fighter.hit{animation:none}.hp i,.gauge i{transition:none}}
+.roster{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.rrow{display:grid;grid-template-columns:3.6em minmax(0,1fr) 64px;gap:8px;align-items:center;font-size:13.5px}
+.rrow .rk{font-family:var(--mono);color:var(--dim);font-size:12px}
+.rrow.out{opacity:.4;text-decoration:line-through}
+.rrow.now{font-weight:700}
+.rrow .mini{height:7px;border-radius:3px;background:#0e0a1a;overflow:hidden}
+.rrow .mini i{display:block;height:100%}
+.pbp .ev{padding-left:12px;border-left:3px solid transparent}
+.pbp .ev.sp{border-left-color:var(--amber);font-weight:700}
+.pbp .ev.ko{border-left-color:var(--red);font-weight:700}
+.pbp .ev.crit{border-left-color:var(--sky)}
+.battlegrid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr) minmax(0,.8fr);gap:14px;align-items:start}
+@media (max-width:900px){.battlegrid{grid-template-columns:1fr 1fr}.battlegrid .pbp{grid-column:1/-1;order:3;max-height:48vh}}
+@media (max-width:700px){.arena{padding:10px;gap:8px}.vs{font-size:22px}.rrow{grid-template-columns:2.6em minmax(0,1fr) 34px;gap:6px;font-size:12.5px}.rrow>span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script>
+const ROSTER=/*ROSTER*/[];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let rnd=Math.random;
+const pick=a=>a[Math.floor(rnd()*a.length)];
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+/* ---------- language: 中文 / English, remembered on this device ---------- */
+let LANG=(()=>{try{const v=localStorage.getItem('animeLang');if(v==='en'||v==='zh')return v}catch(e){}return /^zh/i.test(navigator.language||'')?'zh':'en'})();
+const TR=(zh,en)=>LANG==='en'?en:zh;
+const nm=c=>LANG==='en'?c.en:c.zh;
+const ser=c=>LANG==='en'?c.sen:c.szh;
+const spn=c=>LANG==='en'?c.spen:c.spzh;
+const BYID=new Map(ROSTER.map(c=>[c.id,c]));
+const SLOTS=5,LOTS=10;
+const RANKS=()=>TR(['先鋒','次鋒','中堅','副將','大將'],['Vanguard','Second','Center','Vice-captain','Captain']);
+const STYLE=()=>TR({melee:'體術',sword:'劍術',energy:'氣功',magic:'術式'},{melee:'Fists',sword:'Blade',energy:'Energy',magic:'Arts'});
+
+/* ---------- the duel: two fighters, turn order by speed, a special move when the gauge fills ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const mkF=c=>({c,hp:c.hp,g:0,rd:0});
+const MOVES={
+  melee:{zh:['一記重拳轟向{d}','連續踢擊逼近{d}','一記頭槌撞上{d}','掃腿攻擊{d}'],en:['slams a heavy punch into {d}','unleashes a flurry of kicks on {d}','headbutts {d}','sweeps at {d}\'s legs']},
+  sword:{zh:['一刀斬向{d}','快速突刺{d}','橫劈{d}','拔刀斬向{d}'],en:['slashes at {d}','thrusts at {d}','cuts across {d}','draws and strikes at {d}']},
+  energy:{zh:['發出氣功彈射向{d}','連發能量波轟擊{d}','衝上前一掌打在{d}身上','聚氣後一擊打向{d}'],en:['fires a ki blast at {d}','rains energy waves on {d}','rushes in and palms {d}','charges up and strikes {d}']},
+  magic:{zh:['發動術式攻擊{d}','操縱力量壓制{d}','以奇招突襲{d}','施展能力纏住{d}'],en:['casts a technique at {d}','overwhelms {d} with power','catches {d} with a trick','binds {d} with an ability']}};
+const tpl=(s,o)=>s.replace(/\{(\w+)\}/g,(_,k)=>o[k]);
+// one action by A on D; returns the event or null. push(text,cls,extra) records it.
+function act(A,D,push){
+  A.g=Math.min(100,A.g+22+A.c.spd*.08);
+  const red=110/(110+D.c.df);
+  if(A.g>=100){
+    A.g=0;
+    const dodge=D.c.spd>A.c.spd+15&&rnd()<.15;
+    if(dodge){push(TR(`🌀 ${nm(A.c)} 使出必殺技「${spn(A.c)}」！${nm(D.c)} 千鈞一髮地閃開了！`,`🌀 ${nm(A.c)} unleashes ${spn(A.c)}! ${nm(D.c)} dodges at the last instant!`),'sp');return}
+    const dmg=Math.round(A.c.atk*.32*A.c.sp*(110/(110+D.c.df*.6))*(.9+.2*rnd()));
+    D.hp=Math.max(0,D.hp-dmg);
+    push(TR(`💥 ${nm(A.c)} 使出必殺技「${spn(A.c)}」！${nm(D.c)} 受到 ${dmg} 點傷害`,`💥 ${nm(A.c)} unleashes ${spn(A.c)}! ${nm(D.c)} takes ${dmg}`),'sp',{hit:D});
+    return;
+  }
+  const hitP=clamp(.86+(A.c.spd-D.c.spd)/300,.6,.97);
+  const line=tpl(pick(MOVES[A.c.style][LANG]),{d:nm(D.c)});
+  if(rnd()>hitP){push(TR(`${nm(A.c)} ${line}，被閃開了`,`${nm(A.c)} ${line} — dodged`),'');return}
+  const crit=rnd()<.1;
+  const dmg=Math.round(A.c.atk*.32*red*(crit?1.5:1)*(.85+.3*rnd()));
+  D.hp=Math.max(0,D.hp-dmg);
+  push(TR(`${nm(A.c)} ${line}${crit?'，會心一擊！':''}（${dmg}）`,`${nm(A.c)} ${line}${crit?' — critical!':''} (${dmg})`),crit?'crit':'',{hit:D});
+}
+// fight until one falls; the faster fighter acts more often
+function duel(a,b,push){
+  for(let t=0;t<400&&a.hp>0&&b.hp>0;t++){
+    while(a.rd<100&&b.rd<100){a.rd+=a.c.spd*(.85+.3*rnd());b.rd+=b.c.spd*(.85+.3*rnd())}
+    const [A,D]=a.rd>=b.rd?[a,b]:[b,a];A.rd-=100;
+    act(A,D,push);
+  }
+  return a.hp>0?a:b;
+}
+// rating: each fighter's win rate in one-on-one duels against everyone else, with a fixed seed so it never changes
+function rate(){
+  const old=rnd;rnd=mulberry32(20261025);const w=new Map(ROSTER.map(c=>[c.id,0])),N=16,nop=()=>{};
+  for(let i=0;i<ROSTER.length;i++)for(let j=i+1;j<ROSTER.length;j++)for(let k=0;k<N;k++){
+    const win=duel(mkF(ROSTER[i]),mkF(ROSTER[j]),nop).c;w.set(win.id,w.get(win.id)+1)}
+  rnd=old;
+  ROSTER.forEach(c=>{c.wr=w.get(c.id)/((ROSTER.length-1)*N);c.ovr=Math.round(45+54*c.wr)});
+}
+
+/* ---------- state ---------- */
+const S={screen:'home',teams:[{name:'',budget:100,roster:[]},{name:'',budget:100,roster:[]}],budget:100,deck:[],lotNo:0,lot:null,log:[],ai:null,speed:700};
+const isMine=i=>S.ai?i!==S.ai.seat:true;
+const tname=i=>esc(S.teams[i].name);
+const full=i=>S.teams[i].roster.length>=SLOTS;
+const header=()=>`<header class="top"><h1>${TR('動漫大亂鬥','Anime Brawl Auction')}<small>${TR('盲標選角 · 五人車輪戰','Blind auction · five-on-five elimination')}</small></h1>
+  <div class="hdr-r"><div class="src">${TR('角色數值為依原作自訂，僅供娛樂','Stats are fan-made estimates, just for fun')}</div><button class="ghost mini" id="langbtn">${TR('English','中文')}</button></div></header>${lobbyBar()}`;
+function lobbyBar(){
+  if(!['draft','order','battle'].includes(S.screen))return '';
+  return `<div class="lobbybar"><button class="ghost" id="tolobby">← ${TR('返回大廳','Back to lobby')}</button>
+    <span id="lobbyask" hidden><span>${TR('確定要放棄這場？隊伍會清空。','Abandon this game? Both teams will be cleared.')}</span>
+    <button class="solid" id="lobbyyes">${TR('確定返回','Yes, go back')}</button><button class="ghost" id="lobbyno">${TR('繼續玩','Keep playing')}</button></span></div>`;
+}
+document.addEventListener('click',e=>{
+  const id=e.target&&e.target.id;
+  if(id==='langbtn'){LANG=LANG==='en'?'zh':'en';try{localStorage.setItem('animeLang',LANG)}catch(x){}document.documentElement.lang=LANG==='en'?'en':'zh-Hant';
+    // the battle is replayed from its seed in the new language and picks up where it was
+    if(S.screen==='battle'){const B=S.battle,pos=B.pos,done=B.done;clearTimeout(timer);B.res=simBattle(B.seed);renderBattle();B.skip=true;while(B.pos<pos)emit();B.skip=false;draw(B.res.ev[Math.max(0,B.pos-1)]);if(done)finish();else play()}else render()}
+  else if(id==='tolobby'){$('#lobbyask').hidden=false;$('#tolobby').hidden=true}
+  else if(id==='lobbyno'){$('#lobbyask').hidden=true;$('#tolobby').hidden=false}
+  else if(id==='lobbyyes'){clearTimeout(timer);clearTimeout(aiTimer);S.lot=null;S.screen='home';render()}
+});
+
+/* ---------- home and setup ---------- */
+const NAME_ZH=['烈焰','天狼','雷霆','夜叉','蒼龍','鳳凰','修羅','暴風','流星','黑曜'],NAME_ZH2=['戰團','聯盟','軍團','小隊','幫'];
+const NAME_EN=['Crimson','Thunder','Shadow','Azure','Phoenix','Storm','Iron','Silver','Night','Blazing'],NAME_EN2=['Legion','Squad','Clan','Order','Brigade'];
+const randomName=()=>LANG==='en'?pick(NAME_EN)+' '+pick(NAME_EN2):pick(NAME_ZH)+pick(NAME_ZH2);
+function renderHome(){
+  $('#app').innerHTML=`${header()}<div class="grid2">
+   <section class="panel"><h2>${TR('單人對戰','Single player')}</h2><p class="hint" style="margin-top:6px">${TR('和電腦搶角色，再五人車輪戰。','Bid against the computer, then fight it out five against five.')}</p><button class="solid" id="solo" style="margin-top:14px">${TR('開始','Start')}</button></section>
+   <section class="panel"><h2>${TR('同一台輪流玩','Same device')}</h2><p class="hint" style="margin-top:6px">${TR('兩個人用同一台電腦或手機輪流出價。','Two people share one screen and take turns.')}</p><button class="solid" id="local" style="margin-top:14px">${TR('開始','Start')}</button></section></div>
+   <section class="panel"><h2>${TR('規則','Rules')}</h2><p class="hint" style="margin-top:6px">${TR(`從 ${ROSTER.length} 位角色中隨機抽出 10 位，一次揭曉一位。兩隊各 $${S.budget}，輪流出價；不想加價就放棄，對手以目前價格得標，第一口就放棄的話對手免費得到他。每支籤一定有人拿，沒有流標。一隊湊滿 5 人後，剩下的角色自動免費歸另一隊。選完排好出場順序（先鋒到大將），一對一單挑，贏的人帶著剩下的體力繼續打下一位，先全滅的一隊輸。`,
+     `10 of ${ROSTER.length} characters are drawn at random and revealed one at a time. Each team has $${S.budget}; take turns bidding, or pass and your opponent gets the character at the current price (free, if nobody has bid). Every character goes to someone. Once a team has 5, the rest go free to the other. Then set your order, Vanguard to Captain, and fight one on one: the winner stays on with the health he has left, and the first team wiped out loses.`)}</p></section>`;
+  $('#solo').onclick=()=>{S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.screen='setup';render()};
+  $('#local').onclick=()=>{S.ai=null;S.screen='setup';render()};
+}
+const AI_LV={easy:{zh:'簡單',en:'Easy',scale:.8,noise:.4},normal:{zh:'普通',en:'Normal',scale:1,noise:.2},hard:{zh:'困難',en:'Hard',scale:1.15,noise:.08}};
+function renderSetup(){
+  $('#app').innerHTML=`${header()}
+  ${S.ai?`<section class="panel"><div class="row"><span class="eyebrow">${TR('電腦難度','Computer level')}</span><div class="seg" role="group">${Object.entries(AI_LV).map(([k,v])=>`<button data-lv="${k}" aria-pressed="${S.ai.level===k}">${TR(v.zh,v.en)}</button>`).join('')}</div></div></section>`:''}
+  <div class="grid2">${[0,1].map(i=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${S.ai&&S.ai.seat===i?TR('電腦','Computer'):S.ai?TR('你','You'):TR('玩家 ','Player ')+(i?'B':'A')}</div>
+    <label for="tn${i}" style="margin-top:10px">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:4px"><input id="tn${i}" maxlength="18" style="flex:1" value="${esc(S.teams[i].name)}"><button type="button" class="ghost" data-rn="${i}">🎲 ${TR('隨機','Random')}</button></div></section>`).join('')}</div>
+  <section class="panel"><div class="row"><label style="width:160px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="10" max="1000" value="${S.budget}"></label></div>
+   <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始抽籤','Start the draw')}</button><span class="hint" id="err"></span></div></section>`;
+  const keep=()=>[0,1].forEach(i=>S.teams[i].name=$('#tn'+i).value);
+  document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{keep();S.ai.level=b.dataset.lv;render()});
+  document.querySelectorAll('[data-rn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rn;let n;do{n=randomName()}while(n===$('#tn'+(1-i)).value);$('#tn'+i).value=n});
+  $('#go').onclick=()=>{
+    const a=$('#tn0').value.trim(),b=$('#tn1').value.trim();
+    if(!a||!b){$('#err').textContent=TR('請替兩隊取好隊名。','Name both teams.');return}
+    if(a===b){$('#err').textContent=TR('兩隊隊名不能相同。','The two teams need different names.');return}
+    S.budget=clamp(parseInt($('#bud').value)||100,10,1000);
+    S.teams.forEach((t,i)=>{t.name=i?b:a;t.budget=S.budget;t.roster=[];t.order=null});
+    const d=ROSTER.slice();for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
+    S.deck=d.slice(0,LOTS);S.lotNo=0;S.log=[];S.screen='draft';nextLot();
+  };
+}
+
+/* ---------- draft ---------- */
+let aiTimer=null;
+function nextLot(){
+  if(S.lotNo>=LOTS){S.lot=null;S.screen='order';return render()}
+  const c=S.deck[S.lotNo++];
+  // a full team can't take more: the rest go free to the other side
+  for(const i of [0,1])if(full(i)){const o=1-i;S.teams[o].roster.push({c,price:0});S.log.unshift(TR(`<b>${esc(nm(c))}</b> 自動免費歸 <b class="${o?'tb':'ta'}">${tname(o)}</b>（對手已滿 5 人）`,`<b>${esc(nm(c))}</b> goes free to <b class="${o?'tb':'ta'}">${tname(o)}</b> (the other team is full)`));return nextLot()}
+  S.lot={c,price:0,high:null,turn:(S.lotNo-1)%2};render();
+}
+function bid(v){const L=S.lot,i=L.turn,t=S.teams[i];if(!(v>L.price&&v<=t.budget))return;
+  L.price=v;L.high=i;L.turn=1-i;S.log.unshift(`<b class="${i?'tb':'ta'}">${tname(i)}</b> ${TR('出價','bids')} $${v}`);
+  if(S.teams[1-i].budget<=v){return award(i)}   // the other side can't go higher
+  render()}
+function pass(){const L=S.lot,i=L.turn;S.log.unshift(`<b class="${i?'tb':'ta'}">${tname(i)}</b> ${TR('放棄','passes')}`);award(1-i)}
+function award(w){const L=S.lot,t=S.teams[w];t.budget-=L.price;t.roster.push({c:L.c,price:L.price});
+  S.log.unshift(TR(`⚔️ <b>${esc(nm(L.c))}</b> 由 <b class="${w?'tb':'ta'}">${tname(w)}</b> 以 $${L.price} 得標`,`⚔️ <b>${esc(nm(L.c))}</b> joins <b class="${w?'tb':'ta'}">${tname(w)}</b> for $${L.price}`));
+  S.lot=null;nextLot()}
+function aiAct(){
+  const L=S.lot;if(!S.ai||S.screen!=='draft'||!L||L.turn!==S.ai.seat)return;
+  const i=S.ai.seat,t=S.teams[i],lv=AI_LV[S.ai.level],need=SLOTS-t.roster.length,left=LOTS-S.lotNo+1;
+  if(L.aiv==null){
+    const q=clamp((L.c.ovr-45)/54,0,1);
+    let v=S.budget*.55*q*q;                              // the very best is worth over half the budget
+    v=Math.min(v,t.budget/Math.max(1,need)*2.2);        // keep money for the spots still open
+    if(need>=left)v=Math.max(v,1);                       // it has to take every remaining character anyway
+    L.aiv=Math.floor(v*lv.scale*(1+(Math.random()*2-1)*lv.noise));
+  }
+  const cap=Math.min(L.aiv,t.budget);
+  if(L.price+1>cap)return pass();
+  bid(L.price+(L.price===0&&cap>8?Math.max(1,Math.round(cap*.4)):Math.min(cap-L.price,cap-L.price>10?3:1)));
+}
+function scheduleAI(){clearTimeout(aiTimer);if(S.ai&&S.screen==='draft'&&S.lot&&S.lot.turn===S.ai.seat)aiTimer=setTimeout(aiAct,S.aiFast?0:400+Math.random()*300)}
+const bar=(v,max,hi)=>`<span class="bar"><i class="${hi?'hi':''}" style="width:${Math.round(v/max*100)}%"></i></span>`;
+let lastFlip=-1;
+function charCard(c,lab){
+  const flip=S.lotNo!==lastFlip;lastFlip=S.lotNo;   // animate only when a new character is revealed
+  return `<div class="card ${flip?'flip':''}"><div class="row" style="align-items:flex-start"><div style="min-width:0;display:flex;flex-direction:column;gap:4px">
+    <div class="lotno">${lab}</div><div class="name">${esc(nm(c))}</div><div class="zh" style="font-weight:500;font-size:14px">${esc(LANG==='en'?c.zh:c.en)}</div></div>
+    <div class="ovr">${c.ovr}<span>${TR('綜合評價','RATING')}</span></div></div>
+   <div class="meta"><span class="pos">${STYLE()[c.style]}</span><span>${esc(ser(c))}</span><span>· ${TR(`單挑勝率 ${Math.round(c.wr*100)}%`,`1-on-1 win rate ${Math.round(c.wr*100)}%`)}</span></div>
+   <div class="bars"><span>${TR('體力','Health')}</span>${bar(c.hp,200,c.hp>=180)}<span class="n">${c.hp}</span>
+    <span>${TR('力量','Power')}</span>${bar(c.atk,100,c.atk>=92)}<span class="n">${c.atk}</span>
+    <span>${TR('防禦','Defense')}</span>${bar(c.df,100,c.df>=85)}<span class="n">${c.df}</span>
+    <span>${TR('速度','Speed')}</span>${bar(c.spd,100,c.spd>=92)}<span class="n">${c.spd}</span></div>
+   <div class="special">${TR('必殺技','Special')}：${esc(spn(c))}<small>${TR(`威力 ×${c.sp.toFixed(1)}，集滿能量時發動`,`power ×${c.sp.toFixed(1)}, fires when the gauge is full`)}</small></div></div>`;
+}
+function teamPanel(i){
+  const t=S.teams[i];
+  return `<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${S.ai?(S.ai.seat===i?TR('電腦','Computer'):TR('你','You')):TR('玩家 ','Player ')+(i?'B':'A')}</div>
+   <h2 style="margin-top:4px">${esc(t.name)}</h2><div class="money ${i?'tb':'ta'}" style="margin-top:6px">$${t.budget}</div>
+   <div class="slots">${Array.from({length:SLOTS},(_,k)=>{const r=t.roster[k];return r?`<span class="k">${k+1}</span><span class="v">${esc(nm(r.c))} <small class="mono">${r.c.ovr}</small></span><span class="p">$${r.price}</span>`:`<span class="k">${k+1}</span><span class="v empty">${TR('（空）','(open)')}</span><span class="p"></span>`}).join('')}</div></section>`;
+}
+function renderDraft(){
+  const L=S.lot;if(!L)return;
+  const i=L.turn,t=S.teams[i];
+  const hb=L.high!=null?`<span class="${L.high?'tb':'ta'}">${tname(L.high)}</span> ${TR('領先','leads')}`:TR('尚無人出價','No bids yet');
+  $('#app').innerHTML=`${header()}<div class="draft">${teamPanel(0)}<div class="lotcol">${charCard(L.c,TR(`第 ${S.lotNo} / ${LOTS} 支籤`,`Lot ${S.lotNo} / ${LOTS}`))}
+   <div class="panel bidbox"><div class="price"><span class="eyebrow">${TR('目前價格','Current price')}</span><span class="big mono">$${L.price}</span><span>${hb}</span></div>
+    <div class="turn">${TR('輪到 ','To bid: ')}<span class="${i?'tb':'ta'}">${tname(i)}</span>${TR(`（最多 $${t.budget}）`,` (max $${t.budget})`)}</div>
+    ${!isMine(i)?`<p class="waiting">${TR('電腦考慮中…','The computer is thinking…')}</p>`:`<div class="row bidrow"><input id="bidv" type="number" min="${L.price+1}" max="${t.budget}" value="${Math.min(t.budget,L.price+1)}" style="width:100px" aria-label="${TR('出價金額','Bid amount')}">
+     <button class="${i?'b':'a'} solid" id="bidbtn" ${t.budget<=L.price?'disabled':''}>${TR('出價','Bid')}</button>${[1,5,10].map(d=>`<button class="${i?'b':'a'}" data-q="${d}" ${L.price+d>t.budget?'disabled':''}>+${d}</button>`).join('')}
+     <button class="ghost" id="passbtn">${TR('放棄','Pass')}</button></div>
+     <p class="hint">${L.high==null?TR('放棄的話，對手免費得到他。','If you pass, your opponent gets him free.'):TR(`放棄的話，對手以 $${L.price} 得標。`,`If you pass, your opponent gets him for $${L.price}.`)}</p>`}</div></div>${teamPanel(1)}</div>
+   <section class="panel"><div class="eyebrow">${TR('競標紀錄','Auction log')}</div><div class="log" style="margin-top:8px">${S.log.map(l=>`<div>${l}</div>`).join('')}</div></section>`;
+  if($('#bidbtn')){const go=()=>bid(parseInt($('#bidv').value));$('#bidbtn').onclick=go;$('#bidv').onkeydown=e=>{if(e.key==='Enter')go()};
+    document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>bid(L.price+ +b.dataset.q));$('#passbtn').onclick=pass}
+  scheduleAI();
+}
+
+/* ---------- order: Vanguard first, Captain last ---------- */
+let OPICK=null;
+// the computer: its best as Captain, second best as Vanguard to wear the other side down
+function aiOrder(i){const r=S.teams[i].roster.map(x=>x.c).sort((a,b)=>b.ovr-a.ovr);return [r[1],r[3],r[4],r[2],r[0]].map(c=>c.id)}
+function renderOrder(){
+  S.teams.forEach((t,i)=>{if(!t.order)t.order=isMine(i)?t.roster.map(x=>x.c.id):aiOrder(i)});
+  const panel=i=>{const t=S.teams[i];
+    if(!isMine(i))return `<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('電腦','Computer')}</div><h2>${tname(i)}</h2><p style="margin-top:10px">${TR('電腦的出場順序開打時揭曉。','The computer\'s order is revealed at the start.')}</p></section>`;
+    return `<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${S.ai?TR('你','You'):TR('玩家 ','Player ')+(i?'B':'A')}</div><h2>${tname(i)}</h2>
+     <div class="order">${t.order.map((id,k)=>{const c=BYID.get(id);return `<button class="orow ${OPICK&&OPICK[0]===i&&OPICK[1]===k?'picked':''}" data-o="${i},${k}"><span class="rk">${RANKS()[k]}</span><span>${esc(nm(c))} <small class="mono" style="color:var(--dim)">${c.ovr} · ${TR('體','HP')}${c.hp} ${TR('速','SPD')}${c.spd}</small></span><span class="mono">${STYLE()[c.style]}</span></button>`}).join('')}</div>
+     <p class="hint" style="margin-top:8px">${TR('點一位，再點另一位，兩人互換順序。','Tap one, then another, to swap them.')}</p></section>`};
+  $('#app').innerHTML=`${header()}<section class="panel"><h2>${TR('排出場順序','Set the order')}</h2><p class="hint" style="margin-top:6px">${TR('先鋒先上場，大將最後。贏的人帶著剩下的體力打下一位，每贏一場回復 10% 體力。','The Vanguard goes first, the Captain last. A winner stays on with the health he has left, recovering 10% after each win.')}</p></section>
+   <div class="grid2">${panel(0)}${panel(1)}</div><div class="row"><button class="solid" id="fight">${TR('開打！⚔️','Fight! ⚔️')}</button></div>`;
+  document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{const [i,k]=b.dataset.o.split(',').map(Number),o=S.teams[i].order;
+    if(OPICK&&OPICK[0]===i&&OPICK[1]!==k){[o[k],o[OPICK[1]]]=[o[OPICK[1]],o[k]];OPICK=null}else OPICK=OPICK&&OPICK[0]===i&&OPICK[1]===k?null:[i,k];renderOrder()});
+  $('#fight').onclick=()=>{S.battle={seed:(Math.random()*2**31)>>>0};S.screen='battle';render();window.scrollTo(0,0)};
+}
+
+/* ---------- battle: replayed from its seed, so switching language redraws the same fight ---------- */
+function simBattle(seed){
+  const old=rnd;rnd=mulberry32(seed);
+  const T=[0,1].map(i=>S.teams[i].order.map(id=>mkF(BYID.get(id))));
+  const idx=[0,0],ko=[0,0],dmgDealt=new Map(),kos=new Map(),ev=[];
+  const snap=()=>({idx:idx.slice(),hp:T.map(t=>t.map(f=>f.hp)),g:T.map(t=>t.map(f=>Math.round(f.g)))});
+  const push=(t,c,x)=>ev.push({t,c,hit:x&&x.hit?(T[0].includes(x.hit)?0:1):null,...snap()});
+  push(TR(`${tname(0)} 對 ${tname(1)}，五人車輪戰開始！`,`${tname(0)} vs ${tname(1)}: five-on-five, here we go!`),'note');
+  while(idx[0]<SLOTS&&idx[1]<SLOTS){
+    const a=T[0][idx[0]],b=T[1][idx[1]];a.rd=b.rd=0;
+    push(TR(`⚔️ ${RANKS()[idx[0]]} ${nm(a.c)}（${a.hp}）對 ${RANKS()[idx[1]]} ${nm(b.c)}（${b.hp}）`,`⚔️ ${RANKS()[idx[0]]} ${nm(a.c)} (${a.hp}) vs ${RANKS()[idx[1]]} ${nm(b.c)} (${b.hp})`),'half');
+    const hp0=[a.hp,b.hp];
+    const w=duel(a,b,(t,c,x)=>push(t,c,x)),wi=w===a?0:1,l=wi?a:b;
+    dmgDealt.set(w.c.id,(dmgDealt.get(w.c.id)||0)+(wi?hp0[0]:hp0[1]));dmgDealt.set(l.c.id,(dmgDealt.get(l.c.id)||0)+(wi?hp0[1]-b.hp:hp0[0]-a.hp));
+    kos.set(w.c.id,(kos.get(w.c.id)||0)+1);
+    idx[1-wi]++;w.hp=Math.min(w.c.hp,w.hp+Math.round(w.c.hp*.1));w.g=0;
+    push(TR(`💀 ${nm(l.c)} 倒下！${nm(w.c)} 獲勝，剩下 ${w.hp} 體力`,`💀 ${nm(l.c)} is down! ${nm(w.c)} wins with ${w.hp} health left`),'ko');
+  }
+  const win=idx[1]>=SLOTS?0:1;
+  push(TR(`🏆 ${tname(win)} 獲勝！`,`🏆 ${tname(win)} win!`),'half');
+  rnd=old;
+  const mvp=[...kos.entries()].sort((x,y)=>y[1]-x[1]||(dmgDealt.get(y[0])||0)-(dmgDealt.get(x[0])||0))[0];
+  return {ev,win,mvp:mvp?{id:mvp[0],ko:mvp[1]}:null,T:T.map(t=>t.map(f=>f.c.id))};
+}
+let timer=null;
+function renderBattle(){
+  const B=S.battle;if(!B.res)B.res=simBattle(B.seed);
+  B.pos=0;B.skip=false;B.done=false;
+  $('#app').innerHTML=`${header()}<section class="panel"><div class="row" style="justify-content:space-between"><h2>${tname(0)} <span style="color:var(--dim)">vs</span> ${tname(1)}</h2>
+    <div class="row"><span class="eyebrow">${TR('速度','Speed')}</span><div class="seg" role="group">${[[TR('慢','Slow'),1200],[TR('中','Normal'),700],[TR('快','Fast'),200]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div></div>
+    <div id="arena"></div></section>
+   <div class="battlegrid"><section class="panel teamcard"><div class="eyebrow ta">${tname(0)}</div><div class="roster" id="r0"></div></section>
+    <div class="pbp" id="pbp" aria-live="polite"></div>
+    <section class="panel teamcard B"><div class="eyebrow tb">${tname(1)}</div><div class="roster" id="r1"></div></section></div><div id="after"></div>`;
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  $('#skip').onclick=()=>{clearTimeout(timer);B.skip=true;play()};
+  draw(B.res.ev[0]);
+}
+const hpCol=p=>p>.5?'var(--good)':p>.25?'var(--amber)':'var(--red)';
+function draw(e){
+  const B=S.battle,ids=B.res.T;
+  const f=(s,k)=>{const c=BYID.get(ids[s][k]),hp=e.hp[s][k],p=hp/c.hp;
+    return `<div class="fighter ${s?'r':''} ${e.hit===s?'hit':''} ${hp<=0?'ko':''}"><div class="eyebrow ${s?'tb':'ta'}">${RANKS()[k]}</div><div class="fn">${esc(nm(c))}</div><div class="fs">${esc(ser(c))} · ${esc(spn(c))}</div>
+      <div class="hp"><i style="width:${p*100}%;background:${hpCol(p)}"></i></div><div class="hpn">${hp} / ${c.hp}</div><div class="gauge"><i style="width:${e.g[s][k]}%"></i></div></div>`};
+  const k0=Math.min(e.idx[0],SLOTS-1),k1=Math.min(e.idx[1],SLOTS-1);
+  $('#arena').innerHTML=`<div class="arena">${f(0,k0)}<div class="vs">VS</div>${f(1,k1)}</div>`;
+  for(const s of [0,1])$('#r'+s).innerHTML=ids[s].map((id,k)=>{const c=BYID.get(id),hp=e.hp[s][k],p=hp/c.hp;
+    return `<div class="rrow ${hp<=0?'out':''} ${k===e.idx[s]?'now':''}"><span class="rk">${RANKS()[k]}</span><span>${esc(nm(c))}</span><span class="mini"><i style="width:${p*100}%;background:${hpCol(p)}"></i></span></div>`}).join('');
+}
+function emit(){
+  const B=S.battle,e=B.res.ev[B.pos++],box=$('#pbp'),d=document.createElement('div');
+  d.className=e.c==='half'?'half':e.c==='note'?'note':'ev '+(e.c||'');d.textContent=e.t;box.appendChild(d);box.scrollTop=box.scrollHeight;
+  if(!B.skip||B.pos>=B.res.ev.length)draw(e);
+}
+function play(){
+  const B=S.battle;
+  if(B.skip)while(B.pos<B.res.ev.length)emit();
+  if(B.pos>=B.res.ev.length)return finish();
+  emit();const e=B.res.ev[B.pos-1];
+  timer=setTimeout(play,e.c==='half'||e.c==='ko'?S.speed*2:e.c==='sp'?S.speed*1.6:S.speed);
+}
+function finish(){
+  const B=S.battle;if(B.done)return;B.done=true;
+  const w=B.res.win,m=B.res.mvp&&BYID.get(B.res.mvp.id);
+  $('#after').innerHTML=`<div class="reveal flash"><div class="eyebrow">${TR('勝負揭曉','Result')}</div><div class="w ${w?'tb':'ta'}">${tname(w)} ${TR('獲勝','win')}</div>
+    ${m?`<p style="margin-top:8px;font-weight:700">🏅 MVP　${esc(nm(m))}${TR(`（${esc(ser(m))}）`,` (${esc(ser(m))})`)}${TR(`擊倒 ${B.res.mvp.ko} 人`,` · ${B.res.mvp.ko} KO${B.res.mvp.ko>1?'s':''}`)}</p>`:''}
+    <div class="row" style="justify-content:center;margin-top:16px"><button class="solid" id="again">${TR('同隊伍重排順序再打','Rematch: reorder and fight again')}</button><button class="ghost" id="restart">${TR('重新抽籤','New draw')}</button></div></div>`;
+  $('#again').onclick=()=>{S.screen='order';render();window.scrollTo(0,0)};
+  $('#restart').onclick=()=>{S.screen='setup';render();window.scrollTo(0,0)};
+  if($('#after').scrollIntoView)$('#after').scrollIntoView({block:'nearest'});
+}
+function render(){
+  document.title=TR('動漫大亂鬥','Anime Brawl Auction');document.documentElement.lang=LANG==='en'?'en':'zh-Hant';
+  const f={home:renderHome,setup:renderSetup,draft:renderDraft,order:renderOrder,battle:()=>{renderBattle();play()}}[S.screen];
+  if(f)f();
+}
+rate();
+render();
+</script>
