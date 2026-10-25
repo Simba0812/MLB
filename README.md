@@ -7,6 +7,7 @@
 - `firebase-config.js`：多人版線上對戰用的 Firebase 設定
 - `firestore.rules`：資料庫的安全規則，要貼到 Firebase
 - `source/`：產生上面兩個網頁的原始檔和抓數據的程式，說明在 `source/README.md`。要改遊戲請改這裡，不要直接改 `index.html`。
+- `epl/`：**英超版**（Blind Auction FC，只有英文）。`epl/index.html` 直接雙擊就能玩，原始檔和說明在 `epl/source/`。整個資料夾放上 Netlify 後，網址加上 `/epl/` 就是英超版。
 
 另外，旁邊的 `mlb-auction-單機版` 資料夾裡只有一個 `index.html`，內容和單機版一樣，是給 Netlify 當第二個網站用的。它由 `source/build.py` 自動產生，不在這個 GitHub 專案裡。
 

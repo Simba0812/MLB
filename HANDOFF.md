@@ -41,6 +41,14 @@
   - 把 `mlb-auction-site` 拖到 Netlify，再用 `mlb-auction-單機版` 另外建一個 Netlify 網站
   - 可以順便刪掉舊資料夾
 
+## 英超版（epl/）
+
+- 2026-10-25 新增，英文介面，玩法只有單人對電腦和同一台輪流玩，沒有線上對戰。說明在 `epl/source/README.md`。
+- 和棒球版一樣：只改 `epl/source/template.html`，改完執行 `python3 epl/source/build.py`。
+- 數據是 2025-26 FPL 的整季數據，從 vaastav/Fantasy-Premier-League 的 GitHub 存檔抓取（雲端環境只連得到 GitHub）。
+- 賽制：單場（淘汰賽，平手就踢延長賽、再踢 PK）、主客場兩回合（看總比分）、三戰兩勝。
+- 測試：jsdom 跑過三種賽制的完整流程（選秀、交易、排陣容、換人決定、延長賽、PK），重播結果一致；Playwright 截過桌機和手機畫面，沒有出現橫向捲動。還沒在真的手機上測過。
+
 ## 已做好的功能
 
 - **聯盟與名額**
