@@ -378,14 +378,16 @@ PRS.H.uzr=mk(POOL.filter(p=>p.type==='H'&&p.pos!=='C'),'uzr');PRS.H.frm=mk(POOL.
   PRS.SP={};PRS.RP={};
   ['era','ip','w','so','whip','kr','bbr'].forEach(k=>{PRS.SP['t_'+k]=mk(P.filter(p=>p.pos==='SP'),k);PRS.RP['t_'+k]=mk(P.filter(p=>p.pos!=='SP'),k)});})();
 }
-// secondary positions: where a hitter played at least 30 games last season, besides his main position
+// secondary positions: besides his main position, where a hitter played at least 30 games (MLB)
+// or 150 innings (CPBL, where the numbers come as innings) last season
 const FIELDPOS=['C','1B','2B','3B','SS','LF','CF','RF'];
-const ALT_MIN=30;
-function setAlt(pool){pool.forEach(p=>{p.alt=p.type==='H'&&!p.twp?Object.entries(p.poss||{}).filter(([k,v])=>k!==p.pos&&FIELDPOS.includes(k)&&v>=ALT_MIN).sort((a,b)=>b[1]-a[1]).map(x=>x[0]):[]})}
+const ALT_MIN={MLB:30,CPBL:150};
+const playedAt=(p,k)=>p.pinn?p.pinn[k]||0:(p.poss&&p.poss[k])||0;
+function setAlt(pool,lg){pool.forEach(p=>{p.alt=p.type==='H'&&!p.twp?FIELDPOS.filter(k=>k!==p.pos&&playedAt(p,k)>=ALT_MIN[lg]).sort((a,b)=>playedAt(p,b)-playedAt(p,a)):[]})}
 const posTag=p=>[p.pos,...(p.alt||[])].join('/');
 function setLeague(lg){
   if(!POOLS[lg]||!POOLS[lg].length) lg='MLB';
-  S.league=lg;POOL=POOLS[lg];PARKS=PARKSETS[lg];if(!POOL.defDone){computeDef(POOL);setAlt(POOL);POOL.defDone=1}LG=computeLG();LGP=computeLGP();buildPRS();buildOvr();
+  S.league=lg;POOL=POOLS[lg];PARKS=PARKSETS[lg];if(!POOL.defDone){computeDef(POOL);setAlt(POOL,lg);POOL.defDone=1}LG=computeLG();LGP=computeLGP();buildPRS();buildOvr();
   fixSlots();   // CPBL has fewer closers, so the allowed range can shrink
 }
 // traditional stats are ranked within role: hitters vs hitters, starters vs starters, relievers vs relievers
@@ -681,7 +683,7 @@ function lotCard(p){
     </div>
     <div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div>
    </div>
-   <div class="meta">${p.alt&&p.alt.length?`<span>${TR('主守位','Main')}</span>`:''}<span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}${p.poss&&p.poss[p.pos]&&p.alt&&p.alt.length?` ${p.poss[p.pos]}${TR(' 場',' G')}`:''}</span>${p.alt&&p.alt.length?`<span>${TR('副守位 ','also plays ')}${p.alt.map(k=>`<span class="pos">${k}</span> ${p.poss[k]}${TR(' 場',' G')}${p.defAt&&p.defAt[k]!=null?TR(`（守備 ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)}）`,` (fielding ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)})`):''}`).join(' ')}</span>`:''}<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
+   <div class="meta">${p.alt&&p.alt.length?`<span>${TR('主守位','Main')}</span>`:''}<span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}${p.alt&&p.alt.length&&playedAt(p,p.pos)?` ${playedAt(p,p.pos)}${p.pinn?TR(' 局',' inn'):TR(' 場',' G')}`:''}</span>${p.alt&&p.alt.length?`<span>${TR('副守位 ','also plays ')}${p.alt.map(k=>`<span class="pos">${k}</span> ${p.pinn?p.pinn[k]+TR(' 局',' inn'):p.poss[k]+TR(' 場',' G')}${p.defAt&&p.defAt[k]!=null?TR(`（守備 ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)}）`,` (fielding ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)})`):''}`).join(' ')}</span>`:''}<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
    ${p.type==='H'?hitterStats(p):pitcherStats(p)}
    ${p.twp?pitcherStats({...p.twp},TR('投手成績','Pitching')):''}
   </div>`;
@@ -1171,7 +1173,7 @@ function lineupEditor(i){
       <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
       ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:alt?`<span class="hint">${TR('副守位','secondary')}</span>`:'<span></span>'}</div>`}).join('');
   return `<div class="eyebrow" style="margin-top:14px">${TR('打序與守位','Batting order and positions')}</div><div class="lued">${rows}</div>
-    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場），用他在那個位置的真實守備數據；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season) he fields as his numbers there say; anywhere else, much worse.')}</p>
+    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場，中職是 150 局），用他在那個位置的真實守備數據；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season; 150+ innings in the CPBL) he fields as his numbers there say; anywhere else, much worse.')}</p>
     <button class="ghost mini" data-lureset="${i}" style="margin-top:6px">${TR('恢復建議打序','Reset to suggested lineup')}</button>`;
 }
 const PICK_DEADLINE={};let pickTick=null;
