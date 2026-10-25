@@ -372,9 +372,14 @@ PRS.H.uzr=mk(POOL.filter(p=>p.type==='H'&&p.pos!=='C'),'uzr');PRS.H.frm=mk(POOL.
   PRS.SP={};PRS.RP={};
   ['era','ip','w','so','whip','kr','bbr'].forEach(k=>{PRS.SP['t_'+k]=mk(P.filter(p=>p.pos==='SP'),k);PRS.RP['t_'+k]=mk(P.filter(p=>p.pos!=='SP'),k)});})();
 }
+// other positions a hitter can play: where he actually played last season, from 10 games (MLB) or 30 plate appearances (CPBL)
+const FIELDPOS=['C','1B','2B','3B','SS','LF','CF','RF'];
+const ALT_MIN={MLB:10,CPBL:30};
+function setAlt(pool,lg){pool.forEach(p=>{p.alt=p.type==='H'&&!p.twp?Object.entries(p.poss||{}).filter(([k,v])=>k!==p.pos&&FIELDPOS.includes(k)&&v>=ALT_MIN[lg]).sort((a,b)=>b[1]-a[1]).map(x=>x[0]):[]})}
+const posTag=p=>[p.pos,...(p.alt||[])].join('/');
 function setLeague(lg){
   if(!POOLS[lg]||!POOLS[lg].length) lg='MLB';
-  S.league=lg;POOL=POOLS[lg];PARKS=PARKSETS[lg];if(!POOL.defDone){computeDef(POOL);POOL.defDone=1}LG=computeLG();LGP=computeLGP();buildPRS();buildOvr();
+  S.league=lg;POOL=POOLS[lg];PARKS=PARKSETS[lg];if(!POOL.defDone){computeDef(POOL);setAlt(POOL,lg);POOL.defDone=1}LG=computeLG();LGP=computeLGP();buildPRS();buildOvr();
   fixSlots();   // CPBL has fewer closers, so the allowed range can shrink
 }
 // traditional stats are ranked within role: hitters vs hitters, starters vs starters, relievers vs relievers
@@ -410,7 +415,7 @@ function slotCount(t,k){return t.roster.filter(r=>r.slot===k||(r.slot2===k)).len
 function minRemaining(t){return SLOTS.reduce((s,sl)=>s+Math.max(0,slotMin(sl)-slotCount(t,sl.k)),0)}
 function openSlotsFor(t,p,ignoreDone){
   if(t.done&&!ignoreDone) return [];
-  const ks = p.twp? ['DH','SP','BN'] : p.type==='H'? [...new Set([p.pos,'DH','BN'])] : [p.pos];   // own position first, then DH, then bench
+  const ks = p.twp? ['DH','SP','BN'] : p.type==='H'? [...new Set([p.pos,...(p.alt||[]),'DH','BN'])] : [p.pos];   // own position first, then the others he played, then DH, then bench
   return ks.filter(k=>slotCount(t,k)<slotMax(SLOTS.find(s=>s.k===k)));
 }
 function needsCovered(t,p,slots){ // how many required slots this player fills
@@ -670,7 +675,7 @@ function lotCard(p){
     </div>
     <div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div>
    </div>
-   <div class="meta"><span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}</span><span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
+   <div class="meta"><span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}</span>${p.alt&&p.alt.length?`<span>${TR('也守 ','also ')}${p.alt.map(k=>`<span class="pos">${k}</span> ${p.poss[k]}${S.league==='CPBL'?TR(' 打席',' PA'):TR(' 場',' G')}`).join(' ')}</span>`:''}<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
    ${p.type==='H'?hitterStats(p):pitcherStats(p)}
    ${p.twp?pitcherStats({...p.twp},TR('投手成績','Pitching')):''}
   </div>`;
@@ -682,7 +687,7 @@ function teamPanel(i){
     const lines=[];
     for(let n=0;n<slotMax(sl);n++){
       const r=got[n];
-      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v">${esc(nm(r.p))}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
+      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v">${esc(nm(r.p))}${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
       else if(n<slotMin(sl)) lines.push(`<span class="k">${sl.k}</span><span class="v empty">${TR('（必填）','(required)')}</span><span class="p"></span>`);
     }
     return lines.join('');
@@ -821,10 +826,12 @@ function validLineup(i,lu){
   return lu.every(x=>ids.has(sid(x.id)))&&new Set(lu.map(x=>sid(x.id))).size===9&&POSLIST.every(k=>lu.some(x=>x.pos===k));
 }
 const lineupFor=(i,lu)=>validLineup(i,lu)?lu:defaultLineup(i);
-// fielding value at a position: a player's own rating at his position, a penalty anywhere else
+// fielding value at a position: a player's own rating at his position; at another position he played last season,
+// half his good fielding and a small penalty; anywhere else, a big one
 function defOf(p,pos){
   if(pos==='DH') return 0;
   if(p.pos===pos) return p.def||0;
+  if(p.alt&&p.alt.includes(pos)){const d=p.pos==='DH'?-2:(p.def||0);return pos==='C'?Math.min(d,0)-4:Math.min(d,d*.5)-1.5}
   return pos==='C'?-12:Math.min(p.def||0,0)-5;
 }
 function buildTeam(i,lu){
@@ -1151,12 +1158,12 @@ function ensureLued(g){
 }
 function lineupEditor(i){
   const lu=LUED[i],hit=teamHitters(i).map(r=>r.p),byId=new Map(hit.map(p=>[sid(p.id),p]));
-  const rows=lu.map((x,r)=>{const p=byId.get(sid(x.id)),off=x.pos!=='DH'&&p.pos!==x.pos;
+  const rows=lu.map((x,r)=>{const p=byId.get(sid(x.id)),alt=x.pos!=='DH'&&p.pos!==x.pos&&(p.alt||[]).includes(x.pos),off=x.pos!=='DH'&&p.pos!==x.pos&&!alt;
     return `<div class="lurow ${LUPICK&&LUPICK[0]===i&&LUPICK[1]===r?'picked':''}"><button class="lunum mono" data-pick="${i},${r}" aria-label="${TR(`第 ${r+1} 棒，點選後再點另一棒互換`,`Batting ${ord(r+1)}: tap, then tap another spot to swap`)}">${r+1}</button><span class="mono lupos">${x.pos}</span>
-      <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${h.pos} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
-      ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:'<span></span>'}</div>`}).join('');
+      <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
+      ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:alt?`<span class="hint">${TR('第二守位','also plays here')}</span>`:'<span></span>'}</div>`}).join('');
   return `<div class="eyebrow" style="margin-top:14px">${TR('打序與守位','Batting order and positions')}</div><div class="lued">${rows}</div>
-    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到不是自己的守位，守備會變差。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. A player out of position fields worse.')}</p>
+    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到上季守過的第二守位，守備稍微變差；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a position he also played last season a player fields a little worse; anywhere else, much worse.')}</p>
     <button class="ghost mini" data-lureset="${i}" style="margin-top:6px">${TR('恢復建議打序','Reset to suggested lineup')}</button>`;
 }
 const PICK_DEADLINE={};let pickTick=null;

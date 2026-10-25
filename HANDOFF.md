@@ -59,6 +59,7 @@
 - **數據分級**：傳統數據（含 OPS）和 Savant 數據都只分 PR90+ 金框、PR75+ 紅框、PR50 綠框三級。
 - **總評**：按同類球員（打者 / 先發 / 中繼＋終結者）的排名換算成百分位，再套 `OVR_CURVE`。二刀流取兩者較高的再加 4。
 - **守備**：有 OAA/UZR 和捕手框界值，`computeDef` 換算成同一個尺度。任何守位的打者都能放 DH。
+- **多重守位**（2026-10-25）：pool 裡每位打者的 `poss` 是 `{守位: 場數或打席數}`，由 `source/fetch_positions.py` 產生。`setAlt` 會把 MLB 10 場以上、中職 30 個打席以上的守位列進 `p.alt`。`openSlotsFor` 會依序放：主守位 → 第二守位 → DH → 板凳。`defOf` 在第二守位時取主守位守備值的一半（負的不減半），再扣 1.5，當捕手則扣 4；沒有 `poss` 時，行為和以前完全相同（已用固定 seed 比對過）。**目前的 pool 還沒有 `poss`，因為雲端環境連不上 MLB 和中職官網，要在 Mac 上執行一次 `fetch_positions.py` 才會生效。**
 - **投手**：
   - 有體力條，前三場的用球數會造成疲勞。
   - 先發輪值休息天數：`restN`。
@@ -100,6 +101,7 @@
 
     python3 source/fetch_stats.py 2027
     python3 source/fetch_cpbl.py 2027
+    python3 source/fetch_positions.py 2027
     python3 source/build.py
 
 ## 使用者偏好
