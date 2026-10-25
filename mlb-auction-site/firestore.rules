@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // One document per room. Anyone signed in (anonymously) can watch a room;
+    // only its two seated players can change it, and seat B can be claimed only while empty.
+    // Every write stamps `exp` (milliseconds) three days ahead; it can't be pushed further out,
+    // and once it passes anyone may delete the room.
+    match /rooms/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && code.matches('^[A-Z0-9]{4}$')
+        && request.resource.data.seats['0'] == request.auth.uid
+        && request.resource.data.exp is number
+        && request.resource.data.exp <= request.time.toMillis() + 4 * 86400000;
+      allow update: if request.auth != null
+        && (request.auth.uid in resource.data.seats.values() || !('1' in resource.data.seats))
+        && request.resource.data.seats['0'] == resource.data.seats['0']
+        && request.resource.data.exp <= request.time.toMillis() + 4 * 86400000;
+      allow delete: if request.auth != null
+        && resource.data.exp < request.time.toMillis();
+    }
+  }
+}
