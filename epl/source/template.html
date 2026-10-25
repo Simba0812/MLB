@@ -259,6 +259,20 @@ button.mini{padding:3px 8px;font-size:13px}
 .xirow select{padding:5px 6px;font-size:13px}
 .xirow .role{font-family:var(--mono);color:var(--amber);font-size:13px}
 .formseg{flex-wrap:wrap}
+.matchgrid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:960px){.matchgrid{grid-template-columns:1fr}.matchgrid .pbp{max-height:46vh}}
+.pitchwrap{padding:12px}
+.pitch{display:block;width:100%;height:auto;border-radius:4px}
+.pitch .pdot{transition:transform .5s ease}
+.pitch .pdot text{font-size:2.1px;fill:#fff;font-family:var(--body);font-weight:700;paint-order:stroke;stroke:#0b2a1c;stroke-width:.5px}
+.pitch .flash{font-family:var(--display);font-weight:900;font-size:13px;opacity:0;paint-order:stroke;stroke:#0b2a1c;stroke-width:.8px}
+.pitch .flash.on{animation:goal 1.6s ease}
+@keyframes goal{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.05)}70%{opacity:1}100%{opacity:0}}
+.pitch .flash{transform-origin:52.5px 34px;transform-box:view-box}
+#shotline{transition:opacity .2s}
+.xgc{display:block;width:100%;height:auto;margin-top:4px}
+.xgc text{font-size:9px;fill:var(--dim);font-family:var(--mono)}
+@media (prefers-reduced-motion:reduce){.pitch .pdot,#ball{transition:none!important}.pitch .flash.on{animation:none;opacity:1}}
 .badge{display:inline-block;font-size:11px;font-weight:700;background:#10261d;color:var(--amber);padding:1px 6px;border-radius:2px}
 @media (max-width:700px){
   .scoreboard{padding:8px 10px;gap:8px}
@@ -349,23 +363,28 @@ function calibrate(){
 const S={screen:'home',teams:[
   {name:'',budget:200,roster:[],done:false},
   {name:'',budget:200,roster:[],done:false}],
-  budget:200,lotMax:50,slots:{GK:2,DEF:5,MID:5,FWD:3},deck:[],lotNo:0,lot:null,log:[],speed:600,mode:'single',ai:null};
-const SLOTS=GROUPS.map(k=>({k}));
-const slotMin=sl=>S.slots[sl.k], slotMax=sl=>S.slots[sl.k];
-function slotRange(k){
-  const pool=POOL.filter(p=>p.pos===k).length,cap=Math.floor(pool/2);
-  const [lo,hi]={GK:[1,2],DEF:[4,6],MID:[3,6],FWD:[2,4]}[k];
-  return [Math.min(lo,cap),Math.max(Math.min(lo,cap),Math.min(hi,cap))];
+  budget:200,lotMax:40,deck:[],lotNo:0,lot:null,log:[],speed:600,mode:'single',ai:null};
+// a squad is 13: the XI plus two substitutes, in whatever mix each team likes, as long as it can field a legal XI
+const SQUAD=13,MINP={GK:1,DEF:3,MID:2,FWD:1},MAXP={GK:2,DEF:6,MID:6,FWD:4};
+const lotsNeeded=()=>2*SQUAD+8;
+function cntOf(roster){const c={GK:0,DEF:0,MID:0,FWD:0};for(const r of roster)c[r.p.pos]++;return c}
+const xiOK=c=>c.GK>=1&&c.DEF>=3&&c.MID>=2&&c.FWD>=1&&Math.min(c.DEF,5)+Math.min(c.MID,5)+Math.min(c.FWD,3)>=10;
+const COMP=new Map();
+function canComplete(c){   // can these counts still grow into a legal 13?
+  const tot=GROUPS.reduce((s,k)=>s+c[k],0);
+  if(tot>SQUAD||GROUPS.some(k=>c[k]>MAXP[k]))return false;
+  const key=GROUPS.map(k=>c[k]).join(',');if(COMP.has(key))return COMP.get(key);
+  const ok=tot===SQUAD?xiOK(c):GROUPS.some(k=>canComplete({...c,[k]:c[k]+1}));
+  COMP.set(key,ok);return ok;
 }
-function fixSlots(){GROUPS.forEach(k=>{const [lo,hi]=slotRange(k);S.slots[k]=clamp(S.slots[k]??lo,lo,hi)})}
-const squadSize=()=>GROUPS.reduce((s,k)=>s+S.slots[k],0);
-const lotsNeeded=()=>2*squadSize()+8;
-function slotCount(t,k){return t.roster.filter(r=>r.slot===k).length}
-function minRemaining(t){return SLOTS.reduce((s,sl)=>s+Math.max(0,slotMin(sl)-slotCount(t,sl.k)),0)}
-function openSlotsFor(t,p,ignoreDone){if(t.done&&!ignoreDone)return [];return slotCount(t,p.pos)<S.slots[p.pos]?[p.pos]:[]}
-function needsCovered(t,p,slots){return slots.filter(k=>slotCount(t,k)<S.slots[k]).length}
-function maxBid(t,p){const slots=openSlotsFor(t,p);if(!slots.length)return 0;return Math.max(0,t.budget-(minRemaining(t)-needsCovered(t,p,slots)))}
-function canMeetMin(t){return GROUPS.every(k=>slotCount(t,k)>=S.slots[k])}
+function slotCount(t,k){return t.roster.filter(r=>r.p.pos===k).length}
+function minRemaining(t){return SQUAD-t.roster.length}
+function openSlotsFor(t,p,ignoreDone){if(t.done&&!ignoreDone)return [];const c=cntOf(t.roster);c[p.pos]++;return canComplete(c)?[p.pos]:[]}
+function needsCovered(t,p,slots){return slots.length?1:0}   // every empty spot has to be filled
+function maxBid(t,p){const slots=openSlotsFor(t,p);if(!slots.length)return 0;return Math.max(0,t.budget-(minRemaining(t)-1))}
+function canMeetMin(t){return t.roster.length===SQUAD&&xiOK(cntOf(t.roster))}
+// what a squad still lacks to field a legal XI, for the team panel
+function stillNeeds(t){const c=cntOf(t.roster);return GROUPS.filter(k=>c[k]<MINP[k]).map(k=>`${MINP[k]-c[k]} ${k}`)}
 
 /* ---------- formations ---------- */
 const FORMS=['4-4-2','4-3-3','4-5-1','4-2-4','3-5-2','3-4-3','5-3-2','5-4-1'];
@@ -378,6 +397,7 @@ const MODES={single:'One match',legs:'Two legs',bo3:'Best of 3'};
 const MODEHINT={single:'One knockout match. Level after 90 minutes: extra time, then penalties.',
   legs:'Home and away. The aggregate score decides it; level after the second leg: extra time, then penalties.',
   bo3:'Up to three knockout matches; first to two wins. Players who played recently start less fresh.'};
+const AI_SHAPE={GK:1,DEF:4,MID:5,FWD:3};
 const AI_LV={
   easy:{label:'Easy',hint:'Bids cautiously, judges loosely, and accepts trades that cost it a little.',scale:.8,noise:.4,accept:-3},
   normal:{label:'Normal',hint:'Bids what players are worth and only accepts fair trades.',scale:1,noise:.2,accept:0},
@@ -416,12 +436,10 @@ function renderHome(){
   $('#solo').onclick=()=>{S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.screen='setup';render()};
 }
 function renderSetup(){
-  const sz=squadSize();
   $('#app').innerHTML=`${header()}
   <section class="panel">
    <div class="row"><span class="eyebrow">Format</span><div class="seg" role="group" aria-label="Format">${Object.entries(MODES).map(([k,l])=>`<button data-m="${k}" aria-pressed="${S.mode===k}">${l}</button>`).join('')}</div><span class="hint">${MODEHINT[S.mode]}</span></div>
-   <div class="row" style="margin-top:12px"><span class="eyebrow">Squad</span>${GROUPS.map(k=>{const [lo,hi]=slotRange(k);
-     return `<label class="slotpick">${POSN[k]}s<select data-slot="${k}">${Array.from({length:hi-lo+1},(_,j)=>lo+j).map(n=>`<option value="${n}" ${S.slots[k]===n?'selected':''}>${n}</option>`).join('')}</select></label>`}).join('')}<span class="hint">${sz} players per team. The XI needs 1 keeper, 3–5 defenders, 2–5 midfielders and 1–3 forwards.</span></div>
+   <div class="row" style="margin-top:12px"><span class="eyebrow">Squad</span><span class="hint">13 players: your XI plus 2 substitutes, in any mix you like. The XI needs 1 keeper, 3–5 defenders, 2–5 midfielders and 1–3 forwards, so a squad holds at most ${MAXP.GK} keepers, ${MAXP.DEF} defenders, ${MAXP.MID} midfielders and ${MAXP.FWD} forwards.</span></div>
    ${S.ai?`<div class="row" style="margin-top:12px"><span class="eyebrow">Computer level</span><div class="seg" role="group" aria-label="Computer level">${Object.entries(AI_LV).map(([k,v])=>`<button data-lv="${k}" aria-pressed="${S.ai.level===k}">${v.label}</button>`).join('')}</div><span class="hint">${AI_LV[S.ai.level].hint}</span></div>`:''}</section>
   <div class="grid2">
    ${[0,1].map(i=>`<section class="panel teamcard ${i?'B':''}">
@@ -434,7 +452,7 @@ function renderSetup(){
     <div class="row" style="justify-content:space-between">
       <div style="display:flex;flex-direction:column;gap:6px;max-width:660px">
         <h2>Auction rules</h2>
-        <p class="hint">Players are drawn at random from ${POOL.length} who played at least 900 Premier League minutes in ${SEASON}, and revealed one at a time, so nobody knows who comes next. Teams take turns bidding; press "Pass" to stop and your opponent signs the player at the current price. Each squad needs ${GROUPS.map(k=>`${S.slots[k]} ${POSN[k].toLowerCase()}${S.slots[k]>1?'s':''}`).join(', ')}. You always keep enough money to fill your empty spots (£1m each). There are ${Math.max(S.lotMax,lotsNeeded())} lots; near the end only positions someone still needs are drawn, and if a team is still short after the last lot, fill-in lots follow that the short team cannot skip. After the draft each team gets 3 trade proposals.</p>
+        <p class="hint">Players are drawn at random from ${POOL.length} who played at least 900 Premier League minutes in ${SEASON}, and revealed one at a time, so nobody knows who comes next. Teams take turns bidding; press "Pass" to stop and your opponent signs the player at the current price. Each squad signs 13 players, choosing its own balance of keepers, defenders, midfielders and forwards; you can't sign a player who would leave you unable to field a legal XI. You always keep enough money to fill your empty spots (£1m each). There are ${Math.max(S.lotMax,lotsNeeded())} lots; near the end only positions someone still needs are drawn, and if a team is still short after the last lot, fill-in lots follow that the short team cannot skip. After the draft each team gets 3 trade proposals.</p>
       </div>
       <div class="row" style="align-items:flex-end"><label style="width:150px">Budget per team (£m)<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">Total lots<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(S.lotMax,lotsNeeded())}"></label></div>
     </div>
@@ -442,7 +460,6 @@ function renderSetup(){
   </section>`;
   const keep=()=>[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value});
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{keep();S.mode=b.dataset.m;render()});
-  document.querySelectorAll('[data-slot]').forEach(el=>el.onchange=()=>{keep();S.slots[el.dataset.slot]=+el.value;render()});
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{keep();S.ai.level=b.dataset.lv;render()});
   document.querySelectorAll('[data-rn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rn,other=$('#tn'+(1-i)).value.trim();let n;do{n=randomName()}while(n.split(' ')[0]===other.split(' ')[0]);$('#tn'+i).value=n});
   $('#go').onclick=()=>{
@@ -450,7 +467,7 @@ function renderSetup(){
     if(!a||!b){$('#err').textContent='Give both clubs a name.';return}
     if(a===b){$('#err').textContent='The two clubs need different names.';return}
     const bud=clamp(parseInt($('#bud').value)||200,30,1000);
-    S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||50,lotsNeeded(),200),lotsNeeded());
+    S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||40,lotsNeeded(),200),lotsNeeded());
     S.teams.forEach((t,i)=>{t.name=i?b:a;t.budget=bud;t.roster=[];t.done=false});
     S.deck=POOL.slice();
     for(let i=S.deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]]}
@@ -465,9 +482,10 @@ function aiValue(t,p){
   const lv=AI_LV[S.ai.level],slots=openSlotsFor(t,p);if(!slots.length)return 0;
   const need=needsCovered(t,p,slots)>0,q=clamp((p.ovr-52)/45,0,1),req=minRemaining(t);
   let v=1+S.budget*.22*q*q;                                  // a 97 is worth about a fifth of the starting budget
-  if(p.pos==='GK'&&slotCount(t,'GK')>=1)v*=.35;              // the second keeper rarely plays
+  const want=slotCount(t,p.pos)<AI_SHAPE[p.pos];                // the computer aims for 1 GK, 4 DEF, 5 MID, 3 FWD
+  if(p.pos==='GK'&&slotCount(t,'GK')>=1)v*=.35;              // a second keeper rarely plays
   v=Math.min(v,(t.budget/Math.max(1,req))*(need?3:1.2));
-  if(!need)v*=.45;
+  if(!want)v*=.45;
   if(need&&S.lotMax-S.lotNo<req*2)v*=1.4;
   const pace=t.budget/Math.max(1,S.budget*Math.max(0,S.lotMax-S.lotNo)/S.lotMax);
   if(pace>1.2)v*=Math.min(2.2,pace*.8);
@@ -495,7 +513,7 @@ function aiTradeReply(){
 
 /* ---------- draft ---------- */
 function nextLot(){
-  if(S.teams.every(t=>t.done||GROUPS.every(k=>slotCount(t,k)>=S.slots[k]))) return endDraft();
+  if(S.teams.every(t=>t.done||t.roster.length>=SQUAD)) return endDraft();
   const over=S.lotNo>=S.lotMax;
   if(over&&S.teams.every(canMeetMin)) return endDraft();
   const needAll=S.teams.reduce((s,t)=>s+minRemaining(t),0);
@@ -544,9 +562,6 @@ function unsold(){
   if(S.teams.some(t=>needsCovered(t,p,openSlotsFor(t,p,true))>0))S.deck.push(p);
   S.lot=null;nextLot();
 }
-function declareDone(i){S.teams[i].done=true;S.log.unshift(`<b class="${i?'tb':'ta'}">${esc(S.teams[i].name)}</b> declares the squad complete`);
-  if(S.lot){advanceAuto();if(S.lot)render()}}
-
 function statBox(v,l,sv,pr,cls){const t=pr==null?'':pr>=90?'t90':pr>=75?'t75':pr>=50?'t50':'';return `<div class="stat ${sv?'sv':''} ${t} ${cls||''}" title="${esc(l)}${pr!=null?' · PR '+pr:''}"><b>${v}</b><i>${l}</i>${pr!=null?`<em>PR ${pr}</em>`:''}</div>`}
 const LEGEND=`<span class="legend"><span><i style="border-color:#c99a1e"></i>PR90+</span><span><i style="border-color:#c8372d"></i>PR75+</span><span><i style="border-color:#2f8f4e"></i>PR50+</span></span>`;
 function playerStats(p){
@@ -579,19 +594,16 @@ function lotCard(p){
 }
 function teamPanel(i){
   const t=S.teams[i];
-  const rows=GROUPS.map(k=>{
-    const got=t.roster.filter(r=>r.slot===k),lines=[];
-    for(let n=0;n<S.slots[k];n++){const r=got[n];
-      lines.push(r?`<span class="k">${k}</span><span class="v">${esc(r.p.n)}</span><span class="p">${money(r.price)}</span>`
-        :`<span class="k">${k}</span><span class="v empty">(required)</span><span class="p"></span>`)}
-    return lines.join('');
-  }).join('');
+  const rows=GROUPS.flatMap(k=>t.roster.filter(r=>r.p.pos===k)).map(r=>`<span class="k">${r.p.pos}</span><span class="v">${esc(r.p.n)}</span><span class="p">${money(r.price)}</span>`).join('')
+    +Array.from({length:SQUAD-t.roster.length},()=>`<span class="k">··</span><span class="v empty">(open)</span><span class="p"></span>`).join('');
+  const c=cntOf(t.roster),nd=stillNeeds(t);
   const mr=minRemaining(t);
   return `<section class="panel teamcard ${i?'B':''}">
    <div class="eyebrow ${i?'tb':'ta'}">${S.ai?(S.ai.seat===i?'Computer':'You'):'Player '+(i?'B':'A')}</div>
    <h2 style="margin-top:4px">${esc(t.name)}</h2>
    <div class="row" style="justify-content:space-between;margin-top:6px"><div class="money ${i?'tb':'ta'}">${money(t.budget)}</div>
-   <div class="need">${mr} spot${mr===1?'':'s'} left${t.done?'<br><b>Squad complete</b>':''}</div></div>
+   <div class="need">${mr} spot${mr===1?'':'s'} left${nd.length?'<br>Still needs '+nd.join(', '):''}</div></div>
+   <div class="need mono">${GROUPS.map(k=>`${k} ${c[k]}`).join(' · ')}</div>
    <div class="slots">${rows}</div>
   </section>`;
 }
@@ -635,11 +647,9 @@ function renderDraft(){
       </div>`;
     }
   }
-  const done=i=>canMeetMin(S.teams[i])&&!S.teams[i].done&&isMine(i)?`<button class="ghost" style="width:100%" data-done="${i}">Squad complete, stop bidding</button>`:'';
   const grid=duo?`<div class="draft duo">${teamPanel(0)}<div class="duoside">${side[0]}</div><div class="lotcol">${lotHtml}</div><div class="duoside">${side[1]}</div>${teamPanel(1)}</div>`
     :`<div class="draft">${teamPanel(0)}<div class="lotcol">${lotHtml}</div>${teamPanel(1)}</div>`;
   $('#app').innerHTML=`${header()}${grid}
-   <div class="row">${done(0)}${done(1)}</div>
    <section class="panel"><div class="eyebrow">Auction log</div><div class="log" style="margin-top:8px">${S.log.map(l=>`<div>${l}</div>`).join('')||'<div>The first player is about to be revealed.</div>'}</div></section>`;
   if(L&&$('#bidbtn')){
     const go=()=>bid(parseInt($('#bidv').value));
@@ -647,7 +657,6 @@ function renderDraft(){
     document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>bid(L.price+ +b.dataset.q));
     if($('#passbtn'))$('#passbtn').onclick=pass;
   }
-  document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>declareDone(+b.dataset.done));
   scheduleAI();
 }
 function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[null,null],pending:null,log:[]};render()}
@@ -656,18 +665,17 @@ function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[
 function tradeResult(pi,ai,oi,bi){
   const A=S.teams[pi],B=S.teams[oi],xa=A.roster[ai],yb=B.roster[bi];
   const ta={roster:A.roster.filter(e=>e!==xa)},tb={roster:B.roster.filter(e=>e!==yb)};
-  const put=(t,e)=>{if(slotCount(t,e.p.pos)>=S.slots[e.p.pos])return false;t.roster.push({p:e.p,price:e.price,slot:e.p.pos,traded:true});return true};
-  if(!put(ta,yb)||!put(tb,xa)) return null;
+  ta.roster.push({p:yb.p,price:yb.price,slot:yb.p.pos,traded:true});tb.roster.push({p:xa.p,price:xa.price,slot:xa.p.pos,traded:true});
   if(!canMeetMin(ta)||!canMeetMin(tb)) return null;
   return [ta.roster,tb.roster];
 }
 function renderTrade(){
   const T=S.trade,pi=S.ai?1-S.ai.seat:T.prop,oi=1-pi,P=S.teams[pi],O=S.teams[oi];
   const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}</h2>
-    <div role="radiogroup" aria-label="${esc(S.teams[i].name)} players" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]?'disabled':''}><span class="mono" style="color:var(--dim);width:3em">${e.slot}</span><span class="spn">${esc(e.p.n)}</span><span class="mono" style="color:var(--dim)">Rating ${e.p.ovr}</span>${e.traded?'<span style="color:var(--dim)">acquired</span>':''}</label>`).join('')}</div></section>`;
+    <div role="radiogroup" aria-label="${esc(S.teams[i].name)} players" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>[e,j]).sort((a,b)=>GROUPS.indexOf(a[0].p.pos)-GROUPS.indexOf(b[0].p.pos)||b[0].p.ovr-a[0].p.ovr).map(([e,j])=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]?'disabled':''}><span class="mono" style="color:var(--dim);width:3em">${e.slot}</span><span class="spn">${esc(e.p.n)}</span><span class="mono" style="color:var(--dim)">Rating ${e.p.ovr}</span>${e.traded?'<span style="color:var(--dim)">acquired</span>':''}</label>`).join('')}</div></section>`;
   const both=T.sel[pi]!=null&&T.sel[oi]!=null,valid=both&&tradeResult(pi,T.sel[pi],oi,T.sel[oi]);
   const status=!T.left[pi]?`${esc(P.name)} has used all 3 trade proposals.`:!both?'Pick one player on each side for a one-for-one trade.'
-    :!valid?'This trade doesn\'t work: a squad would end up short of, or over, a position.':`${esc(P.roster[T.sel[pi]].p.n)} ⇄ ${esc(O.roster[T.sel[oi]].p.n)}: positions check out.`;
+    :!valid?'This trade doesn\'t work: a squad could no longer field a legal XI.':`${esc(P.roster[T.sel[pi]].p.n)} ⇄ ${esc(O.roster[T.sel[oi]].p.n)}: positions check out.`;
   const q=T.pending;
   const pend=q?`<section class="reveal"><div class="eyebrow">Trade proposal</div>
      <p style="font-size:18px;margin:8px 0"><b class="${q.pi?'tb':'ta'}">${esc(S.teams[q.pi].name)}</b> offers <b>${esc(S.teams[q.pi].roster[q.a].p.n)}</b> for <b class="${q.pi?'ta':'tb'}">${esc(S.teams[1-q.pi].name)}</b>'s <b>${esc(S.teams[1-q.pi].roster[q.b].p.n)}</b>.</p>
@@ -675,7 +683,7 @@ function renderTrade(){
      ${isMine(1-q.pi)?`<div class="row" style="justify-content:center;margin-top:12px"><button class="${q.pi?'a':'b'} solid" id="tacc">Accept</button><button class="ghost" id="trej">Decline</button></div>`:'<p class="waiting" style="margin-top:8px">Waiting for a reply…</p>'}</section>`:'';
   $('#app').innerHTML=`${header()}
   <section class="panel"><h2>Trades</h2>
-   <p class="hint" style="margin-top:6px">The draft is over. Each team gets 3 trade proposals, one player for one, and the other side must agree. A proposal is used up either way. Squads must still have the right number at each position after a trade.</p>
+   <p class="hint" style="margin-top:6px">The draft is over. Each team gets 3 trade proposals, one player for one, and the other side must agree. A proposal is used up either way. Both squads must still be able to field a legal XI after a trade.</p>
    <div class="row" style="margin-top:12px">${S.ai?`<span class="eyebrow">Proposals left</span><span>You have ${T.left[pi]}. The computer only answers your proposals; it never makes its own.</span>`
      :`<span class="eyebrow">Proposing team</span><div class="seg" role="group" aria-label="Proposing team">${[0,1].map(i=>`<button data-tp="${i}" aria-pressed="${pi===i}" ${T.pending?'disabled':''}>${esc(S.teams[i].name)} (${T.left[i]} left)</button>`).join('')}</div>`}</div></section>
   ${pend}
@@ -722,7 +730,7 @@ function bestForm(i,fit){
   }
   return best?best.f:FORMS.find(f=>formOK(i,f));
 }
-function defaultLineup(i,g){const fit=fitnessMap(i,g),f=bestForm(i,fit);return {f,xi:bestXI(i,f,fit)}}
+function defaultLineup(i,g){const fit=fitnessMap(i,g),f=bestForm(i,fit);return {f,xi:bestXI(i,f,fit),tac:'bal'}}
 function validLineup(i,lu){
   if(!lu||!FORMS.includes(lu.f)||!formOK(i,lu.f)||!Array.isArray(lu.xi)||lu.xi.length!==11)return false;
   const ids=new Set(squadOf(i).map(p=>sid(p.id)));if(!lu.xi.every(id=>ids.has(sid(id)))||new Set(lu.xi.map(sid)).size!==11)return false;
@@ -750,11 +758,15 @@ function teamStrength(on,raw){
   return {A,C,dcs,gkf,gk};
 }
 const SUBW=[46,58,66,74,82],SUBW_ET=[91,106];
+// mentality: how much a team commits forward. A scales the chances it makes, C the chances it allows, d how fast it tires
+const TAC={park:{l:'Park the bus',A:.7,C:.78,d:.92,x:-7},def:{l:'Defensive',A:.87,C:.9,d:.96,x:-3.5},bal:{l:'Balanced',A:1,C:1,d:1,x:0},
+  att:{l:'Attacking',A:1.13,C:1.15,d:1.06,x:3.5},all:{l:'All-out attack',A:1.28,C:1.3,d:1.12,x:7}};
+const TACK=Object.keys(TAC);
 function lambdaOf(sx,sy,home){return LGG*Math.pow(sx.A/LGA,.8)*Math.pow(sy.C/LGC,.8)*(home?1.11:.9)}
 const FIN=['fires low into the bottom corner','slots it past {gk}','curls one into the top corner','heads home from close range','smashes it in off the underside of the bar','taps in at the far post','drills it through {gk}\'s legs','lifts it over the advancing {gk}','buries the rebound','finds the net from the edge of the box'];
 const SHOT=['lets fly from distance','gets a shot away on the turn','meets a cross with a header','cuts inside and shoots','tries his luck from 25 yards','snatches at a half-chance','volleys from the edge of the area','goes for goal at the near post'];
 const SAVE=['{gk} gets down to save','{gk} tips it over the bar','{gk} parries it away','straight at {gk}','{gk} holds on comfortably','a fine save from {gk}'];
-const MISS=['just wide','over the bar','off the post!','into the side-netting','well wide','high into the stand','grazes the crossbar'];
+const MISS=['just wide','over the bar','off the post','into the side-netting','well wide','high into the stand','grazes the crossbar'];
 const BLOCK=['blocked by {d}','{d} throws himself in the way','charged down by {d}'];
 const tpl=(s,o)=>s.replace(/\{(\w+)\}/g,(_,k)=>o[k]);
 const nmShort=p=>p.w||p.n;
@@ -765,11 +777,13 @@ function simMatch(home,away,ctx){
     const fit=tm.fit;
     const mk=(p,role,inMin)=>({p,role,en:fit[sid(p.id)]??100,st:{min0:inMin,min1:null,g:0,a:0,sh:0,sot:0,sv:0,gc:0,yc:0,rc:0,off:false},emerg:false});
     const on=tm.xi.map(p=>mk(p,p.pos,0));
-    return {tm,s,on,all:[...on],bench:tm.bench.slice(),subs:0,maxSubs:5,mk,
-      score:0,sh:0,sot:0,xg:0,yc:0,rc:0,touch:0};
+    return {tm,s,on,all:[...on],bench:tm.bench.slice(),subs:0,maxSubs:5,mk,tac:TAC[tm.tac]?tm.tac:'bal',
+      score:0,sh:0,sot:0,xg:0,yc:0,rc:0};
   });
-  const ev=[],dec=ctx.dec||[];let di=0;
-  const snap=m=>({m,sc:[sides[0].score,sides[1].score],sh:sides.map(x=>x.sh),sot:sides.map(x=>x.sot),xg:sides.map(x=>+x.xg.toFixed(2)),yc:sides.map(x=>x.yc),rc:sides.map(x=>x.rc)});
+  const ev=[],dec=ctx.dec||[],tacs=ctx.tac||[];let di=0,tk=0,mn=0;
+  // every event carries the score, the stats and where each player stands, so playback can draw the pitch
+  const snap=m=>({m,tk,mn,sc:[sides[0].score,sides[1].score],sh:sides.map(x=>x.sh),sot:sides.map(x=>x.sot),xg:sides.map(x=>+x.xg.toFixed(2)),yc:sides.map(x=>x.yc),rc:sides.map(x=>x.rc),
+    tac:sides.map(x=>x.tac),ln:sides.map(S_=>S_.on.map(x=>[x.p.id,x.role,Math.round(x.en),x.st.yc,x.off?1:0]))});
   const push=(m,t,c,k)=>ev.push({k:k||'ev',t,c,...snap(m)});
   const active=S_=>S_.on.filter(x=>!x.off);
   const outfield=S_=>active(S_).filter(x=>x.role!=='GK');
@@ -821,7 +835,7 @@ function simMatch(home,away,ctx){
       if(ctx.human[S_.tm.i]){
         if(!q.ask)continue;
         v=dec[di];
-        if(v==null)throw {pause:{di,team:S_.tm.i,min:lab,score:[sides[0].score,sides[1].score],agg:ctx.agg,opts:q.opts,suggest:q.suggest,subsLeft:S_.maxSubs-S_.subs},partial:{ev,home,away,poss:[Math.round(poss0),100-Math.round(poss0)]}};
+        if(v==null)throw {pause:{di,tk,team:S_.tm.i,min:lab,score:[sides[0].score,sides[1].score],agg:ctx.agg,opts:q.opts,suggest:q.suggest,subsLeft:S_.maxSubs-S_.subs},partial:{ev,home,away,poss:[Math.round(poss0),100-Math.round(poss0)]}};
         di++;
       }else v=q.suggest;
       doSub(S_,v,min,lab);
@@ -844,6 +858,7 @@ function simMatch(home,away,ctx){
   function attack(X,Y,lab,big,pen,sx,sy){
     const gkY=sy.gk,gkName=gkY?nmShort(gkY.p):'an empty net';
     let shooter,xg;
+    const mark=res=>{ev[ev.length-1].shot={s:X.s,id:shooter.p.id,res,pen:!!pen,big:!!big}};
     if(pen){
       const of=outfield(X);shooter=of.filter(x=>x.p.pk).sort((a,b)=>b.p.g90-a.p.g90)[0]||of.sort((a,b)=>b.p.g90-a.p.g90)[0];
       xg=.78;push(lab,`❗ Penalty to ${tname(X)}! ${nmShort(shooter.p)} steps up…`,'big');
@@ -862,25 +877,36 @@ function simMatch(home,away,ctx){
       if(ast)ast.st.a++;
       const sc=`${sides[0].score}–${sides[1].score}`;
       push(lab,`⚽ GOAL! ${shooter.p.n} ${pen?'sends the keeper the wrong way':tpl(pick(FIN),{gk:gkName})}${ast?` (assist: ${nmShort(ast.p)})`:''}. ${tname(sides[0])} ${sc} ${tname(sides[1])}`,'goal');
-      ev[ev.length-1].gs={s:X.s,n:nmShort(shooter.p)+(pen?' (pen)':'')};
+      ev[ev.length-1].gs={s:X.s,n:nmShort(shooter.p)+(pen?' (pen)':'')};mark('goal');
       return;
     }
     const r=rnd();
     if(pen){
-      if(r<.6&&gkY){X.sot++;shooter.st.sot++;gkY.st.sv++;push(lab,`🧤 Saved! ${gkName} guesses right and keeps it out.`,'big')}
-      else push(lab,`${nmShort(shooter.p)} ${pick(['hits the post!','blazes it over!','drags it wide!'])}`,'big');
+      if(r<.6&&gkY){X.sot++;shooter.st.sot++;gkY.st.sv++;push(lab,`🧤 Saved! ${gkName} guesses right and keeps it out.`,'big');mark('save')}
+      else{push(lab,`${nmShort(shooter.p)} ${pick(['hits the post!','blazes it over!','drags it wide!'])}`,'big');mark('miss')}
       return;
     }
     const who=`${big?'Big chance! ':''}${nmShort(shooter.p)} ${pick(SHOT)}`;
-    if(r<.36&&gkY){X.sot++;shooter.st.sot++;gkY.st.sv++;push(lab,`${who} — ${tpl(pick(SAVE),{gk:gkName})}.`,big?'big':'')}
-    else if(r<.6){const d=wpick(outfield(Y),x=>x.role==='DEF'?x.p.dc90:x.p.dc90*.4);push(lab,`${who} — ${tpl(pick(BLOCK),{d:nmShort(d.p)})}.`,big?'big':'')}
-    else push(lab,`${who} — ${pick(MISS)}.`,big?'big':'');
+    if(r<.36&&gkY){X.sot++;shooter.st.sot++;gkY.st.sv++;push(lab,`${who} — ${tpl(pick(SAVE),{gk:gkName})}.`,big?'big':'');mark('save')}
+    else if(r<.6){const d=wpick(outfield(Y),x=>x.role==='DEF'?x.p.dc90:x.p.dc90*.4);push(lab,`${who} — ${tpl(pick(BLOCK),{d:nmShort(d.p)})}.`,big?'big':'');mark('block')}
+    else{push(lab,`${who} — ${pick(MISS)}.`,big?'big':'');mark('miss')}
+  }
+  function setTac(S_,v,lab){if(S_.tac===v)return;S_.tac=v;push(lab,`📣 ${tname(S_)} switch to ${TAC[v].l.toLowerCase()}.`,'sub')}
+  // the computer changes approach with the score and the clock
+  function aiTac(S_,min){
+    const diff=S_.score-sides[1-S_.s].score+(ctx.agg?ctx.agg[S_.s]-ctx.agg[1-S_.s]:0);
+    if(diff<0)return min>=80?'all':min>=60?'att':'bal';
+    if(diff>0)return diff===1&&min>=85?'park':min>=72?'def':'bal';
+    return ctx.ko&&min>=82?'att':'bal';
   }
   function minute(m,lab){
-    for(const S_ of sides){
-      for(const x of active(S_)){x.en=Math.max(20,x.en-(.42+Math.max(0,(x.p.age||27)-30)*.03))}
+    tk++;
+    for(const c of tacs)if(c.t===tk&&TAC[c.v]){const S_=sides.find(x=>x.tm.i===c.i);if(S_)setTac(S_,c.v,lab)}
+    if(!lab.includes('+')&&[60,70,78,85,100,112].includes(m))for(const S_ of sides)if(!ctx.human[S_.tm.i])setTac(S_,aiTac(S_,m),lab);
+    for(const S_ of sides){const d=TAC[S_.tac].d;
+      for(const x of active(S_)){x.en=Math.max(20,x.en-(.42+Math.max(0,(x.p.age||27)-30)*.03)*d)}
     }
-    const st=sides.map(S_=>teamStrength(S_.on));
+    const st=sides.map(S_=>{const t=teamStrength(S_.on),k=TAC[S_.tac];return {...t,A:t.A*k.A,C:t.C*k.C}});
     for(const s of rnd()<.5?[0,1]:[1,0]){
       const X=sides[s],Y=sides[1-s],lam=lambdaOf(st[s],st[1-s],s===0);
       const pRate=.11/93*Math.sqrt(st[s].A/LGA);
@@ -891,7 +917,7 @@ function simMatch(home,away,ctx){
     for(const S_ of sides)for(const x of active(S_)){
       if(rnd()<x.p.yc90/90*1.05){
         if(x.st.yc){if(rnd()<.25){x.st.yc++;S_.yc++;sendOff(S_,x,lab,true)}}
-        else{x.st.yc=1;S_.yc++;push(lab,`🟨 ${x.p.n} (${tname(S_)}) is booked.`,'')}
+        else{x.st.yc=1;S_.yc++;push(lab,`🟨 ${x.p.n} (${tname(S_)}) is booked.`,'');ev[ev.length-1].card={s:S_.s,id:x.p.id}}
       }else if(rnd()<.0004/11*(x.role==='GK'?.3:1)) sendOff(S_,x,lab,false);   // a straight red: about one match in twelve
     }
   }
@@ -899,13 +925,14 @@ function simMatch(home,away,ctx){
     const stop=extra;
     for(let m=from;m<=to+stop;m++){
       const lab=m<=to?String(m):`${to}+${m-to}`;
+      mn=m<=to?m:to+.9*(m-to)/(stop+1);
       if(m<=to){const w=(to<=90?SUBW:SUBW_ET);if(w.includes(m))subWindow(m,lab)}
       minute(m<=to?m:to,lab);
     }
   }
   const kickoff=`Kick-off at ${possessive(home.name)} ground. ${ctx.agg?`First leg: ${home.name} ${ctx.agg[0]}–${ctx.agg[1]} ${away.name}.`:''}`;
   push('0',kickoff,'','note');
-  for(const S_ of sides)push('0',`${tname(S_)} (${S_.tm.form}): ${S_.on.map(x=>nmShort(x.p)).join(', ')}.`,'','note');
+  for(const S_ of sides)push('0',`${tname(S_)} (${S_.tm.form}${S_.tac!=='bal'?', '+TAC[S_.tac].l.toLowerCase():''}): ${S_.on.map(x=>nmShort(x.p)).join(', ')}.`,'','note');
   period(1,45,1+Math.floor(rnd()*4));
   push('45',`Half-time: ${home.name} ${sides[0].score}–${sides[1].score} ${away.name}.`,'','half');
   for(const S_ of sides)for(const x of active(S_))x.en=Math.min(100,x.en+6);
@@ -964,18 +991,18 @@ const rosterKey=()=>S.teams.map(t=>t.roster.map(e=>e.p.id).join('.')).join('|');
 function teamFor(i,g,lu){
   const fit=fitnessMap(i,g),l=validLineup(i,lu)?lu:defaultLineup(i,g),inXI=new Set(l.xi.map(sid));
   const xi=l.xi.map(id=>BYID.get(id)).sort((a,b)=>GROUPS.indexOf(a.pos)-GROUPS.indexOf(b.pos));
-  return {i,name:S.teams[i].name,form:l.f,xi,bench:squadOf(i).filter(p=>!inXI.has(sid(p.id))),fit};
+  return {i,name:S.teams[i].name,form:l.f,tac:(lu&&TAC[lu.tac])?lu.tac:'bal',xi,bench:squadOf(i).filter(p=>!inXI.has(sid(p.id))),fit};
 }
 function gameResult(g){
   const gm=S.series.games[g],dec=gm.dec||[];
-  const key=[gm.seed,JSON.stringify(gm.lu),JSON.stringify(dec),rosterKey(),S.ai?S.ai.seat:'-'].join('/');
+  const key=[gm.seed,JSON.stringify(gm.lu),JSON.stringify(dec),JSON.stringify(gm.tac||[]),rosterKey(),S.ai?S.ai.seat:'-'].join('/');
   if(RES_CACHE.has(key))return RES_CACHE.get(key);
   const h=S.series.sched[g],tms=[0,1].map(i=>teamFor(i,g,gm.lu[i]));
   let agg=null;
   if(S.mode==='legs'&&g===1){const r0=gameResult(0);agg=[r0.score[r0.home.i===h?0:1],r0.score[r0.home.i===h?1:0]]}
   const old=rnd;rnd=mulberry32(gm.seed);
   let res;
-  try{res=simMatch(tms[h],tms[1-h],{dec,human:[0,1].map(i=>!(S.ai&&S.ai.seat===i)),ko:!(S.mode==='legs'&&g===0),agg})}
+  try{res=simMatch(tms[h],tms[1-h],{dec,human:[0,1].map(i=>!(S.ai&&S.ai.seat===i)),ko:!(S.mode==='legs'&&g===0),agg,tac:gm.tac||[]})}
   catch(e){if(!e||!e.pause)throw e;res={...e.partial,paused:e.pause}}
   finally{rnd=old}
   if(!res.paused&&res.win!=null)res.winIdx=(res.win?res.away:res.home).i;
@@ -1016,7 +1043,7 @@ let LUED=[null,null],LUED_KEY='';
 function ensureLued(g){
   const k='g'+g+'/'+S.series.sched.join('');if(LUED_KEY===k)return;
   LUED_KEY=k;
-  LUED=[0,1].map(i=>{const prev=g?S.series.games[g-1].lu[i]:null;if(prev&&validLineup(i,prev)){const fit=fitnessMap(i,g);return {f:prev.f,xi:bestXI(i,prev.f,fit)}}return defaultLineup(i,g)});
+  LUED=[0,1].map(i=>{const prev=g?S.series.games[g-1].lu[i]:null;if(prev&&validLineup(i,prev)){const fit=fitnessMap(i,g);return {f:prev.f,xi:bestXI(i,prev.f,fit),tac:prev.tac||'bal'}}return defaultLineup(i,g)});
 }
 function xiEditor(i,g){
   const lu=LUED[i],fit=fitnessMap(i,g),sq=squadOf(i),n=formN(lu.f);
@@ -1027,6 +1054,8 @@ function xiEditor(i,g){
   const bench=sq.filter(p=>!inXI.has(sid(p.id)));
   return `<div class="eyebrow" style="margin-top:12px">Formation</div>
    <div class="seg formseg" role="group" aria-label="Formation">${FORMS.map(f=>`<button data-form="${i},${f}" aria-pressed="${lu.f===f}" ${formOK(i,f)?'':'disabled'}>${f}</button>`).join('')}</div>
+   <div class="eyebrow" style="margin-top:12px">Approach</div>
+   <div class="seg formseg" role="group" aria-label="Approach">${TACK.map(k=>`<button data-tac0="${i},${k}" aria-pressed="${(lu.tac||'bal')===k}">${TAC[k].l}</button>`).join('')}</div>
    <div class="eyebrow" style="margin-top:12px">Starting XI</div><div class="xi">${rows}</div>
    <p class="hint" style="margin-top:6px">Pick a substitute from a menu to bring him into the XI. The bar is each player's fitness.</p>
    <div class="eyebrow" style="margin-top:12px">Substitutes</div>
@@ -1048,11 +1077,12 @@ function renderPick(){
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${matchTitle(g)} · at ${tname(h)}</div>
    <h2 style="margin-top:4px">Team selection</h2>
-   <p class="hint" style="margin-top:6px">${ctxLine} Pick a formation and your starting XI. ${g?'Players who played the last match start less fresh, and tired players do less. ':''}You can make up to 5 substitutions (one more in extra time).</p></section>
+   <p class="hint" style="margin-top:6px">${ctxLine} Pick a formation and your starting XI. ${g?'Players who played the last match start less fresh, and tired players do less. ':''}Your 2 substitutes can come on during the match, and you can change your approach at any time.</p></section>
   <div class="grid2">${panel(0)}${panel(1)}</div>
   <div class="row"><button class="solid" id="startg">Kick off ⚽</button></div>`;
   const at=s=>s.split(',');
-  document.querySelectorAll('[data-form]').forEach(b=>b.onclick=()=>{const [i,f]=at(b.dataset.form);const fit=fitnessMap(+i,g);LUED[+i]={f,xi:bestXI(+i,f,fit)};renderPick()});
+  document.querySelectorAll('[data-form]').forEach(b=>b.onclick=()=>{const [i,f]=at(b.dataset.form);const fit=fitnessMap(+i,g);LUED[+i]={f,xi:bestXI(+i,f,fit),tac:LUED[+i].tac};renderPick()});
+  document.querySelectorAll('[data-tac0]').forEach(b=>b.onclick=()=>{const [i,v]=at(b.dataset.tac0);LUED[+i].tac=v;renderPick()});
   document.querySelectorAll('[data-xi]').forEach(el=>el.onchange=()=>{const [i,old]=at(el.dataset.xi),lu=LUED[+i],nw=pid(el.value);
     const j=lu.xi.findIndex(id=>sid(id)===sid(nw)),k=lu.xi.findIndex(id=>sid(id)===old);
     if(j<0)lu.xi[k]=nw;   // a substitute comes in; picking someone already in the XI just keeps the XI as it is
@@ -1085,9 +1115,15 @@ function scoreboard(res,e){
     <span class="l">${e.yc[0]}${e.rc[0]?' · 🟥'+e.rc[0]:''}</span><span class="k">Cards</span><span>${e.yc[1]}${e.rc[1]?' · 🟥'+e.rc[1]:''}</span></div>`:''}`;
 }
 function myTeams(){return [0,1].filter(isMine)}
+function tacControls(){
+  const G=S.game,e=G.pos?G.res.ev[G.pos-1]:null;
+  return myTeams().map(i=>{const side=G.res.home.i===i?0:1,cur=G.tacUI&&G.tacUI[i]||(e?e.tac[side]:G.res.ev[0].tac[side]);
+    return `<div class="row" style="margin-top:8px"><span class="eyebrow ${colorOf(i)}">${myTeams().length>1?esc(S.teams[i].name):'Approach'}</span>
+      <div class="seg formseg" role="group" aria-label="${esc(S.teams[i].name)} approach">${TACK.map(k=>`<button data-tac="${i},${k}" aria-pressed="${cur===k}" ${G.finished?'disabled':''}>${TAC[k].l}</button>`).join('')}</div></div>`}).join('');
+}
 function renderGameShell(){
   const G=S.game,res=G.res,st=seriesState(G.gnum);
-  const auto=myTeams().map(i=>`<label class="autolbl"><input type="checkbox" data-auto="${i}" ${AUTO[i]?'checked':''}> ${myTeams().length>1?esc(S.teams[i].name)+' ':''}Auto-manage (stop asking)</label>`).join('');
+  const auto=myTeams().map(i=>`<label class="autolbl"><input type="checkbox" data-auto="${i}" ${AUTO[i]?'checked':''}> ${myTeams().length>1?esc(S.teams[i].name)+' ':''}Auto-manage substitutions</label>`).join('');
   $('#app').innerHTML=`${header()}
   <section class="panel">
    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${matchTitle(G.gnum)} · at ${esc(res.home.name)}</div>
@@ -1095,14 +1131,32 @@ function renderGameShell(){
     <div class="row"><span class="eyebrow">Speed</span><div class="seg" role="group" aria-label="Speed">${[['Slow',1300],['Normal',600],['Fast',150]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">Skip ahead</button></div>
    </div>
    <div id="sb">${scoreboard(res,null)}</div>
+   <div id="tacs">${tacControls()}</div>
    ${auto?`<div class="row" style="margin-top:8px">${auto}</div>`:''}
   </section>
   <div id="decide"></div>
-  <div class="pbp" id="pbp" aria-live="polite"></div>
+  <div class="matchgrid">
+   <section class="panel pitchwrap">${pitchSVG()}<div class="eyebrow" style="margin-top:10px">Expected goals, as the match goes</div><div id="xgc"></div></section>
+   <div class="pbp" id="pbp" aria-live="polite"></div>
+  </div>
   <div id="after"></div>`;
+  PITCH.els=new Map();drawPitch(G.res.ev[0],true);
   document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
   $('#skip').onclick=()=>{clearTimeout(timer);S.game.skip=true;play()};
+  bindTacs();
+}
+function bindTacs(){
+  document.querySelectorAll('[data-tac]').forEach(b=>b.onclick=()=>{const [i,v]=b.dataset.tac.split(',');setTactic(+i,v)});
+}
+// a change of approach takes effect from the next minute; everything already shown stays the same
+function setTactic(i,v){
+  const G=S.game;if(!G||G.finished)return;
+  const gm=S.series.games[G.gnum],last=G.pos?G.res.ev[G.pos-1].tk:0;
+  (gm.tac=gm.tac||[]).push({t:last+1,i,v});
+  G.res=gameResult(G.gnum);
+  (G.tacUI=G.tacUI||{})[i]=v;
+  $('#tacs').innerHTML=tacControls();bindTacs();
 }
 function emit(){
   const G=S.game,e=G.res.ev[G.pos++],box=$('#pbp');
@@ -1114,6 +1168,87 @@ function emit(){
     box.appendChild(d);box.scrollTop=box.scrollHeight;
   }
   $('#sb').innerHTML=scoreboard(G.res,e);
+  if(G.tacUI){const side=i=>G.res.home.i===i?0:1;for(const i in G.tacUI)if(e.tac[side(+i)]===G.tacUI[i])delete G.tacUI[i]}
+  if(!G.skip||G.pos>=G.res.ev.length){drawPitch(e,G.skip);$('#xgc').innerHTML=xgChart(G.res,G.pos)}
+  if(document.querySelector('[data-tac]')){document.querySelectorAll('[data-tac]').forEach(b=>{const [i,v]=b.dataset.tac.split(','),side=G.res.home.i===+i?0:1;
+    b.setAttribute('aria-pressed',((G.tacUI&&G.tacUI[i])||e.tac[side])===v)})}
+}
+
+/* ---------- the pitch: both XIs by formation, the ball following each chance ---------- */
+const PITCH={els:new Map()};
+const TEAMCOL=['#f2b134','#7cc7ea'];
+function pitchSVG(){
+  const stripes=Array.from({length:10},(_,k)=>`<rect x="${k*10.5}" y="0" width="10.5" height="68" fill="${k%2?'#1f6a3b':'#236f40'}"/>`).join('');
+  const L='fill="none" stroke="rgba(255,255,255,.75)" stroke-width=".35"';
+  return `<svg class="pitch" viewBox="-4 -3 113 74" role="img" aria-label="Pitch: both line-ups and the ball">
+   <rect x="-4" y="-3" width="113" height="74" fill="#1a5c34"/>${stripes}
+   <rect x="0" y="0" width="105" height="68" ${L}/><line x1="52.5" y1="0" x2="52.5" y2="68" ${L}/><circle cx="52.5" cy="34" r="9.15" ${L}/>
+   <rect x="0" y="13.85" width="16.5" height="40.3" ${L}/><rect x="88.5" y="13.85" width="16.5" height="40.3" ${L}/>
+   <rect x="0" y="24.84" width="5.5" height="18.32" ${L}/><rect x="99.5" y="24.84" width="5.5" height="18.32" ${L}/>
+   <rect x="-2" y="30.34" width="2" height="7.32" ${L}/><rect x="105" y="30.34" width="2" height="7.32" ${L}/>
+   <circle cx="11" cy="34" r=".35" fill="#fff"/><circle cx="94" cy="34" r=".35" fill="#fff"/><circle cx="52.5" cy="34" r=".35" fill="#fff"/>
+   <g id="pl"></g><line id="shotline" x1="0" y1="0" x2="0" y2="0" stroke="#fff" stroke-width=".3" stroke-dasharray="1 .8" opacity="0"/>
+   <circle id="ball" r="1.05" fill="#fff" stroke="#111" stroke-width=".25" style="transform:translate(52.5px,34px)"/>
+   <text id="flash" x="52.5" y="38" text-anchor="middle" class="flash"></text>
+  </svg>`;
+}
+// where each player stands: lines by role, pushed up or dropped back by the team's approach
+function layout(e){
+  const pos=new Map();
+  e.ln.forEach((line,s)=>{
+    const act=line.filter(x=>!x[4]),tac=TAC[e.tac[s]].x;
+    const by=r=>act.filter(x=>x[1]===r);
+    const put=(arr,x,stag)=>arr.forEach((x0,k)=>{let xx=x+(stag&&arr.length>=4?(k%2?-2.5:2.5):0),yy=6+56*(k+.5)/arr.length;
+      if(s)xx=105-xx,yy=68-yy;pos.set(sid(x0[0]),{x:xx,y:yy,s,en:x0[2],yc:x0[3]})});
+    put(by('GK'),4,false);put(by('DEF'),19+tac*.6,false);put(by('MID'),32.5+tac,by('MID').length>=4);put(by('FWD'),Math.min(50,43.5+tac),false);
+  });
+  return pos;
+}
+function drawPitch(e,instant){
+  const g=$('#pl');if(!g||!e||!e.ln)return;
+  const pos=layout(e),res=S.game.res,seen=new Set();
+  for(const [id,p] of pos){
+    seen.add(id);let el=PITCH.els.get(id);
+    const ti=(p.s?res.away:res.home).i,pl=BYID.get(+id),gk=e.ln[p.s].find(x=>sid(x[0])===id)[1]==='GK';
+    if(!el){el=document.createElementNS('http://www.w3.org/2000/svg','g');el.setAttribute('class','pdot');g.appendChild(el);PITCH.els.set(id,el)}
+    el.innerHTML=`<circle r="1.9" fill="${gk?'#e9e4d2':TEAMCOL[ti]}" stroke="${staColor(p.en)}" stroke-width=".55"/>${p.yc?'<rect x="1.1" y="-2.9" width="1" height="1.4" fill="#f5d90a"/>':''}<text y="4.4" text-anchor="middle">${esc(pl?nmShort(pl):'')}</text><title>${esc(pl?pl.n:'')} · energy ${p.en}%</title>`;
+    if(instant)el.style.transition='none';else el.style.transition='';
+    el.style.transform=`translate(${p.x}px,${p.y}px)`;
+  }
+  for(const [id,el] of PITCH.els)if(!seen.has(id)){el.remove();PITCH.els.delete(id)}
+  if(e.shot&&!instant)animShot(e,pos);
+  else if(e.k==='half'||e.m==='0')moveBall(52.5,34,true);
+}
+function moveBall(x,y,instant,ms){const b=$('#ball');if(!b)return;b.style.transition=instant?'none':`transform ${ms||300}ms ease-out`;b.style.transform=`translate(${x}px,${y}px)`}
+function animShot(e,pos){
+  const sh=e.shot,me=pos.get(sid(sh.id)),dir=sh.s?-1:1,gx=sh.s?0:105;
+  const fx=x=>sh.s?105-x:x;
+  let sx=sh.pen?fx(94):fx(clamp((me?(sh.s?105-me.x:me.x):80)+18+Math.random()*10,78,99)),sy=sh.pen?34:clamp((me?me.y:34)*.5+34*.5+(Math.random()-.5)*14,14,54);
+  const side=Math.random()<.5?-1:1;
+  const tgt={goal:[gx+dir*1.2,34+side*Math.random()*3],save:[gx-dir*1.6,34+side*Math.random()*2],block:[sx+dir*4,sy+(Math.random()-.5)*4],miss:[gx+dir*1.5,34+side*(4.6+Math.random()*5)]}[sh.res];
+  const ms=clamp(S.speed*.35,70,420);
+  moveBall(sx,sy,false,ms);
+  const line=$('#shotline');
+  clearTimeout(PITCH.t1);clearTimeout(PITCH.t2);
+  PITCH.t1=setTimeout(()=>{
+    moveBall(tgt[0],tgt[1],false,ms*.7);
+    if(line){line.setAttribute('x1',sx);line.setAttribute('y1',sy);line.setAttribute('x2',tgt[0]);line.setAttribute('y2',tgt[1]);line.style.opacity=.8}
+    PITCH.t2=setTimeout(()=>{if(line)line.style.opacity=0;
+      if(sh.res==='goal'){const f=$('#flash');if(f){f.textContent='GOAL!';f.setAttribute('fill',TEAMCOL[(sh.s?S.game.res.away:S.game.res.home).i]);f.classList.remove('on');void f.getBBox;f.classList.add('on')}
+        setTimeout(()=>moveBall(52.5,34,false,ms),ms*2)}},ms*1.4);
+  },ms+40);
+}
+// cumulative xG for both sides, minute by minute, with the goals marked
+function xgChart(res,upto){
+  const evs=res.ev.slice(0,upto).filter(e=>e.mn!=null);if(!evs.length)return '';
+  const last=evs[evs.length-1],maxM=evs.some(e=>e.mn>91)?120:90,top=Math.max(1.5,Math.ceil(Math.max(...last.xg)*2)/2);
+  const X=m=>26+m/maxM*286,Y=v=>78-v/top*68;
+  const series=[0,1].map(s=>{let d=`M${X(0)},${Y(0)}`,prev=0;for(const e of evs){const v=e.xg[s];if(v!==prev){d+=` H${X(e.mn).toFixed(1)} V${Y(v).toFixed(1)}`;prev=v}}return d+` H${X(last.mn).toFixed(1)}`});
+  const goals=evs.filter(e=>e.shot&&e.shot.res==='goal').map(e=>`<circle cx="${X(e.mn).toFixed(1)}" cy="${Y(e.xg[e.shot.s]).toFixed(1)}" r="3.2" fill="${TEAMCOL[(e.shot.s?res.away:res.home).i]}" stroke="#0d3326" stroke-width="1"/>`).join('');
+  const grid=[0,top/2,top].map(v=>`<line x1="26" x2="312" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6"/><text x="22" y="${Y(v)+3}" text-anchor="end">${v.toFixed(1)}</text>`).join('')
+    +[45,90,...(maxM>90?[105,120]:[])].map(m=>`<line x1="${X(m)}" x2="${X(m)}" y1="10" y2="78" stroke="var(--line)" stroke-dasharray="2 2" stroke-width=".6"/><text x="${X(m)}" y="88" text-anchor="middle">${m}′</text>`).join('');
+  return `<svg class="xgc" viewBox="0 0 320 92" role="img" aria-label="Expected goals: ${esc(res.home.name)} ${last.xg[0].toFixed(2)}, ${esc(res.away.name)} ${last.xg[1].toFixed(2)}">${grid}
+   ${series.map((d,s)=>`<path d="${d}" fill="none" stroke="${TEAMCOL[(s?res.away:res.home).i]}" stroke-width="2"/>`).join('')}${goals}</svg>`;
 }
 function play(){
   const G=S.game;
@@ -1217,6 +1352,6 @@ function render(){
   if(f)return f();
   if(S.screen==='stuck'){$('#app').innerHTML=`${header()}<section class="panel"><h2>Out of players</h2><p class="hint">No remaining player can fill the missing spots. Start a new draft.</p><button id="restart">New draft</button></section>`;$('#restart').onclick=()=>{S.screen='setup';render()}}
 }
-derive();buildPRS();calibrate();fixSlots();
+derive();buildPRS();calibrate();
 render();
 </script>
