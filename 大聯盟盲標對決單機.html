@@ -7,7 +7,7 @@
 <title>大聯盟盲標對決</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
 /* Layout: a hand-operated outfield scoreboard — green panels, chalk numerals, two team colors. Single dark look by choice. */
 :root{
@@ -23,11 +23,12 @@ body{background:var(--board);color:var(--chalk);font-family:var(--body);font-siz
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;
   background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 2px,transparent 2px 46px)}
 .wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
-/* draft screen: everything, bid box included, should fit one screen */
-.wrap:has(.draft){gap:10px}
-.wrap:has(.draft) header.top{padding-bottom:6px}
-.wrap:has(.draft) h1{font-size:clamp(26px,3vw,34px)}
-.wrap:has(.draft) h1 small{font-size:13px;margin-top:2px}
+/* draft screen: everything, bid box included, should fit one screen. render() tags .wrap with the screen
+   (s-draft, s-pick, s-game) instead of :has(), which phones re-check on every update */
+.wrap.s-draft{gap:10px}
+.wrap.s-draft header.top{padding-bottom:6px}
+.wrap.s-draft h1{font-size:clamp(26px,3vw,34px)}
+.wrap.s-draft h1 small{font-size:13px;margin-top:2px}
 .draft .panel{padding:12px 14px}
 header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--chalk);padding-bottom:10px}
 h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,58px);line-height:.95;margin:0;letter-spacing:.01em;text-transform:uppercase}
@@ -192,12 +193,12 @@ button.mini{padding:3px 8px;font-size:13px}
 .draft.duo .card .stats{grid-template-columns:repeat(auto-fill,minmax(62px,1fr))}
 /* phone held sideways: little height, so the header shrinks and the bid area tightens */
 @media (max-height:520px){
-  body:has(.draft.duo){padding-block:6px 16px}
-  .wrap:has(.draft.duo){gap:6px}
-  .wrap:has(.draft.duo) header.top{padding-bottom:2px;border-bottom-width:2px}
-  .wrap:has(.draft.duo) h1{font-size:18px}
-  .wrap:has(.draft.duo) h1 small,.wrap:has(.draft.duo) .src{display:none}
-  .wrap:has(.draft.duo) .lobbybar button{padding:2px 8px;font-size:12px}
+  body.duo{padding-block:6px 16px}
+  .wrap.duo{gap:6px}
+  .wrap.duo header.top{padding-bottom:2px;border-bottom-width:2px}
+  .wrap.duo h1{font-size:18px}
+  .wrap.duo h1 small,.wrap.duo .src{display:none}
+  .wrap.duo .lobbybar button{padding:2px 8px;font-size:12px}
   .draft.duo .duoside{margin-top:0;top:4px}
   .draft.duo .duobid{padding:7px 8px;gap:3px}
   .draft.duo .duobid .price .big{font-size:24px}
@@ -218,7 +219,7 @@ button.mini{padding:3px 8px;font-size:13px}
   h1{font-size:24px}
   h1 small{font-size:11.5px;margin-top:3px}
   .src{font-size:10.5px}
-  .wrap:has(.draft) .src,.wrap:has(.pbp) .src,.wrap:has(.lued) .src{display:none}
+  .wrap.s-draft .src,.wrap.s-game .src,.wrap.s-battle .src,.wrap.s-pick .src{display:none}
   .lobbybar button{padding:4px 10px;font-size:13px}
   .panel{padding:12px}
   .mobonly{display:block}
@@ -750,6 +751,7 @@ function renderDraft(){
      </div>`;
     }
   }
+  $('#app').classList.toggle('duo',duo);document.body.classList.toggle('duo',duo);
   const grid=duo?`<div class="draft duo">${teamPanel(0)}<div class="duoside">${side[0]}</div><div class="lotcol">${lotHtml}</div><div class="duoside">${side[1]}</div>${teamPanel(1)}</div>`
     :`<div class="draft">${teamPanel(0)}<div class="lotcol">${lotHtml}</div>${teamPanel(1)}</div>`;
   $('#app').innerHTML=`${header()}
@@ -1492,7 +1494,9 @@ function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,m
   series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev}}
 function hydrate(o){
   const prevSel=S.trade&&S.trade.sel;
-  setLeague(o.league||'MLB');if(o.slots)S.slots={...o.slots};
+  // rebuilding the league tables takes a phone tens of milliseconds, so only when the league actually changes
+  if((o.league||'MLB')!==S.league)setLeague(o.league||'MLB');
+  if(o.slots)S.slots={...o.slots};
   S.screen=o.screen;S.mode=o.mode;S.lotMax=o.lotMax;S.budget=o.budget;
   S.teams=o.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:t.done,roster:t.roster.map(e=>({p:BYID.get(e.id),price:e.price,slot:e.slot,slot2:e.slot2||undefined,traded:e.traded}))}));
   S.deckKey=o.deckKey;S.tail=(o.deckTail||[]).slice();S.deck=deckFrom(o);S.lotNo=o.lotNo;S.lot=o.lot?{...o.lot,p:BYID.get(o.lot.p)}:null;
@@ -1510,7 +1514,8 @@ function onRoom(snap){
     else{hydrate(st);render()}
   }
   if(S.screen==='room'){if(!NET.drawn)renderRoom();else updateRoom()}
-  if(S.screen==='pick'){maybeFinalizePick();if(S.screen==='pick')renderPick()}
+  // redraw the lineup screen only when something on it changed: a redraw closes a menu the player has open
+  if(S.screen==='pick'){maybeFinalizePick();if(S.screen==='pick'){const sig=S.rev+'|'+JSON.stringify((d.picks||{})[pickKey()]||null);if(sig!==NET.pickSig){NET.pickSig=sig;renderPick()}}}
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length&&decList(S.game.gnum).length>S.game.res.paused.di) resumeGame();
   updateNetBadge();
 }
@@ -1709,6 +1714,7 @@ function render(){
   document.title=TR('大聯盟盲標對決','MLB Blind Auction');
   if($('#followbtn')){$('#follow span').textContent=TR('對手已經前往下一步。','Your opponent has moved on.');$('#followbtn').textContent=TR('跟上','Catch up')}
   updateNetBadge();
+  $('#app').className='wrap s-'+S.screen;
   const f={home:renderHome,setup:renderSetup,draft:renderDraft,pregame:renderPregame,trade:renderTrade,pick:renderPick,game:startGame,room:renderRoom}[S.screen];
   if(f) return f();
   if(S.screen==='stuck'){ $('#app').innerHTML=`${header()}<section class="panel"><h2>${TR('球員池用完了','Out of players')}</h2><p class="hint">${TR('剩下的球員沒有人能填補還缺的位置。請重新選秀。','No remaining player can fill the missing spots. Start a new draft.')}</p><button id="restart">${TR('重新選秀','New draft')}</button></section>`; $('#restart').onclick=()=>{S.screen=NET.on?'room':'setup';sync();render()}; }
