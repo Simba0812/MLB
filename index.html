@@ -324,7 +324,12 @@ function computeDef(pool){
   const scale=g=>{const v=g.map(raw).filter(x=>x!=null),m=v.reduce((a,b)=>a+b,0)/(v.length||1),sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/(v.length||1))||1;
     return x=>x==null?0:clamp((x-m)/sd*6,-15,18)};
   const fc=scale(H.filter(p=>p.pos==='C')),ff=scale(H.filter(p=>p.pos!=='C'&&p.pos!=='DH'));
-  H.forEach(p=>{p.def=p.pos==='DH'?0:Math.round((p.pos==='C'?fc:ff)(raw(p))*10)/10});
+  H.forEach(p=>{p.def=p.pos==='DH'?0:Math.round((p.pos==='C'?fc:ff)(raw(p))*10)/10;
+    // fielding at his other positions, from that position's own numbers. A short stint is pulled toward average
+    // (60 games of average fielding mixed in), then scaled up to as many games as he played at his main position.
+    p.defAt={};const gref=(p.poss&&p.poss[p.pos])||120;
+    for(const [k,v] of Object.entries(p.pdef||{})){const g=(p.poss&&p.poss[k])||0;
+      p.defAt[k]=Math.round((k==='C'?fc:ff)(v*gref/(g+60))*10)/10}});
 }
 // the rating is a player's rank among his own kind in this league (hitters, starters, relievers),
 // read off a curve: top 3% about 93, top 10% about 86, top 20% about 80, median 68
@@ -676,7 +681,7 @@ function lotCard(p){
     </div>
     <div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div>
    </div>
-   <div class="meta">${p.alt&&p.alt.length?`<span>${TR('主守位','Main')}</span>`:''}<span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}${p.poss&&p.poss[p.pos]&&p.alt&&p.alt.length?` ${p.poss[p.pos]}${TR(' 場',' G')}`:''}</span>${p.alt&&p.alt.length?`<span>${TR('副守位 ','also plays ')}${p.alt.map(k=>`<span class="pos">${k}</span> ${p.poss[k]}${TR(' 場',' G')}`).join(' ')}</span>`:''}<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
+   <div class="meta">${p.alt&&p.alt.length?`<span>${TR('主守位','Main')}</span>`:''}<span class="pos">${p.twp?'DH ＋ SP':p.pos}</span><span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}${p.poss&&p.poss[p.pos]&&p.alt&&p.alt.length?` ${p.poss[p.pos]}${TR(' 場',' G')}`:''}</span>${p.alt&&p.alt.length?`<span>${TR('副守位 ','also plays ')}${p.alt.map(k=>`<span class="pos">${k}</span> ${p.poss[k]}${TR(' 場',' G')}${p.defAt&&p.defAt[k]!=null?TR(`（守備 ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)}）`,` (fielding ${p.defAt[k]>0?'+':''}${p.defAt[k].toFixed(1)})`):''}`).join(' ')}</span>`:''}<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}</div>
    ${p.type==='H'?hitterStats(p):pitcherStats(p)}
    ${p.twp?pitcherStats({...p.twp},TR('投手成績','Pitching')):''}
   </div>`;
@@ -827,13 +832,14 @@ function validLineup(i,lu){
   return lu.every(x=>ids.has(sid(x.id)))&&new Set(lu.map(x=>sid(x.id))).size===9&&POSLIST.every(k=>lu.some(x=>x.pos===k));
 }
 const lineupFor=(i,lu)=>validLineup(i,lu)?lu:defaultLineup(i);
-// fielding value at a position. Main position: his own rating. Secondary position: 70% of a good rating, a poor one stays
-// as poor; framing (catchers) and range (everyone else) don't carry over, so a secondary position involving catcher is -2.
-// Anywhere else: a big penalty.
+// fielding value at a position. Main position: his own rating. Secondary position: his rating from that position's own
+// numbers; if the source had none, 70% of a good main-position rating (a poor one stays poor), or -2 where catcher is involved,
+// since framing and range don't carry over. Anywhere else: a big penalty.
 function defOf(p,pos){
   if(pos==='DH') return 0;
   if(p.pos===pos) return p.def||0;
-  if(p.alt&&p.alt.includes(pos)){if(pos==='C'||p.pos==='C'||p.pos==='DH')return -2;const d=p.def||0;return d>0?d*.7:d}
+  if(p.alt&&p.alt.includes(pos)){if(p.defAt&&p.defAt[pos]!=null)return p.defAt[pos];
+    if(pos==='C'||p.pos==='C'||p.pos==='DH')return -2;const d=p.def||0;return d>0?d*.7:d}
   return pos==='C'?-12:Math.min(p.def||0,0)-5;
 }
 function buildTeam(i,lu){
@@ -1165,7 +1171,7 @@ function lineupEditor(i){
       <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
       ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:alt?`<span class="hint">${TR('副守位','secondary')}</span>`:'<span></span>'}</div>`}).join('');
   return `<div class="eyebrow" style="margin-top:14px">${TR('打序與守位','Batting order and positions')}</div><div class="lued">${rows}</div>
-    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場），守得好的人守備值打 7 折；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season) a good fielder keeps 70% of his rating; anywhere else, he fields much worse.')}</p>
+    <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場），用他在那個位置的真實守備數據；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season) he fields as his numbers there say; anywhere else, much worse.')}</p>
     <button class="ghost mini" data-lureset="${i}" style="margin-top:6px">${TR('恢復建議打序','Reset to suggested lineup')}</button>`;
 }
 const PICK_DEADLINE={};let pickTick=null;
