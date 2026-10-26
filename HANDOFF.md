@@ -37,6 +37,7 @@
 - GitHub：`simba0812/mlb`。2026-10-25 起 repo 根目錄就是 `mlb-auction-site` 的內容（原本根目錄只有單機版 `index.html`，`source/` 曾被刪掉，已從使用者上傳的檔案還原）。
 - `source/build.py` 原本的檔案遺失，以 Git 歷史版本為底補上「產生 `../mlb-auction-單機版/index.html`」那幾行；四個產生的網頁都和使用者手上的版本逐位元相同。
 - Firebase 專案 `mlbb-e98d2`，設定已填進 `firebase-config.js`。apiKey 是公開識別碼，不是密碼。
+- `firestore.rules`（2026-10-26 版）：只有入座的玩家能改遊戲；其他人只能坐上空的 B 座位（只改 `seats.1`、時間戳記和 `lease`）或拿 `lease`；欄位限定在已知的那幾個，`state` 小於 200 KB。規則沒在模擬器測過（雲端環境不允許執行模擬器），是逐一對照程式裡每個寫入點確認的。
 - 使用者還要自己做的事：
   - 在 Firebase 重新發布 `firestore.rules`（如果還是舊規則）
   - 把 `mlb-auction-site` 拖到 Netlify，再用 `mlb-auction-單機版` 另外建一個 Netlify 網站
