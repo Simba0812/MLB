@@ -1,0 +1,38 @@
+# 抓 NBA 球季數據（先試 NBA.com，被擋就改用 Basketball Reference），存回同一個分支。
+name: Fetch NBA stats
+
+on:
+  push:
+    paths:
+      - .github/workflows/fetch-nba.yml
+      - nba/source/fetch_stats.py
+  workflow_dispatch:
+    inputs:
+      season:
+        description: Season
+        default: '2025-26'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install nba_api==1.10.0 pandas lxml
+      - name: Fetch stats
+        run: python3 nba/source/fetch_stats.py "${{ inputs.season || '2025-26' }}"
+      - name: Rebuild page
+        run: if [ -f nba/source/build.py ]; then python3 nba/source/build.py; fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add nba/source/pool.json
+          [ -f nba/index.html ] && git add nba/index.html
+          git diff --cached --quiet || git commit -m "更新 NBA 數據（${{ inputs.season || '2025-26' }}）"
+          git push
