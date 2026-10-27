@@ -37,10 +37,19 @@
 - GitHub：`simba0812/mlb`。2026-10-25 起 repo 根目錄就是 `mlb-auction-site` 的內容（原本根目錄只有單機版 `index.html`，`source/` 曾被刪掉，已從使用者上傳的檔案還原）。
 - `source/build.py` 原本的檔案遺失，以 Git 歷史版本為底補上「產生 `../mlb-auction-單機版/index.html`」那幾行；四個產生的網頁都和使用者手上的版本逐位元相同。
 - Firebase 專案 `mlbb-e98d2`，設定已填進 `firebase-config.js`。apiKey 是公開識別碼，不是密碼。
+- `firestore.rules`（2026-10-26 版）：只有入座的玩家能改遊戲；其他人只能坐上空的 B 座位（只改 `seats.1`、時間戳記和 `lease`）或拿 `lease`；欄位限定在已知的那幾個，`state` 小於 200 KB。規則沒在模擬器測過（雲端環境不允許執行模擬器），是逐一對照程式裡每個寫入點確認的。
 - 使用者還要自己做的事：
   - 在 Firebase 重新發布 `firestore.rules`（如果還是舊規則）
   - 把 `mlb-auction-site` 拖到 Netlify，再用 `mlb-auction-單機版` 另外建一個 Netlify 網站
   - 可以順便刪掉舊資料夾
+
+## NBA 盲標對決（nba/）
+
+- 2026-10-27 新增，中英文都有，玩法有單人、同一台輪流玩、線上對戰。說明在 `nba/source/README.md`。
+- 以棒球版 template 為底組成（選秀、交易、線上房間都沿用），籃球的部分另外寫。之後如果棒球版的線上程式修了 bug，NBA 版也要一起改。
+- 數據：NBA.com 會擋 GitHub 的主機，所以用 Basketball Reference，透過 `.github/workflows/fetch-nba.yml` 抓取。
+- 線上對戰：房間放在同一個 `rooms` 集合，用 `cfg.game='nba'` 區分。節間決定存成 `dec[key]["節次:隊伍"]`，兩隊可以同時決定。
+- 測試：jsdom 跑過中英文、單人／同一台、單場／三戰兩勝／七戰四勝；也用模擬的 Firestore 開兩個分頁，跑完一輪三戰兩勝的線上對戰，兩邊結果一致。
 
 ## 動漫大亂鬥（anime/）
 
@@ -89,6 +98,7 @@
 
 - **模擬**：log5 打席模型。打者對照 `LG`，投手對照 `LGP`。另外套用球場係數、疲勞、捕手框界值。守備會把安打變出局（d/260）或出局變安打（d/520）。
 - **決定性**：比賽由 seed（mulberry32）加上玩家的決定重播，所有裝置結果相同。改模擬時要保持亂數的消耗順序一致。中英文的轉播文字也消耗相同的亂數。
+- **手機效能**（2026-10-25）：`hydrate` 只有在聯盟改變時才呼叫 `setLeague`（重建數據表在手機上要花幾十毫秒）；`render()` 會把目前的畫面寫在 `.wrap` 的 class 上（`s-draft`、`s-pick`、`s-game`、`duo`），CSS 不再使用 `.wrap:has(...)`；`pick` 畫面只有在 picks 或 rev 改變時才重畫；Noto Sans TC 只載入 400 和 700 兩種字重。
 - **暫停**：遇到需要玩家決定時，`simGame` 會丟出 `{pause, partial}`。`play()` 會先檢查決定是否已經到了；這是之前修好的手機卡死問題，不要拿掉。
 - **線上資料**：
   - Firestore 的 `rooms/{code}` 有這些欄位：seats、setup、cfg、picks、dec、state（JSON 字串）、rev、deck0、exp。

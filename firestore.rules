@@ -1,23 +1,48 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // One document per room. Anyone signed in (anonymously) can watch a room;
-    // only its two seated players can change it, and seat B can be claimed only while empty.
+    // One document per room. Anyone signed in (anonymously) can watch a room.
+    // Its two seated players can change the game; everyone else can only claim the empty seat B,
+    // or take the short lease that guards that claim. Nobody can move or remove a seated player.
     // Every write stamps `exp` (milliseconds) three days ahead; it can't be pushed further out,
     // and once it passes anyone may delete the room.
     match /rooms/{code} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
+      function signedIn() { return request.auth != null; }
+      function me() { return request.auth.uid; }
+      function seats() { return resource.data.seats; }
+      function seated() { return seats()['0'] == me() || ('1' in seats() && seats()['1'] == me()); }
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+      // the only fields the game writes, and a cap on the game state so a room can't be blown up
+      function shapeOK(d) {
+        return d.keys().hasOnly(['v', 'seats', 'setup', 'cfg', 'picks', 'dec', 'state', 'rev', 'deck0',
+                                 'created', 'exp', 'expireAt', 'lease'])
+          && (!('state' in d) || (d.state is string && d.state.size() < 200000))
+          && d.exp is number && d.exp <= request.time.toMillis() + 4 * 86400000;
+      }
+
+      allow read: if signedIn();
+
+      allow create: if signedIn()
         && code.matches('^[A-Z0-9]{4}$')
-        && request.resource.data.seats['0'] == request.auth.uid
-        && request.resource.data.exp is number
-        && request.resource.data.exp <= request.time.toMillis() + 4 * 86400000;
-      allow update: if request.auth != null
-        && (request.auth.uid in resource.data.seats.values() || !('1' in resource.data.seats))
-        && request.resource.data.seats['0'] == resource.data.seats['0']
-        && request.resource.data.exp <= request.time.toMillis() + 4 * 86400000;
-      allow delete: if request.auth != null
-        && resource.data.exp < request.time.toMillis();
+        && request.resource.data.seats.keys().hasOnly(['0'])
+        && request.resource.data.seats['0'] == me()
+        && shapeOK(request.resource.data);
+
+      allow update: if signedIn() && shapeOK(request.resource.data) && (
+        // a seated player: anything in the game, but the seats stay as they are
+        (seated() && request.resource.data.seats == seats())
+        // anyone else: sit down in the empty seat B, and change nothing but that and the timestamps
+        || (!('1' in seats()) && seats()['0'] != me()
+            && changed().hasOnly(['seats', 'exp', 'expireAt', 'lease'])
+            && request.resource.data.seats.diff(seats()).affectedKeys().hasOnly(['1'])
+            && request.resource.data.seats['1'] == me())
+        // anyone else: take the five-second lease that makes two people claiming seat B take turns
+        || (!('1' in seats())
+            && changed().hasOnly(['lease'])
+            && request.resource.data.lease.holder == me())
+      );
+
+      allow delete: if signedIn() && resource.data.exp < request.time.toMillis();
     }
   }
 }

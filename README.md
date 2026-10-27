@@ -7,6 +7,7 @@
 - `firebase-config.js`：多人版線上對戰用的 Firebase 設定
 - `firestore.rules`：資料庫的安全規則，要貼到 Firebase
 - `source/`：產生上面兩個網頁的原始檔和抓數據的程式，說明在 `source/README.md`。要改遊戲請改這裡，不要直接改 `index.html`。
+- `nba/`：**NBA 盲標對決**（中英文，可以線上對戰）。說明在 `nba/source/README.md`。線上對戰和棒球版共用同一個 Firebase。
 - `anime/`：**動漫大亂鬥**（中英文）。10 部動漫各 4 人，抽 10 位、兩隊各 5 人的盲標，接著五人車輪戰。`anime/index.html` 直接雙擊就能玩，說明在 `anime/source/README.md`。
 - `epl/`：**英超版**（Blind Auction FC，只有英文）。`epl/index.html` 直接雙擊就能玩，原始檔和說明在 `epl/source/`。整個資料夾放上 Netlify 後，網址加上 `/epl/` 就是英超版。
 
@@ -46,7 +47,7 @@
 
 如果想讓 Firebase 自己準時刪除（就算沒人打開網站），可以另外開「存留時間（TTL）」政策：Firestore Database →「存留時間」→「建立政策」，集合群組填 `rooms`，時間戳記欄位填 `expireAt`，按建立。Google 通常會在過期後 24 小時內刪除。如果你的方案不能開這個功能，略過也沒關係，網站內建的清除一樣有效。
 
-**更新提醒**：3 天自動刪除這一版的 `firestore.rules` 有改過。如果你的 Firebase 還是舊規則，請照第一部分第 4 步再貼一次並按「發布」，不然建立房間會被拒絕。
+**更新提醒（2026-10-26）**：`firestore.rules` 加強了安全性：已經入座的兩位玩家以外，其他人只能坐上空著的 B 座位，不能改房間的其他內容；也不能移走已經入座的人；遊戲狀態的大小有上限。請照第一部分第 4 步，把新規則再貼一次並按「發布」。
 
 ## 第二部分：把網站放上網路（免費，約 3 分鐘）
 
@@ -58,6 +59,7 @@
 - 棒球單機版：https://simba0812.github.io/MLB/大聯盟盲標對決單機.html
 - 英超版：https://simba0812.github.io/MLB/epl/
 - 動漫大亂鬥：https://simba0812.github.io/MLB/anime/
+- NBA（可線上對戰）：https://simba0812.github.io/MLB/nba/
 
 線上對戰要先到 Firebase：Authentication →「設定」分頁 →「已授權網域」→「新增網域」，填入 `simba0812.github.io`（不要加 `https://`）。根目錄的 `.nojekyll` 是告訴 GitHub 直接發布檔案、不要另外處理，不要刪掉。
 
