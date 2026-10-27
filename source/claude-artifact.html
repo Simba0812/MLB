@@ -1530,6 +1530,8 @@ async function joinRoom(raw){
   if(!/^[A-Z0-9]{4}$/.test(code)) throw new Error(TR('房號是 4 個英文字母或數字。','Room codes are 4 letters or digits.'));
   const ref=roomDoc(code),s=await ref.get();
   if(!s.exists||roomExpired(s.data())) throw new Error(TR('找不到這個房號，請確認後再試一次。','No room with that code. Check it and try again.'));
+  // the NBA page uses the same rooms; its rooms say so in cfg.game
+  if((s.data().cfg||{}).game==='nba') throw new Error(TR('這是 NBA 版的房號，請到 NBA 版的網頁加入。','That code belongs to the NBA game; join it there.'));
   const seats=s.data().seats||{};
   if(seats[0]===NET.uid) return enterRoom(code,0);
   if(seats[1]===NET.uid) return enterRoom(code,1);
