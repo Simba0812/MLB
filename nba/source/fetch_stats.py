@@ -46,8 +46,14 @@ def from_nba_api():
         out.append(dict(id=int(r.PLAYER_ID), n=r.PLAYER_NAME, t=r.TEAM_ABBREVIATION, age=int(r.AGE or 0), pos=pos.get(r.PLAYER_ID, ''),
                         **{f: float(getattr(r, f.upper())) for f in FIELDS},
                         usg=float(a.USG_PCT) if a is not None else None, drtg=float(a.DEF_RATING) if a is not None else None,
-                        ortg=float(a.OFF_RATING) if a is not None else None))
+                        ortg=float(a.OFF_RATING) if a is not None else None, bpm=None, obpm=None, dbpm=None))
     return out, 'NBA.com'
+
+
+def slug(name):
+    # a stable id from the name, so the same player keeps it when the stats are fetched again
+    import unicodedata
+    return re.sub(r'[^a-z0-9]', '', unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode().lower())
 
 
 def from_bbref():
@@ -69,12 +75,15 @@ def from_bbref():
     for i, r in tot.iterrows():
         a = advd.get(r['Player'])
         p = '-'.join(dict.fromkeys(bpos.get(x, '') for x in str(r['Pos']).split('-') if x in bpos))
-        out.append(dict(id=f"b{i}", n=r['Player'].replace('*', ''), t=r[team_col], age=int(num(r['Age'])), pos=p,
+        name = r['Player'].replace('*', '')
+        out.append(dict(id=slug(name), n=name, t=r[team_col], age=int(num(r['Age'])), pos=p,
                         gp=num(r['G']), min=num(r['MP']), fgm=num(r['FG']), fga=num(r['FGA']), fg3m=num(r['3P']), fg3a=num(r['3PA']),
                         ftm=num(r['FT']), fta=num(r['FTA']), oreb=num(r['ORB']), dreb=num(r['DRB']), ast=num(r['AST']),
                         stl=num(r['STL']), blk=num(r['BLK']), tov=num(r['TOV']), pf=num(r['PF']), pts=num(r['PTS']),
                         usg=num(a['USG%']) / 100 if a is not None else None, drtg=None, ortg=None,
-                        bpm=num(a['BPM']) if a is not None and 'BPM' in a else None))
+                        bpm=num(a['BPM']) if a is not None and 'BPM' in a else None,
+                        obpm=num(a['OBPM']) if a is not None and 'OBPM' in a else None,
+                        dbpm=num(a['DBPM']) if a is not None and 'DBPM' in a else None))
     return out, 'Basketball Reference'
 
 
