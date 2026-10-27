@@ -43,6 +43,14 @@
   - 把 `mlb-auction-site` 拖到 Netlify，再用 `mlb-auction-單機版` 另外建一個 Netlify 網站
   - 可以順便刪掉舊資料夾
 
+## NBA 盲標對決（nba/）
+
+- 2026-10-27 新增，中英文都有，玩法有單人、同一台輪流玩、線上對戰。說明在 `nba/source/README.md`。
+- 以棒球版 template 為底組成（選秀、交易、線上房間都沿用），籃球的部分另外寫。之後如果棒球版的線上程式修了 bug，NBA 版也要一起改。
+- 數據：NBA.com 會擋 GitHub 的主機，所以用 Basketball Reference，透過 `.github/workflows/fetch-nba.yml` 抓取。
+- 線上對戰：房間放在同一個 `rooms` 集合，用 `cfg.game='nba'` 區分。節間決定存成 `dec[key]["節次:隊伍"]`，兩隊可以同時決定。
+- 測試：jsdom 跑過中英文、單人／同一台、單場／三戰兩勝／七戰四勝；也用模擬的 Firestore 開兩個分頁，跑完一輪三戰兩勝的線上對戰，兩邊結果一致。
+
 ## 動漫大亂鬥（anime/）
 
 - 2026-10-25 新增，中英文都有，玩法有單人對電腦和同一台輪流玩。說明在 `anime/source/README.md`。

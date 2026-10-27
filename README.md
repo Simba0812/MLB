@@ -7,6 +7,7 @@
 - `firebase-config.js`：多人版線上對戰用的 Firebase 設定
 - `firestore.rules`：資料庫的安全規則，要貼到 Firebase
 - `source/`：產生上面兩個網頁的原始檔和抓數據的程式，說明在 `source/README.md`。要改遊戲請改這裡，不要直接改 `index.html`。
+- `nba/`：**NBA 盲標對決**（中英文，可以線上對戰）。說明在 `nba/source/README.md`。線上對戰和棒球版共用同一個 Firebase。
 - `anime/`：**動漫大亂鬥**（中英文）。10 部動漫各 4 人，抽 10 位、兩隊各 5 人的盲標，接著五人車輪戰。`anime/index.html` 直接雙擊就能玩，說明在 `anime/source/README.md`。
 - `epl/`：**英超版**（Blind Auction FC，只有英文）。`epl/index.html` 直接雙擊就能玩，原始檔和說明在 `epl/source/`。整個資料夾放上 Netlify 後，網址加上 `/epl/` 就是英超版。
 
@@ -58,6 +59,7 @@
 - 棒球單機版：https://simba0812.github.io/MLB/大聯盟盲標對決單機.html
 - 英超版：https://simba0812.github.io/MLB/epl/
 - 動漫大亂鬥：https://simba0812.github.io/MLB/anime/
+- NBA（可線上對戰）：https://simba0812.github.io/MLB/nba/
 
 線上對戰要先到 Firebase：Authentication →「設定」分頁 →「已授權網域」→「新增網域」，填入 `simba0812.github.io`（不要加 `https://`）。根目錄的 `.nojekyll` 是告訴 GitHub 直接發布檔案、不要另外處理，不要刪掉。
 
