@@ -1216,10 +1216,19 @@ function finish(){
   const w=B.res.win,m=B.res.mvp&&BYID.get(B.res.mvp.id);
   $('#after').innerHTML=`<div class="reveal flash"><div class="eyebrow">${TR('勝負揭曉','Result')}</div><div class="w ${w?'tb':'ta'}">${tname(w)} ${TR('獲勝','win')}</div>
     ${m?`<p style="margin-top:8px;font-weight:700">🏅 MVP　${esc(nm(m))}${TR(`（${esc(ser(m))}）`,` (${esc(ser(m))})`)}${TR(`擊倒 ${B.res.mvp.ko} 人`,` · ${B.res.mvp.ko} KO${B.res.mvp.ko>1?'s':''}`)}</p>`:''}
-    <div class="row" style="justify-content:center;margin-top:16px"><button class="solid" id="again">${TR('同隊伍重排順序再打','Rematch: reorder and fight again')}</button><button class="ghost" id="restart">${TR('重新抽籤','New draw')}</button></div></div>`;
+    <div class="row" style="justify-content:center;margin-top:16px"><button class="solid" id="again">${TR('同隊伍重排順序再打','Rematch: reorder and fight again')}</button><button class="ghost" id="restart">${TR('重新抽籤','New draw')}</button><button class="ghost" id="sharer">📤 ${TR('分享結果','Share result')}</button></div></div>`;
   $('#again').onclick=()=>{S.screen='order';render();window.scrollTo(0,0)};
   $('#restart').onclick=()=>{S.screen='setup';render();window.scrollTo(0,0)};
+  $('#sharer').onclick=()=>shareIt($('#sharer'),TR('動漫大亂鬥','Anime Brawl Auction'),
+    TR(`⚔️ 動漫大亂鬥：${S.teams[w].name} 獲勝！${m?`MVP ${nm(m)}，擊倒 ${B.res.mvp.ko} 人。`:''}陣容：${B.res.T[w].map(id=>nm(BYID.get(id))).join('、')}`,
+       `⚔️ Anime Brawl: ${S.teams[w].name} win!${m?` MVP ${nm(m)} with ${B.res.mvp.ko} KO${B.res.mvp.ko>1?'s':''}.`:''} Lineup: ${B.res.T[w].map(id=>nm(BYID.get(id))).join(', ')}`),location.origin+location.pathname);
   if($('#after').scrollIntoView)$('#after').scrollIntoView({block:'nearest'});
+}
+/* ---------- sharing: the phone's share sheet where there is one, otherwise copy the text and link ---------- */
+function shareIt(btn,title,text,url){
+  if(navigator.share){navigator.share({title,text,url}).catch(()=>{});return}
+  const all=text+' '+url,o=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(all):Promise.reject()).then(()=>{btn.textContent=TR('已複製，貼給朋友','Copied: paste it to a friend');setTimeout(()=>btn.textContent=o,2500)},()=>window.prompt(TR('複製這段文字分享：','Copy this to share:'),all));
 }
 function render(){
   document.title=TR('動漫大亂鬥','Anime Brawl Auction');document.documentElement.lang=LANG==='en'?'en':'zh-Hant';

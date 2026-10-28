@@ -1348,16 +1348,23 @@ function finish(){
      <p style="margin-top:8px;font-weight:700">🏅 Player of the tie　${esc(playerOfTie(n,champ))}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${more?`<button class="solid" id="nextg">${S.mode==='legs'?'Go to the second leg':`Set up match ${n+1}`}</button>`:''}
-     <button id="again">Play again with these squads</button><button class="ghost" id="restart">New draft</button></div>
+     <button id="again">Play again with these squads</button><button class="ghost" id="restart">New draft</button><button class="ghost" id="sharer">📤 Share result</button></div>
    </div>
    ${S.mode!=='single'?seriesPanel(n,!more):''}
    <h2 style="margin-top:20px">This match</h2>
    <div class="grid2" style="margin-top:10px">${boxScore(res,0)}${boxScore(res,1)}</div>`;
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:n};S.screen='pick';render();window.scrollTo(0,0)};
   $('#again').onclick=()=>{LUED_KEY='';S.screen='pregame';render();window.scrollTo(0,0)};
+  $('#sharer').onclick=()=>shareIt($('#sharer'),'Blind Auction FC',`⚽ ${res.home.name} ${res.score[0]}-${res.score[1]} ${res.away.name}${sub?` (${sub})`:''}: ${res.win==null?'a draw':(res.win?res.away:res.home).name+' win'}!${champ!=null&&S.mode!=='single'?` ${S.teams[champ].name} ${S.mode==='legs'?'go through':'win the series'}.`:''} Player of the match: ${potm(res)}`,location.origin+location.pathname);
   $('#restart').onclick=()=>{LUED_KEY='';S.screen='setup';render();window.scrollTo(0,0)};
 }
 
+/* ---------- sharing: the phone's share sheet where there is one, otherwise copy the text and link ---------- */
+function shareIt(btn,title,text,url){
+  if(navigator.share){navigator.share({title,text,url}).catch(()=>{});return}
+  const all=text+' '+url,o=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(all):Promise.reject()).then(()=>{btn.textContent='Copied: paste it to a friend';setTimeout(()=>btn.textContent=o,2500)},()=>window.prompt('Copy this to share:',all));
+}
 function render(){
   $('#app').className='wrap s-'+S.screen;
   const f={home:renderHome,setup:renderSetup,draft:renderDraft,trade:renderTrade,pregame:renderPregame,pick:renderPick,game:startGame}[S.screen];
