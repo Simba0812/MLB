@@ -371,11 +371,12 @@ function renderSetup(){
         <p class="hint">${TR(`球員從 ${POOL.length} 位 ${DATA.season} 球季球員中隨機抽出，一次只揭曉一位。雙方輪流出價，不想加價就按「放棄」，對手以目前價格得標。每隊需要 2 名後衛、2 名前鋒、1 名中鋒，加上 ${S.slots.BN} 名替補（不限位置）。系統會替你保留填滿必要位置的最低預算（每個空位 $1）。總共抽 ${Math.max(S.lotMax,lotsNeeded())} 支籤，快抽完時只會抽出還有隊伍缺的位置；抽完後如果還有人缺位置，會加開補位籤。選秀後雙方各有 3 次交易提案機會。`,
     `Players are drawn at random from ${POOL.length} who played in ${DATA.season} and revealed one at a time. Teams take turns bidding; press "Pass" to stop and your opponent gets the player at the current price. Each team needs 2 guards, 2 forwards and a center, plus ${S.slots.BN} bench player${S.slots.BN===1?'':'s'} of any position. You always keep enough budget to fill your required spots ($1 per empty spot). There are ${Math.max(S.lotMax,lotsNeeded())} lots; near the end only positions someone still needs are drawn, and fill-in lots follow if a team is still short. After the draft each team gets 3 trade proposals.`)}</p>
       </div>
-      <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(S.lotMax,lotsNeeded())}"></label></div>
+      <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(S.lotMax,lotsNeeded())}"><span class="hint">${TR(`最少 ${lotsNeeded()} 支`,`At least ${lotsNeeded()}`)}</span></label></div>
     </div>
     <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="err"></span></div>
   </section>`;
-  const keepTyped=()=>[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value});
+  const keepTyped=()=>{[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value});
+    S.budget=clamp(parseInt($('#bud').value)||S.budget,30,1000);S.lotMax=clamp(parseInt($('#lots').value)||S.lotMax,1,200)};
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{keepTyped();S.mode=b.dataset.m;render()});
   document.querySelectorAll('[data-slot]').forEach(el=>el.onchange=()=>{keepTyped();S.slots[el.dataset.slot]=+el.value;render()});
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{keepTyped();S.ai.level=b.dataset.lv;render()});

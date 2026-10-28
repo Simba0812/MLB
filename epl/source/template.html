@@ -455,11 +455,12 @@ function renderSetup(){
         <h2>Auction rules</h2>
         <p class="hint">Players are drawn at random from ${POOL.length} who played at least 900 Premier League minutes in ${SEASON}, and revealed one at a time, so nobody knows who comes next. Teams take turns bidding; press "Pass" to stop and your opponent signs the player at the current price. Each squad signs 13 players, choosing its own balance of keepers, defenders, midfielders and forwards; you can't sign a player who would leave you unable to field a legal XI. You always keep enough money to fill your empty spots (£1m each). There are ${Math.max(S.lotMax,lotsNeeded())} lots; near the end only positions someone still needs are drawn, and if a team is still short after the last lot, fill-in lots follow that the short team cannot skip. After the draft each team gets 3 trade proposals.</p>
       </div>
-      <div class="row" style="align-items:flex-end"><label style="width:150px">Budget per team (£m)<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">Total lots<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(S.lotMax,lotsNeeded())}"></label></div>
+      <div class="row" style="align-items:flex-end"><label style="width:150px">Budget per team (£m)<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">Total lots<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(S.lotMax,lotsNeeded())}"><span class="hint">At least ${lotsNeeded()}</span></label></div>
     </div>
     <div class="row" style="margin-top:14px"><button class="solid" id="go">Start draft</button><span class="hint" id="err"></span></div>
   </section>`;
-  const keep=()=>[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value});
+  const keep=()=>{[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value});
+    S.budget=clamp(parseInt($('#bud').value)||S.budget,30,1000);S.lotMax=clamp(parseInt($('#lots').value)||S.lotMax,1,200)};
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{keep();S.mode=b.dataset.m;render()});
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{keep();S.ai.level=b.dataset.lv;render()});
   document.querySelectorAll('[data-rn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rn,other=$('#tn'+(1-i)).value.trim();let n;do{n=randomName()}while(n.split(' ')[0]===other.split(' ')[0]);$('#tn'+i).value=n});

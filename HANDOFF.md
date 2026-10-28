@@ -99,6 +99,7 @@
 - **模擬**：log5 打席模型。打者對照 `LG`，投手對照 `LGP`。另外套用球場係數、疲勞、捕手框界值。守備會把安打變出局（d/260）或出局變安打（d/520）。
 - **決定性**：比賽由 seed（mulberry32）加上玩家的決定重播，所有裝置結果相同。改模擬時要保持亂數的消耗順序一致。中英文的轉播文字也消耗相同的亂數。
 - **手機效能**（2026-10-25）：`hydrate` 只有在聯盟改變時才呼叫 `setLeague`（重建數據表在手機上要花幾十毫秒）；`render()` 會把目前的畫面寫在 `.wrap` 的 class 上（`s-draft`、`s-pick`、`s-game`、`duo`），CSS 不再使用 `.wrap:has(...)`；`pick` 畫面只有在 picks 或 rev 改變時才重畫；Noto Sans TC 只載入 400 和 700 兩種字重。
+- **戰術**（2026-10-28）：`TACT` 表裡分 off／run／pit 三類，每一項是打席結果（k、bb、s1、s2、s3、hr）的乘數，加上 gb（滾地出局比例）、ppa（每打席多投幾球）、steal、send（多搶一個壘包）、bunt（小球戰術的犧牲觸擊）。開賽的戰術存在 `game.tac`，線上存在 picks；4 局和 7 局開始前的調整是一般的決定（`kind:'tac'`，值是 `off|run|pit`）。電腦的 `aiTactic` 只在 7 局以後依比分改變戰術。用 500 場模擬比較過，各戰術的勝率差距都在 ±3% 以內。
 - **暫停**：遇到需要玩家決定時，`simGame` 會丟出 `{pause, partial}`。`play()` 會先檢查決定是否已經到了；這是之前修好的手機卡死問題，不要拿掉。
 - **線上資料**：
   - Firestore 的 `rooms/{code}` 有這些欄位：seats、setup、cfg、picks、dec、state（JSON 字串）、rev、deck0、exp。
