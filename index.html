@@ -907,6 +907,17 @@ const tm_=(t,side,k)=>(TACT[side][t[side]]||{})[k];
 const tf=(t,side,k)=>tm_(t,side,k)??1;   // a multiplier, 1 when the tactic doesn't touch it
 const ta=(t,side,k)=>tm_(t,side,k)??0;   // an addition, 0 when it doesn't
 // the computer: chase runs when behind late, protect a lead with contact and strikes; otherwise stay as it is
+/* ---------- bullpen roles: high-leverage (勝利組), middle relief (佈局), low-leverage (敗戰組) ---------- */
+const ROLES=['win','mid','mop'];
+const ROLEL=()=>({win:TR('勝利組','High leverage'),mid:TR('佈局','Middle relief'),mop:TR('敗戰組','Low leverage')});
+const ROLEHINT=()=>({win:TR('7 局以後比分接近','late and close'),mid:TR('中段局數、比分普通','middle innings'),mop:TR('差距 5 分以上','games out of reach')});
+// the default split: the two best relievers set up the closer, the worst mops up, the rest pitch the middle
+function defaultRoles(rps){
+  const r=rps.slice().sort((a,b)=>pitBlend(a)-pitBlend(b)),out={};
+  r.forEach((p,k)=>out[sid(p.id)]=k<2?'win':(k===r.length-1&&r.length>=3)?'mop':'mid');
+  return out;
+}
+const rolesOK=(rps,m)=>m&&typeof m==='object'&&rps.every(p=>ROLES.includes(m[sid(p.id)]));
 function aiTactic(inning,lead,cur){
   if(inning>=7&&lead<=-3)return {off:'power',run:'norm',pit:'norm'};
   if(inning>=7&&lead>=3)return {off:'contact',run:'safe',pit:'zone'};
@@ -955,7 +966,9 @@ function simGame(away,home,ctx){
   const st=[away,home].map((tm,ti)=>{
     const sta0=p=>tm.sta0&&tm.sta0[sid(p.id)]!=null?tm.sta0[sid(p.id)]:100;
     const sp=tm.chosenSP||tm.sps[0];
-    const s={tm,ti,sta0,pen:[...tm.rps,...tm.cl,...tm.sps.filter(x=>x!==sp)],used:new Set([sp]),bench:[...tm.bench],
+    // only relievers and the closer come out of the bullpen; the other starters rest for their own turns
+    const s={tm,ti,sta0,pen:[...tm.rps,...tm.cl],used:new Set([sp]),bench:[...tm.bench],
+      roles:rolesOK(tm.rps,tm.roles)?tm.roles:defaultRoles(tm.rps),
       lu:box[ti].bat.slice(),bi:0,field:{},tac:tacOK(tm.tac)?{...tm.tac}:{...TACT0}};
     tm.order.forEach(h=>{if(h.fpos!=='DH')s.field[h.fpos]=h});
     s.cur={p:sp,pc:0,bf:0,outs:0,runs:0,starter:true,sta0:sta0(sp),E:capOf(sp)};
@@ -975,19 +988,20 @@ function simGame(away,home,ctx){
     if(di<ctx.dec.length) return ctx.dec[di++];
     throw {pause:{...info,di,score:[...R]},partial:{away,home,park,ev:ev.slice(),line,R:[...R],H:[...H],E:[...E]}};
   }
+  // the situation decides which group pitches: the closer for saves (and a tie late at home), the high-leverage group
+  // late and close, the low-leverage group in blowouts, middle relief otherwise. An empty group hands over to the next one.
   function pickReliever(s,inning,lead){
     const pen=avail(s);if(!pen.length)return null;
     const sta=p=>s.sta0(p);
     const save=inning>=9&&lead>=1&&lead<=3, tieLate=inning>=9&&lead===0&&s.ti===1;
     const cl=pen.find(p=>p.pos==='CL'&&sta(p)>=40);
     if(cl&&(save||tieLate)) return cl;
-    // starters stay in the rotation: they relieve only when the bullpen is spent
-    const bull=pen.filter(p=>p.pos!=='SP'&&sta(p)>=30);
-    const pool=(bull.length?bull:pen).filter(p=>p.pos!=='CL'||inning>=9);
-    const fresh=pool.filter(p=>sta(p)>=45);
-    const cand=(fresh.length?fresh:pool.length?pool:pen).slice().sort((a,b)=>(pitBlend(a)-sta(a)/40)-(pitBlend(b)-sta(b)/40));
-    // close and late: best arm; otherwise keep the best arms for later
-    return inning>=7&&Math.abs(lead)<=3?cand[0]:cand[cand.length>2?Math.floor(cand.length/2):0];
+    const order=Math.abs(lead)>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
+    const best=a=>a.slice().sort((x,y)=>(pitBlend(x)-sta(x)/40)-(pitBlend(y)-sta(y)/40))[0];
+    for(const min of [45,30])for(const r of order){const g=pen.filter(p=>p.pos!=='CL'&&s.roles[sid(p.id)]===r&&sta(p)>=min);if(g.length)return best(g)}
+    // nobody fresh: the closer from the 9th on, then whoever is left
+    const rest=pen.filter(p=>p.pos!=='CL'||inning>=9);
+    return rest.length?best(rest):cl||null;
   }
   function doChange(dt,np,lead){
     const s=st[dt],old=s.cur.p;
@@ -1009,7 +1023,7 @@ function simGame(away,home,ctx){
     if(ctx.human[s.tm.i]&&ask){
       choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,
         cur:{id:sid(c.p.id),name:nm(c.p),pc:c.pc,sta:Math.round(sta),runs:c.runs,era:c.p.era},
-        opts:avail(s).map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,era:p.era,sta:s.sta0(p),velo:p.velo}))});
+        opts:avail(s).map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,role:p.pos==='CL'?null:s.roles[sid(p.id)],era:p.era,sta:s.sta0(p),velo:p.velo}))});
       if(choice==='keep') c.keep={runs:c.runs,sta};
     }
     if(choice!=='keep'){const np=avail(s).find(p=>sid(p.id)===choice);if(np)doChange(dt,np,lead)}
@@ -1183,7 +1197,7 @@ function renderPregame(){
   const lu=tm=>`<div class="lineup">${tm.order.map((h,j)=>`<span class="k">${j+1}</span><span class="k">${h.fpos}</span><span>${esc(nm(h))}</span><span class="mono" style="color:var(--dim)">${h.ops}</span>`).join('')}</div>
    ${tm.bench.length?`<div class="eyebrow" style="margin-top:12px">${TR('替補','Bench')}</div><div class="lineup">${tm.bench.map(h=>`<span class="k"></span><span class="k">${h.pos}</span><span>${esc(nm(h))}</span><span class="mono" style="color:var(--dim)">${h.ops}</span>`).join('')}</div>`:''}
    <div class="eyebrow" style="margin-top:12px">${TR('先發輪值','Rotation')}</div><div class="lineup">${tm.sps.map((p,j)=>`<span class="k">${j+1}</span><span class="k">SP</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>
-   <div class="eyebrow" style="margin-top:12px">${TR('牛棚','Bullpen')}</div><div class="lineup">${[...tm.rps.map(p=>['RP',p]),...tm.cl.map(p=>['CL',p])].map(([k,p])=>`<span class="k"></span><span class="k">${k}</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>`;
+   <div class="eyebrow" style="margin-top:12px">${TR('牛棚','Bullpen')}</div><div class="lineup">${[...tm.rps.map(p=>[ROLEL()[defaultRoles(tm.rps)[sid(p.id)]],p]),...tm.cl.map(p=>['CL',p])].map(([k,p])=>`<span class="k"></span><span class="k">${k}</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>`;
   $('#app').innerHTML=`${header()}
   <section class="panel"><h2>${TR('選秀結束','Draft complete')}</h2><p class="hint" style="margin-top:6px">${TR(`賽制：${MODEZH[S.mode]}${S.mode==='bo7'?'，4 人先發輪值':S.mode==='bo3'?'，3 人先發輪值':''}。每場開打前可以調整打序、選先發；比賽中的關鍵時刻會問你要不要換投或換代打。剩餘預算不影響比賽。`,`Format: ${MODEZH[S.mode]}${S.mode==='bo7'?', 4-man rotation':S.mode==='bo3'?', 3-man rotation':''}. Before each game you set the lineup and pick a starter; at key moments you'll be asked whether to change pitchers or pinch-hit. Leftover budget doesn't affect the games.`)}</p>
    <div class="row" style="margin-top:14px"><button class="solid" id="play" ${watch?'disabled':''}>${TR('進入第一戰 ⚾','Go to Game 1 ⚾')}</button></div></section>
@@ -1210,10 +1224,10 @@ function decList(g){
 }
 function gameResult(g){
   const gm=S.series.games[g],dec=decList(g);
-  const key=[gm.seed,gm.sp.join('.'),JSON.stringify(gm.lu||[]),JSON.stringify(gm.tac||[]),JSON.stringify(dec),rosterKey(),S.ai?S.ai.seat:'-',LANG].join('/');
+  const key=[gm.seed,gm.sp.join('.'),JSON.stringify(gm.lu||[]),JSON.stringify(gm.tac||[]),JSON.stringify(gm.roles||[]),JSON.stringify(dec),rosterKey(),S.ai?S.ai.seat:'-',LANG].join('/');
   if(RES_CACHE.has(key)) return RES_CACHE.get(key);
   const tms=[0,1].map(i=>buildTeam(i,gm.lu&&gm.lu[i]));
-  tms.forEach((tm,i)=>{tm.chosenSP=tm.sps.find(p=>sid(p.id)===sid(gm.sp[i]))||tm.sps[0];tm.sta0=staminaMap(i,g);tm.tac=gm.tac&&tacOK(gm.tac[i])?gm.tac[i]:{...TACT0}});
+  tms.forEach((tm,i)=>{tm.chosenSP=tm.sps.find(p=>sid(p.id)===sid(gm.sp[i]))||tm.sps[0];tm.sta0=staminaMap(i,g);tm.tac=gm.tac&&tacOK(gm.tac[i])?gm.tac[i]:{...TACT0};tm.roles=gm.roles&&gm.roles[i]});
   const h=S.series.sched[g], old=rnd; rnd=mulberry32(gm.seed);
   let res;
   try{res=simGame(tms[1-h],tms[h],{dec,human:[0,1].map(i=>!(S.ai&&S.ai.seat===i))})}
@@ -1231,7 +1245,7 @@ function coinText(g){const s=S.series;
   if(S.mode==='bo7') return TR(`擲硬幣結果：${tname(s.coin)} 擁有主場優勢（第 1、2、6、7 戰在主場）。`,`Coin toss: ${tname(s.coin)} have home-field advantage (Games 1, 2, 6, 7 at home).`);
   return '';}
 const PICKSEL=[null,null];
-let TACSEL=[{...TACT0},{...TACT0}];
+let TACSEL=[{...TACT0},{...TACT0}],ROLESEL=[{},{}];
 let LUED=[null,null],LUED_KEY='',LUPICK=null;   // LUPICK: the batting spot tapped first, waiting for a second tap
 // MLB ids are numbers, CPBL ids are text: turn a form value back into the player's own id
 const pid=v=>{const n=Number(v);return v!==''&&!isNaN(n)?n:v};
@@ -1242,6 +1256,8 @@ function ensureLued(g){
   LUED_KEY=k;LUPICK=null;LUED=[0,1].map(i=>(lastLineup(i,g)||defaultLineup(i)).map(x=>({...x})));PICKSEL[0]=PICKSEL[1]=null;
   // tactics start where this team left them last game
   TACSEL=[0,1].map(i=>{for(let k2=g-1;k2>=0;k2--){const t=S.series.games[k2].tac;if(t&&tacOK(t[i]))return {...t[i]}}return {...TACT0}});
+  // bullpen roles also carry over from the last game
+  ROLESEL=[0,1].map(i=>{const rps=buildTeam(i).rps;for(let k2=g-1;k2>=0;k2--){const r=S.series.games[k2].roles;if(r&&rolesOK(rps,r[i]))return {...r[i]}}return defaultRoles(rps)});
 }
 function lineupEditor(i){
   const lu=LUED[i],hit=teamHitters(i).map(r=>r.p),byId=new Map(hit.map(p=>[sid(p.id),p]));
@@ -1282,9 +1298,10 @@ function renderPick(){
      <div class="eyebrow" style="margin-top:10px">${TR('先發投手','Starting pitcher')}</div>
      <div role="radiogroup" aria-label="${esc(tm.name)} ${TR('先發投手','starting pitcher')}">${tm.sps.map(p=>{const r=rest.includes(sid(p.id))&&avail0.length;
       return `<label class="spopt"><input type="radio" name="sp${i}" value="${p.id}" ${r||sent?'disabled':''} ${p.id===cur?'checked':''}><span class="spn">${esc(nm(p))}</span><span class="mono">ERA ${p.era}</span><span class="mono">${p.velo?p.velo.toFixed(1)+' mph':''}</span>${staBar(sv(p))}${r?`<span>${TR('休息中','Resting')}</span>`:''}</label>`}).join('')}</div>
-     <div class="eyebrow" style="margin-top:14px">${TR('牛棚體力','Bullpen stamina')}</div>
-     <div class="penlist">${pen.map(p=>`<span>${p.pos} ${esc(nm(p))}</span>${staBar(sv(p))}`).join('')}</div>
-     ${sent?`<p class="hint" style="margin-top:8px">${TR('已送出，等待對手準備好。','Sent. Waiting for your opponent.')}</p>`:lineupEditor(i)+`<div class="eyebrow" style="margin-top:14px">${TR('戰術（4 局、7 局開始前可以再調整）','Tactics (you can change them before the 4th and the 7th)')}</div>`+tacticsPicker(TACSEL[i],'tp',i)}</section>`};
+     <div class="eyebrow" style="margin-top:14px">${TR('牛棚分組與體力','Bullpen roles and stamina')}</div>
+     <div class="penlist" style="grid-template-columns:minmax(0,1fr) auto auto">${pen.map(p=>`<span>${p.pos==='CL'?`<span class="mono">CL</span> `:''}${esc(nm(p))} <span class="mono" style="color:var(--dim)">ERA ${p.era}</span></span>${p.pos==='CL'||sent?`<span class="hint">${p.pos==='CL'?TR('終結者','Closer'):ROLEL()[ROLESEL[i][sid(p.id)]]}</span>`:`<select data-role="${i},${esc(p.id)}" aria-label="${esc(nm(p))}" style="padding:3px 6px;font-size:13px">${ROLES.map(r=>`<option value="${r}" ${ROLESEL[i][sid(p.id)]===r?'selected':''}>${ROLEL()[r]}</option>`).join('')}</select>`}<span style="white-space:nowrap">${staBar(sv(p))}</span>`).join('')}</div>
+     ${sent?'':`<p class="hint" style="margin-top:6px">${ROLES.map(r=>`${ROLEL()[r]}：${ROLEHINT()[r]}`).join('；')}${TR('。先發投手不會下來救援。','. Starters never pitch in relief.')}</p>`}
+     ${sent?`<p class="hint" style="margin-top:8px">${TR('已送出，等待對手準備好。','Sent. Waiting for your opponent.')}</p>`:lineupEditor(i)+`<div class="eyebrow" style="margin-top:14px">${TR('戰術（4 局、7 局開始前可以再調整）','Tactics (you can change them before the 4th and the 7th)')}</div>`+tacticsPicker(TACSEL[i],'tpk',i)}</section>`};
   const mySent=NET.on&&NET.seat!=null&&picks[NET.seat]!=null;
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${S.mode==='single'?TR('決勝戰','Winner-take-all'):TR('第 '+(g+1)+' 戰','Game '+(g+1))} · ${esc(PARKS[S.teams[homeIdx].park].n)}</div>
@@ -1302,16 +1319,18 @@ function renderPick(){
     else LUPICK=LUPICK&&LUPICK[0]===i&&LUPICK[1]===r?null:[i,r];
     renderPick()});
   document.querySelectorAll('[data-lureset]').forEach(b=>b.onclick=()=>{const i=+b.dataset.lureset;LUED[i]=defaultLineup(i);renderPick()});
-  document.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{const [i,side,k]=b.dataset.tp.split(',');TACSEL[+i]={...TACSEL[+i],[side]:k};renderPick()});
+  document.querySelectorAll('[data-role]').forEach(el=>el.onchange=()=>{const [i,id]=el.dataset.role.split(',');ROLESEL[+i]={...ROLESEL[+i],[id]:el.value}});
+  document.querySelectorAll('[data-tpk]').forEach(b=>b.onclick=()=>{const [i,side,k]=b.dataset.tpk.split(',');TACSEL[+i]={...TACSEL[+i],[side]:k};renderPick()});
   if(!$('#startg')) return;
   $('#startg').onclick=()=>{
     const val=i=>pid(document.querySelector(`input[name="sp${i}"]:checked`).value);
     if(!NET.on){
       ser.games.push({seed:(Math.random()*2**31)>>>0,sp:[0,1].map(i=>S.ai&&i===S.ai.seat?aiPickSP(i):val(i)),
-        lu:[0,1].map(i=>S.ai&&i===S.ai.seat?defaultLineup(i):LUED[i]),tac:[0,1].map(i=>S.ai&&i===S.ai.seat?{...TACT0}:{...TACSEL[i]}),dec:[]});
+        lu:[0,1].map(i=>S.ai&&i===S.ai.seat?defaultLineup(i):LUED[i]),tac:[0,1].map(i=>S.ai&&i===S.ai.seat?{...TACT0}:{...TACSEL[i]}),
+        roles:[0,1].map(i=>S.ai&&i===S.ai.seat?defaultRoles(buildTeam(i).rps):{...ROLESEL[i]}),dec:[]});
       S.screen='game';render();window.scrollTo(0,0);return}
     const me=NET.seat;$('#startg').disabled=true;
-    dbWrite(()=>NET.ref.update({picks:{[pickKey()]:{[me]:{sp:val(me),lu:LUED[me],tac:TACSEL[me]}}}}));
+    dbWrite(()=>NET.ref.update({picks:{[pickKey()]:{[me]:{sp:val(me),lu:LUED[me],tac:TACSEL[me],roles:ROLESEL[me]}}}}));
   };
 }
 function maybeFinalizePick(){
@@ -1319,7 +1338,7 @@ function maybeFinalizePick(){
   const ser=S.series,g=S.game.gnum,k=pickKey(),pk=NET.doc&&NET.doc.picks&&NET.doc.picks[k];
   if(!pk||pk[0]==null||pk[1]==null||ser.games.length>g) return;
   const sp=[pid(pk[0].sp),pid(pk[1].sp)],lu=[pk[0].lu,pk[1].lu];
-  ser.games.push({seed:hashSeed(NET.code+k+sp.join('.')),sp,lu,tac:[pk[0].tac||TACT0,pk[1].tac||TACT0]});
+  ser.games.push({seed:hashSeed(NET.code+k+sp.join('.')),sp,lu,tac:[pk[0].tac||TACT0,pk[1].tac||TACT0],roles:[pk[0].roles||null,pk[1].roles||null]});
   S.screen='game';
   S.rev=k+'-go'; // both players may write this; the content is identical either way
   commitRaw();render();window.scrollTo(0,0);
@@ -1421,7 +1440,7 @@ function showDecision(){
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換投嗎？',': change pitchers?')}</h2>
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
      <div class="optlist"><button class="opt" data-choose="keep">${TR(`繼續由 ${esc(c.name)} 投球`,`Stay with ${esc(c.name)}`)} ${tag('keep')}<span class="hint">${TR(`已投 ${c.pc} 球 · 本場失 ${c.runs} 分`,`${c.pc} pitches · ${c.runs} R today`)} · ERA ${c.era}</span>${staBar(c.sta)}</button>
-     ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('換上','Bring in')} ${o.pos} ${esc(o.name)} ${tag(o.id)}<span class="hint">ERA ${o.era}${o.velo?` · ${o.velo.toFixed(1)} mph`:''}</span>${staBar(o.sta)}</button>`).join('')}</div>`;
+     ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('換上','Bring in')} ${o.role?ROLEL()[o.role]:o.pos} ${esc(o.name)} ${tag(o.id)}<span class="hint">ERA ${o.era}${o.velo?` · ${o.velo.toFixed(1)} mph`:''}</span>${staBar(o.sta)}</button>`).join('')}</div>`;
   }else{
     const c=q.cur;
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換代打嗎？',': pinch-hit?')}</h2>
@@ -1528,7 +1547,7 @@ function finish(){
      <p style="margin-top:8px;font-weight:700">🏅 ${TR('系列賽 MVP','Series MVP')}　${esc(seriesMvp(seriesStats(G.gnum+1),champ))}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
-     <button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button></div>
+     <button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button><button class="ghost" id="sharer">📤 ${TR('分享結果','Share result')}</button></div>
    </div>
    ${S.mode!=='single'?seriesPanel(G.gnum+1,seriesOver):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
@@ -1536,7 +1555,18 @@ function finish(){
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
   $('#again').onclick=()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   $('#restart').onclick=()=>{S.screen=NET.on?'room':'setup';sync();render();window.scrollTo(0,0)};
+  $('#sharer').onclick=()=>shareIt($('#sharer'),TR('大聯盟盲標對決','MLB Blind Auction'),
+    TR(`⚾ ${res.away.name} ${res.R[0]}：${res.R[1]} ${res.home.name}，${winTm.name} 獲勝！${champ!=null&&S.mode!=='single'?`系列賽 ${w[0]}：${w[1]}，${S.teams[champ].name} 封王。`:''}MVP ${mvp(res)}`,
+       `⚾ ${res.away.name} ${res.R[0]}-${res.R[1]} ${res.home.name}: ${winTm.name} win!${champ!=null&&S.mode!=='single'?` ${S.teams[champ].name} take the series ${Math.max(...w)}-${Math.min(...w)}.`:''} MVP ${mvp(res)}`),pageUrl());
   if(NET.pending) showFollow();
+}
+
+/* ---------- sharing: the phone's share sheet where there is one, otherwise copy the text and link ---------- */
+const pageUrl=()=>location.origin+location.pathname;   // without any ?room=
+function shareIt(btn,title,text,url){
+  if(navigator.share){navigator.share({title,text,url}).catch(()=>{});return}
+  const all=text+' '+url,o=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(all):Promise.reject()).then(()=>{btn.textContent=TR('已複製，貼給朋友','Copied: paste it to a friend');setTimeout(()=>btn.textContent=o,2500)},()=>window.prompt(TR('複製這段文字分享：','Copy this to share:'),all));
 }
 
 /* ---------- online play: one shared room document ---------- */
@@ -1642,6 +1672,13 @@ async function joinRoom(raw){
   }
   enterRoom(code,null);
 }
+// opened from an invite link (?room=CODE): join that room at once, then tidy the address bar
+function inviteFromLink(){
+  const code=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
+  if(!/^[A-Z0-9]{4}$/.test(code)||S.screen!=='home')return;
+  try{history.replaceState(null,'',location.pathname)}catch(e){}
+  joinRoom(code).catch(e=>{renderNetBox();const el=$('#neterr');if(el)el.textContent=e&&e.message&&!e.code?e.message:TR('連線失敗，請再試一次。','Connection failed. Try again.')});
+}
 function enterRoom(code,seat){
   S.ai=null;
   Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false});
@@ -1660,7 +1697,7 @@ function enterRoom(code,seat){
       const uid=await user.id(),cw=await user.can('data.write');
       if(!uid){NET.status='off';NET.msg=TR('請先登入 claude.ai 再使用線上對戰。','Sign in to claude.ai to play online.')}
       else if(cw===false){NET.status='off';NET.msg=TR('你目前只有檢視權限，沒辦法加入對戰。請房主從頁面的 Share 選單把你設為可以編輯（Editor）。','You only have view access. Ask the host to make you an Editor from the page\'s Share menu.')}
-      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms()}
+      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink()}
     }
   }catch(e){NET.status='off';NET.msg=window.STANDALONE?TR(`Firebase 連線失敗，請確認設定正確、匿名登入已啟用。（${(e&&(e.code||e.message))||''}）`,`Couldn't connect to Firebase. Check the config and that anonymous sign-in is enabled. (${(e&&(e.code||e.message))||''})`):TR('線上功能暫時無法使用，請重新整理頁面。','Online play is unavailable right now. Reload the page.')}
   renderNetBox();
@@ -1739,13 +1776,14 @@ function renderRoom(){
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${TR('線上房間','Online room')}</div>
-   <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div>
+   <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>
   <div class="grid2">${seat(0)}${seat(1)}</div>
   <section class="panel">${me===0?`<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"><span class="hint">${TR(`最少 ${lotsNeeded()} 支`,`At least ${lotsNeeded()}`)}</span></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
     :`<h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:6px" id="cfgtxt"></p>`}</section>`;
+  $('#share').onclick=()=>shareIt($('#share'),TR('大聯盟盲標對決','MLB Blind Auction'),TR(`來玩大聯盟盲標對決！點連結直接加入房間，房號 ${NET.code}`,`Come play MLB Blind Auction! The link takes you straight into room ${NET.code}`),pageUrl()+'?room='+NET.code);
   $('#copy').onclick=()=>{navigator.clipboard.writeText(NET.code).then(()=>{$('#copy').textContent=TR('已複製','Copied')},()=>{$('#copy').textContent=TR('房號：','Code: ')+NET.code})};
   if(me!=null){
     const pf=()=>{const p=PARKS[+$('#pk').value];$('#pkf').textContent=TR(`球場係數：得分 ${p.r}、全壘打 ${p.hr}（100 為聯盟平均）`,`Park factors: runs ${p.r}, home runs ${p.hr} (100 = league average)`)};pf();

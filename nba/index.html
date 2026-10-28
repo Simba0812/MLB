@@ -1163,7 +1163,7 @@ function finish(){
      <p style="margin-top:8px;font-weight:700">🏅 ${TR('系列賽 MVP','Series MVP')}　${esc(seriesMvp(seriesStats(G.gnum+1),champ))}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
-     <button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button></div>
+     <button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button><button class="ghost" id="sharer">📤 ${TR('分享結果','Share result')}</button></div>
    </div>
    ${S.mode!=='single'?seriesPanel(G.gnum+1,seriesOver):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
@@ -1171,7 +1171,18 @@ function finish(){
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
   $('#again').onclick=()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   $('#restart').onclick=()=>{S.screen=NET.on?'room':'setup';sync();render();window.scrollTo(0,0)};
+  $('#sharer').onclick=()=>shareIt($('#sharer'),TR('NBA 盲標對決','NBA Blind Auction'),
+    TR(`🏀 ${res.away.name} ${res.R[1]}：${res.R[0]} ${res.home.name}，${winTm.name} 獲勝！${champ!=null&&S.mode!=='single'?`系列賽 ${w[0]}：${w[1]}，${S.teams[champ].name} 封王。`:''}MVP ${mvp(res)}`,
+       `🏀 ${res.away.name} ${res.R[1]}-${res.R[0]} ${res.home.name}: ${winTm.name} win!${champ!=null&&S.mode!=='single'?` ${S.teams[champ].name} take the series ${Math.max(...w)}-${Math.min(...w)}.`:''} MVP ${mvp(res)}`),pageUrl());
   if(NET.pending) showFollow();
+}
+
+/* ---------- sharing: the phone's share sheet where there is one, otherwise copy the text and link ---------- */
+const pageUrl=()=>location.origin+location.pathname;   // without any ?room=
+function shareIt(btn,title,text,url){
+  if(navigator.share){navigator.share({title,text,url}).catch(()=>{});return}
+  const all=text+' '+url,o=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(all):Promise.reject()).then(()=>{btn.textContent=TR('已複製，貼給朋友','Copied: paste it to a friend');setTimeout(()=>btn.textContent=o,2500)},()=>window.prompt(TR('複製這段文字分享：','Copy this to share:'),all));
 }
 
 /* ---------- online play: one shared room document ---------- */
@@ -1277,6 +1288,13 @@ async function joinRoom(raw){
   }
   enterRoom(code,null);
 }
+// opened from an invite link (?room=CODE): join that room at once, then tidy the address bar
+function inviteFromLink(){
+  const code=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
+  if(!/^[A-Z0-9]{4}$/.test(code)||S.screen!=='home')return;
+  try{history.replaceState(null,'',location.pathname)}catch(e){}
+  joinRoom(code).catch(e=>{renderNetBox();const el=$('#neterr');if(el)el.textContent=e&&e.message&&!e.code?e.message:TR('連線失敗，請再試一次。','Connection failed. Try again.')});
+}
 function enterRoom(code,seat){
   S.ai=null;
   Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false});
@@ -1295,7 +1313,7 @@ function enterRoom(code,seat){
       const uid=await user.id(),cw=await user.can('data.write');
       if(!uid){NET.status='off';NET.msg=TR('請先登入 claude.ai 再使用線上對戰。','Sign in to claude.ai to play online.')}
       else if(cw===false){NET.status='off';NET.msg=TR('你目前只有檢視權限，沒辦法加入對戰。請房主從頁面的 Share 選單把你設為可以編輯（Editor）。','You only have view access. Ask the host to make you an Editor from the page\'s Share menu.')}
-      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms()}
+      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink()}
     }
   }catch(e){NET.status='off';NET.msg=window.STANDALONE?TR(`Firebase 連線失敗，請確認設定正確、匿名登入已啟用。（${(e&&(e.code||e.message))||''}）`,`Couldn't connect to Firebase. Check the config and that anonymous sign-in is enabled. (${(e&&(e.code||e.message))||''})`):TR('線上功能暫時無法使用，請重新整理頁面。','Online play is unavailable right now. Reload the page.')}
   renderNetBox();
@@ -1373,13 +1391,14 @@ function renderRoom(){
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${TR('線上房間','Online room')}</div>
-   <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div>
+   <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>
   <div class="grid2">${seat(0)}${seat(1)}</div>
   <section class="panel">${me===0?`<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${cfg.lotMax}"></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
     :`<h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:6px" id="cfgtxt"></p>`}</section>`;
+  $('#share').onclick=()=>shareIt($('#share'),TR('NBA 盲標對決','NBA Blind Auction'),TR(`來玩NBA 盲標對決！點連結直接加入房間，房號 ${NET.code}`,`Come play NBA Blind Auction! The link takes you straight into room ${NET.code}`),pageUrl()+'?room='+NET.code);
   $('#copy').onclick=()=>{navigator.clipboard.writeText(NET.code).then(()=>{$('#copy').textContent=TR('已複製','Copied')},()=>{$('#copy').textContent=TR('房號：','Code: ')+NET.code})};
   if(me!=null){
     const save=()=>{clearTimeout(setupTimer);setupTimer=setTimeout(()=>dbWrite(()=>NET.ref.update({setup:{[me]:{name:$('#tn').value.trim(),park:me}}})),400)};
