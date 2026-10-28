@@ -458,26 +458,27 @@ function renderSetup(){
         <p class="hint">${TR(`球員從 ${POOL.length} 人的 2026 球季名單隨機抽出，一次只揭曉一位，誰也不知道下一位是誰。雙方輪流出價，不想加價就按「放棄」，對手以目前價格得標並從預算扣款。每隊需要捕手、內野四個位置、外野三個位置、指定打擊各 1 人，先發投手 ${S.slots.SP} 人、中繼投手 ${S.slots.RP} 人、終結者 ${S.slots.CL} 人、板凳打者 ${S.slots.BN} 人。系統會替你保留填滿必要位置的最低預算（每個空位 $1）。總共抽 ${Math.max(S.lotMax,lotsNeeded())} 支籤，快抽完時只會抽出還有隊伍缺的位置；抽完後如果還有人缺必要位置，會加開補位籤，缺位的隊伍不能跳過。選秀後雙方各有 3 次交易提案機會。`,
     `Players are drawn at random from ${POOL.length} on 2026 rosters and revealed one at a time, so nobody knows who comes next. Teams take turns bidding; press "Pass" to stop and your opponent wins the player at the current price, paid from their budget. Each team needs one catcher, four infielders, three outfielders and a DH, ${S.slots.SP} starting pitchers, ${S.slots.RP} relievers and ${S.slots.CL} closers, plus ${S.slots.BN} bench bats. You always keep enough budget to fill your required spots ($1 per empty spot). There are ${Math.max(S.lotMax,lotsNeeded())} lots; near the end only positions someone still needs are drawn, and if a team is still short after the last lot, fill-in lots follow that the short team cannot skip. After the draft each team gets 3 trade proposals.`)}</p>
       </div>
-      <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="34" max="200" value="${S.lotMax}"></label></div>
+      <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${S.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(S.lotMax,lotsNeeded())}"><span class="hint">${TR(`最少 ${lotsNeeded()} 支`,`At least ${lotsNeeded()}`)}</span></label></div>
     </div>
     <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="err"></span></div>
   </section>`;
   const pf=i=>{const p=PARKS[+$('#pk'+i).value];$('#pkf'+i).textContent=TR(`球場係數：得分 ${p.r}、全壘打 ${p.hr}（100 為聯盟平均）`,`Park factors: runs ${p.r}, home runs ${p.hr} (100 = league average)`)};
   [0,1].forEach(i=>{pf(i);$('#pk'+i).onchange=()=>pf(i)});
+  const keepTyped=()=>{[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value;S.teams[i].park=+$('#pk'+i).value});
+    S.budget=clamp(parseInt($('#bud').value)||S.budget,30,1000);S.lotMax=clamp(parseInt($('#lots').value)||S.lotMax,1,200)};
   document.querySelectorAll('[data-lg]').forEach(b=>b.onclick=()=>{
-    [0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value;S.teams[i].park=i});
+    keepTyped();[0,1].forEach(i=>{S.teams[i].park=i});
     setLeague(b.dataset.lg);render()});
-  const keepTyped=()=>[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value;S.teams[i].park=+$('#pk'+i).value});
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{keepTyped();S.mode=b.dataset.m;fixSlots();render()});
   document.querySelectorAll('[data-slot]').forEach(el=>el.onchange=()=>{keepTyped();S.slots[el.dataset.slot]=+el.value;render()});
-  document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{[0,1].forEach(i=>{S.teams[i].name=$('#tn'+i).value;S.teams[i].park=+$('#pk'+i).value});S.ai.level=b.dataset.lv;render()});
+  document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{keepTyped();S.ai.level=b.dataset.lv;render()});
   document.querySelectorAll('[data-rn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rn,other=$('#tn'+(1-i)).value.trim();let n;do{n=randomName()}while(n===other);$('#tn'+i).value=n});
   $('#go').onclick=()=>{
     const a=$('#tn0').value.trim(),b=$('#tn1').value.trim();
     if(!a||!b){$('#err').textContent=TR('請替兩隊都取好隊名。','Give both teams a name.');return}
     if(a===b){$('#err').textContent=TR('兩隊隊名不能相同。','The two teams need different names.');return}
     const bud=clamp(parseInt($('#bud').value)||200,30,1000);
-    S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||50,34,200),lotsNeeded());
+    S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||50,lotsNeeded(),200),lotsNeeded());
     S.teams.forEach((t,i)=>{t.name=i?b:a;t.park=+$('#pk'+i).value;t.budget=bud;t.roster=[];t.done=false});
     S.deck=POOL.slice();
     for(let i=S.deck.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]]}
@@ -1732,7 +1733,7 @@ function renderRoom(){
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>
   <div class="grid2">${seat(0)}${seat(1)}</div>
   <section class="panel">${me===0?`<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
-     <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="34" max="200" value="${cfg.lotMax}"></label></div></div>
+     <div class="row" style="align-items:flex-end"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR('總籤數','Total lots')}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"><span class="hint">${TR(`最少 ${lotsNeeded()} 支`,`At least ${lotsNeeded()}`)}</span></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
     :`<h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:6px" id="cfgtxt"></p>`}</section>`;
   $('#copy').onclick=()=>{navigator.clipboard.writeText(NET.code).then(()=>{$('#copy').textContent=TR('已複製','Copied')},()=>{$('#copy').textContent=TR('房號：','Code: ')+NET.code})};
@@ -1743,7 +1744,7 @@ function renderRoom(){
     $('#rn').onclick=()=>{const other=((NET.doc&&NET.doc.setup&&NET.doc.setup[1-me])||{}).name;let n;do{n=randomName()}while(n===other);$('#tn').value=n;save()};
   }
   if(me===0){
-    const saveCfg=()=>dbWrite(()=>NET.ref.update({cfg:{budget:clamp(parseInt($('#bud').value)||200,30,1000),lotMax:clamp(parseInt($('#lots').value)||50,34,200)}}));
+    const saveCfg=()=>dbWrite(()=>NET.ref.update({cfg:{budget:clamp(parseInt($('#bud').value)||200,30,1000),lotMax:clamp(parseInt($('#lots').value)||50,lotsNeeded(),200)}}));
     $('#bud').onchange=saveCfg;$('#lots').onchange=saveCfg;
     $('#go').onclick=startOnlineDraft;
     document.querySelectorAll('[data-slot]').forEach(el=>el.onchange=()=>{S.slots={...S.slots,[el.dataset.slot]:+el.value};
@@ -1776,13 +1777,13 @@ function updateRoom(){
   const n=roomNames();
   const why=!seats[1]?TR('等待玩家 B 加入。','Waiting for Player B to join.'):(!n[0]||!n[1])?TR('兩隊都要先取好隊名。','Both teams need a name.'):n[0]===n[1]?TR('兩隊隊名不能相同。','The two teams need different names.'):'';
   if($('#go')){$('#go').disabled=!!why;$('#gowhy').textContent=why}
-  if($('#cfgtxt'))$('#cfgtxt').textContent=`${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${MODEZH[S.mode]} · ${TR(`先發 ${S.slots.SP}・中繼 ${S.slots.RP}・終結者 ${S.slots.CL}`,`SP ${S.slots.SP} · RP ${S.slots.RP} · CL ${S.slots.CL}`)} · ${TR('每隊預算','Budget')} $${cfg.budget} · ${TR('總籤數','Lots')} ${cfg.lotMax}. ${why||TR('等待房主開始選秀。','Waiting for the host to start the draft.')}`;
+  if($('#cfgtxt'))$('#cfgtxt').textContent=`${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${MODEZH[S.mode]} · ${TR(`先發 ${S.slots.SP}・中繼 ${S.slots.RP}・終結者 ${S.slots.CL}`,`SP ${S.slots.SP} · RP ${S.slots.RP} · CL ${S.slots.CL}`)} · ${TR('每隊預算','Budget')} $${cfg.budget} · ${TR('總籤數','Lots')} ${Math.max(cfg.lotMax,lotsNeeded())}. ${why||TR('等待房主開始選秀。','Waiting for the host to start the draft.')}`;
 }
 function startOnlineDraft(){
   const su=(NET.doc&&NET.doc.setup)||{},n=roomNames();
   const parks=[0,1].map(i=>Math.min(i===0?+$('#pk').value:((su[i]||{}).park??1),PARKS.length-1));
   const bud=clamp(parseInt($('#bud').value)||200,30,1000);
-  S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||50,34,200),lotsNeeded());
+  S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||50,lotsNeeded(),200),lotsNeeded());
   S.teams=[0,1].map(i=>({name:n[i],park:parks[i],budget:bud,roster:[],done:false}));
   S.deck=POOL.slice();
   for(let i=S.deck.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]]}
