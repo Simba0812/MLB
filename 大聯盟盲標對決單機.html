@@ -65,6 +65,10 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .slots{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;font-size:12.5px;line-height:1.4;margin-top:8px}
 .slots .k{font-family:var(--mono);color:var(--dim)} .slots .v{min-width:0;overflow-wrap:anywhere} .slots .p{font-family:var(--mono);color:var(--dim);text-align:right}
 .slots .empty{color:#6f9686}
+.slots .pv{all:unset;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px} .slots .pv:hover,.slots .pv:focus-visible{color:var(--amber)}
+#pvwrap{position:fixed;inset:0;z-index:50;background:rgba(5,20,14,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+#pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto}
+#pvwrap .pvx{align-self:flex-end;background:#10261d;color:var(--chalk);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
 .card{background:var(--chalk);color:#10261d;border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;transform-origin:50% 50%}
@@ -82,8 +86,8 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .stat{border:1.5px solid #c9c2a8;border-radius:3px;padding:3px 6px;line-height:1.3}
 .stat b{display:block;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
 .stat i{display:block;font-style:normal;font-size:10.5px;line-height:1.2;color:#4d6a5d;overflow-wrap:anywhere}
-.stat.sv{border-color:#d0571f}
-.stat.sv i{color:#a8441a}
+.stat.sv{border-color:#10261d}
+.stat.sv i{color:#10261d}
 .stat.wide{grid-column:span 2}
 .stat em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;color:#4d6a5d}
 .stat.t90{border:3px solid #c99a1e;background:#fbefc8}
@@ -689,6 +693,26 @@ function lotCard(p){
    ${p.twp?pitcherStats({...p.twp},TR('投手成績','Pitching')):''}
   </div>`;
 }
+// a drafted player's short profile: who he is, what he cost and his headline numbers
+function briefCard(i,id){
+  const r=S.teams[i].roster.find(x=>sid(x.p.id)===sid(id));if(!r)return '';
+  const p=r.p,pit=q=>{const g=q.pos==='SP'?'SP':'RP';return `<div class="stats">${statBox(q.era,TR('防禦率','ERA'),0,T(g,'era',q,1))}${statBox(q.ip,TR('局數','IP'),0,T(g,'ip',q))}${statBox(q.w+'-'+q.l,TR('勝-敗','W-L'),0,T(g,'w',q))}${statBox(q.so,TR('三振','SO'),0,T(g,'so',q))}${statBox(q.whip,'WHIP',0,T(g,'whip',q,1))}${statBox(pct(q.r.k),'K%',0,T(g,'kr',q))}</div>`};
+  return `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(nm(p))}">
+   <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
+   <div class="row" style="align-items:flex-start"><div style="min-width:0;display:flex;flex-direction:column;gap:4px"><div class="name">${esc(p.n)}</div>${p.zh?`<div class="zh">${esc(p.zh)}</div>`:''}</div><div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div></div>
+   <div class="meta"><span class="pos">${p.twp?'DH ＋ SP':p.pos}</span>${(p.alt||[]).map(k=>`<span class="pos">${k}</span>`).join('')}<span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}</span>${p.t?`<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>`:''}${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}<span>· ${TR(`得標價 $${r.price}`,`paid $${r.price}`)}</span></div>
+   ${p.type==='H'?`<div class="stats">${statBox(p.avg,TR('打擊率','AVG'),0,T('H','avg',p))}${statBox(p.obp,TR('上壘率','OBP'),0,T('H','obp',p))}${statBox(p.slg,TR('長打率','SLG'),0,T('H','slg',p))}${statBox(p.ops,'OPS',0,T('H','ops',p))}${statBox(p.hr,TR('全壘打','HR'),0,T('H','hr',p))}${statBox(p.sb,TR('盜壘','SB'),0,T('H','sb',p))}${statBox((p.def>0?'+':'')+(p.def||0).toFixed(1),TR('守備指數','Defense'),1)}</div>`:pit(p)}
+   ${p.twp?`<div class="statlabel">${TR('投手成績','Pitching')}</div>`+pit({...p.twp}):''}
+  </div>`;
+}
+function openBrief(i,id){
+  closeBrief();const w=document.createElement('div');w.id='pvwrap';w.innerHTML=briefCard(i,id);if(!w.innerHTML)return;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeBrief()};$('#pvx').focus();
+}
+function closeBrief(){const w=$('#pvwrap');if(w)w.remove()}
+// the roster panels are redrawn on every bid, so listen once at the document level
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-pv]');if(b){const [i,id]=b.dataset.pv.split(',');openBrief(+i,id)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBrief()});
 function teamPanel(i){
   const t=S.teams[i];
   const rows=SLOTS.map(sl=>{
@@ -696,7 +720,7 @@ function teamPanel(i){
     const lines=[];
     for(let n=0;n<slotMax(sl);n++){
       const r=got[n];
-      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v">${esc(nm(r.p))}${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
+      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v"><button class="pv" data-pv="${i},${esc(r.p.id)}" title="${TR('看球員簡介','Player summary')}">${esc(nm(r.p))}</button>${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
       else if(n<slotMin(sl)) lines.push(`<span class="k">${sl.k}</span><span class="v empty">${TR('（必填）','(required)')}</span><span class="p"></span>`);
     }
     return lines.join('');
@@ -965,9 +989,10 @@ function simGame(away,home,ctx){
   const st=[away,home].map((tm,ti)=>{
     const sta0=p=>tm.sta0&&tm.sta0[sid(p.id)]!=null?tm.sta0[sid(p.id)]:100;
     const sp=tm.chosenSP||tm.sps[0];
-    // only relievers and the closer come out of the bullpen; the other starters rest for their own turns
-    const s={tm,ti,sta0,pen:[...tm.rps,...tm.cl],used:new Set([sp]),bench:[...tm.bench],
-      roles:rolesOK(tm.rps,tm.roles)?tm.roles:defaultRoles(tm.rps),
+    // relievers and the closer form the bullpen; another starter joins only if the manager gave him a role
+    const roles=rolesOK(tm.rps,tm.roles)?tm.roles:defaultRoles(tm.rps);
+    const s={tm,ti,sta0,pen:[...tm.rps,...tm.cl,...tm.sps.filter(p=>p!==sp&&ROLES.includes(roles[sid(p.id)]))],used:new Set([sp]),bench:[...tm.bench],
+      roles,
       lu:box[ti].bat.slice(),bi:0,field:{},tac:tacOK(tm.tac)?{...tm.tac}:{...TACT0}};
     tm.order.forEach(h=>{if(h.fpos!=='DH')s.field[h.fpos]=h});
     s.cur={p:sp,pc:0,bf:0,outs:0,runs:0,starter:true,sta0:sta0(sp),E:capOf(sp)};
@@ -1292,14 +1317,14 @@ function renderPick(){
       <p style="margin-top:10px">${S.ai?TR('電腦會在開打時決定先發和打序，開打時揭曉。','The computer sets its starter and lineup at first pitch.'):sent?TR('✅ 已選好先發和打序，開打時揭曉。','✅ Starter and lineup set; revealed at first pitch.'):TR('對手正在調整先發和打序…','Your opponent is setting a starter and lineup…')}</p></section>`;
     const sentSp=sent&&picks[i].sp!=null?pid(picks[i].sp):null;
     const cur=PICKSEL[i]!=null&&avail.some(p=>p.id===PICKSEL[i])?PICKSEL[i]:(sentSp??avail[0].id);
-    const pen=[...tm.rps,...tm.cl];
+    const pen=[...tm.rps,...tm.cl,...tm.sps];
     return `<section class="panel teamcard ${i?'B':''}">${head}
      <div class="eyebrow" style="margin-top:10px">${TR('先發投手','Starting pitcher')}</div>
      <div role="radiogroup" aria-label="${esc(tm.name)} ${TR('先發投手','starting pitcher')}">${tm.sps.map(p=>{const r=rest.includes(sid(p.id))&&avail0.length;
       return `<label class="spopt"><input type="radio" name="sp${i}" value="${p.id}" ${r||sent?'disabled':''} ${p.id===cur?'checked':''}><span class="spn">${esc(nm(p))}</span><span class="mono">ERA ${p.era}</span><span class="mono">${p.velo?p.velo.toFixed(1)+' mph':''}</span>${staBar(sv(p))}${r?`<span>${TR('休息中','Resting')}</span>`:''}</label>`}).join('')}</div>
      <div class="eyebrow" style="margin-top:14px">${TR('牛棚分組與體力','Bullpen roles and stamina')}</div>
-     <div class="penlist" style="grid-template-columns:minmax(0,1fr) auto auto">${pen.map(p=>`<span>${p.pos==='CL'?`<span class="mono">CL</span> `:''}${esc(nm(p))} <span class="mono" style="color:var(--dim)">ERA ${p.era}</span></span>${p.pos==='CL'||sent?`<span class="hint">${p.pos==='CL'?TR('終結者','Closer'):ROLEL()[ROLESEL[i][sid(p.id)]]}</span>`:`<select data-role="${i},${esc(p.id)}" aria-label="${esc(nm(p))}" style="padding:3px 6px;font-size:13px">${ROLES.map(r=>`<option value="${r}" ${ROLESEL[i][sid(p.id)]===r?'selected':''}>${ROLEL()[r]}</option>`).join('')}</select>`}<span style="white-space:nowrap">${staBar(sv(p))}</span>`).join('')}</div>
-     ${sent?'':`<p class="hint" style="margin-top:6px">${ROLES.map(r=>`${ROLEL()[r]}：${ROLEHINT()[r]}`).join('；')}${TR('。先發投手不會下來救援。','. Starters never pitch in relief.')}</p>`}
+     <div class="penlist" style="grid-template-columns:minmax(0,1fr) auto auto">${pen.map(p=>`<span>${p.pos==='CL'||p.pos==='SP'?`<span class="mono">${p.pos}</span> `:''}${esc(nm(p))} <span class="mono" style="color:var(--dim)">ERA ${p.era}</span></span>${p.pos==='CL'||sent?`<span class="hint">${p.pos==='CL'?TR('終結者','Closer'):ROLEL()[ROLESEL[i][sid(p.id)]]||TR('不上場','Not used')}</span>`:`<select data-role="${i},${esc(p.id)}" aria-label="${esc(nm(p))}" style="padding:3px 6px;font-size:13px" ${p.pos==='SP'&&p.id===cur?'disabled':''}>${p.pos==='SP'?`<option value="">${p.id===cur?TR('今天先發','Starting today'):TR('不上場','Not used')}</option>`:''}${ROLES.map(r=>`<option value="${r}" ${p.id!==cur&&ROLESEL[i][sid(p.id)]===r?'selected':''}>${ROLEL()[r]}</option>`).join('')}</select>`}<span style="white-space:nowrap">${staBar(sv(p))}</span>`).join('')}</div>
+     ${sent?'':`<p class="hint" style="margin-top:6px">${ROLES.map(r=>`${ROLEL()[r]}：${ROLEHINT()[r]}`).join('；')}${TR('。其他先發投手預設不上場，要用的話自己編進牛棚（會吃掉他的體力）。','. Other starters stay out unless you put them in the bullpen yourself (it costs them stamina).')}</p>`}
      ${sent?`<p class="hint" style="margin-top:8px">${TR('已送出，等待對手準備好。','Sent. Waiting for your opponent.')}</p>`:lineupEditor(i)+`<div class="eyebrow" style="margin-top:14px">${TR('戰術（4 局、7 局開始前可以再調整）','Tactics (you can change them before the 4th and the 7th)')}</div>`+tacticsPicker(TACSEL[i],'tpk',i)}</section>`};
   const mySent=NET.on&&NET.seat!=null&&picks[NET.seat]!=null;
   $('#app').innerHTML=`${header()}
@@ -1309,7 +1334,10 @@ function renderPick(){
   <div class="grid2">${tms.map(panel).join('')}</div>
   ${NET.on&&NET.seat==null?'':`<div class="row"><button class="solid" id="startg" ${mySent?'disabled':''}>${NET.on?TR('確定我的調度','Confirm my setup'):TR('確定，開打 ⚾','Confirm and play ⚾')}</button>${NET.on&&!mySent?'<span class="hint" id="pickcd"></span>':''}</div>`}`;
   if(NET.on&&NET.seat!=null&&!mySent)pickCountdown();
-  [0,1].forEach(i=>document.querySelectorAll(`input[name="sp${i}"]`).forEach(r=>r.onchange=()=>{PICKSEL[i]=pid(r.value)}));
+  [0,1].forEach(i=>document.querySelectorAll(`input[name="sp${i}"]`).forEach(r=>r.onchange=()=>{PICKSEL[i]=pid(r.value);
+    // today's starter cannot also be in the bullpen
+    document.querySelectorAll(`[data-role^="${i},"]`).forEach(el=>{const id=el.dataset.role.split(',')[1];if(!el.querySelector('option[value=""]'))return;
+      const me=id===String(r.value);el.disabled=me;el.options[0].textContent=me?TR('今天先發','Starting today'):TR('不上場','Not used');if(me){el.value='';const m={...ROLESEL[i]};delete m[id];ROLESEL[i]=m}})}));
   const at=s=>s.split(',').map(Number);
   document.querySelectorAll('[data-lu]').forEach(el=>el.onchange=()=>{const [i,r]=at(el.dataset.lu),lu=LUED[i],id=pid(el.value),j=lu.findIndex(x=>sid(x.id)===sid(id));
     if(j>=0){const t=lu[j].id;lu[j].id=lu[r].id;lu[r].id=t}else lu[r].id=id;renderPick()});
@@ -1318,7 +1346,7 @@ function renderPick(){
     else LUPICK=LUPICK&&LUPICK[0]===i&&LUPICK[1]===r?null:[i,r];
     renderPick()});
   document.querySelectorAll('[data-lureset]').forEach(b=>b.onclick=()=>{const i=+b.dataset.lureset;LUED[i]=defaultLineup(i);renderPick()});
-  document.querySelectorAll('[data-role]').forEach(el=>el.onchange=()=>{const [i,id]=el.dataset.role.split(',');ROLESEL[+i]={...ROLESEL[+i],[id]:el.value}});
+  document.querySelectorAll('[data-role]').forEach(el=>el.onchange=()=>{const [i,id]=el.dataset.role.split(',');const m={...ROLESEL[+i]};if(el.value)m[id]=el.value;else delete m[id];ROLESEL[+i]=m});
   document.querySelectorAll('[data-tpk]').forEach(b=>b.onclick=()=>{const [i,side,k]=b.dataset.tpk.split(',');TACSEL[+i]={...TACSEL[+i],[side]:k};renderPick()});
   if(!$('#startg')) return;
   $('#startg').onclick=()=>{
