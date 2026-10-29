@@ -59,6 +59,10 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .slots{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;font-size:12.5px;line-height:1.4;margin-top:8px}
 .slots .k{font-family:var(--mono);color:var(--dim)} .slots .v{min-width:0;overflow-wrap:anywhere} .slots .p{font-family:var(--mono);color:var(--dim);text-align:right}
 .slots .empty{color:#6f9686}
+.slots .pv{all:unset;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px} .slots .pv:hover,.slots .pv:focus-visible{color:var(--amber)}
+#pvwrap{position:fixed;inset:0;z-index:50;background:rgba(5,20,14,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+#pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto}
+#pvwrap .pvx{align-self:flex-end;background:#10261d;color:var(--chalk);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
 .card{background:var(--chalk);color:#10261d;border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;transform-origin:50% 50%}
@@ -563,6 +567,25 @@ function lotCard(p){
   </div>`;
 }
 
+// a drafted player's short profile: who he is, what he cost and his headline numbers
+function briefCard(i,id){
+  const r=S.teams[i].roster.find(x=>sid(x.p.id)===sid(id));if(!r)return '';
+  const p=r.p,K=k=>STATK[k](p);
+  return `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(nm(p))}">
+   <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
+   <div class="row" style="align-items:flex-start"><div style="min-width:0;display:flex;flex-direction:column;gap:4px"><div class="name">${esc(p.n)}</div>${p.zh?`<div class="zh">${esc(p.zh)}</div>`:''}</div><div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div></div>
+   <div class="meta">${elig(p).map(k=>`<span class="pos">${k}</span>`).join('')}<span>${elig(p).map(k=>POSZH[k]).join('／')}</span><span>· ${esc(TEAMZH[p.t]||p.t)}</span>${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}<span>· ${TR(`得標價 $${r.price}`,`paid $${r.price}`)}</span></div>
+   <div class="stats">${statBox(f1(K('ppg')),TR('得分','PTS'),0,prOf(p,'ppg'))}${statBox(f1(K('rpg')),TR('籃板','REB'),0,prOf(p,'rpg'))}${statBox(f1(K('apg')),TR('助攻','AST'),0,prOf(p,'apg'))}${statBox(pct(K('fgp')),TR('投籃命中率','FG%'),0,prOf(p,'fgp'))}${statBox(K('tpp')==null?'—':pct(K('tpp')),TR('三分命中率','3P%'),0,prOf(p,'tpp'))}${statBox(f1(K('mpg')),TR('上場分鐘','MIN'),0,prOf(p,'mpg'))}</div>
+  </div>`;
+}
+function openBrief(i,id){
+  closeBrief();const w=document.createElement('div');w.id='pvwrap';w.innerHTML=briefCard(i,id);if(!w.innerHTML)return;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeBrief()};$('#pvx').focus();
+}
+function closeBrief(){const w=$('#pvwrap');if(w)w.remove()}
+// the roster panels are redrawn on every bid, so listen once at the document level
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-pv]');if(b){const [i,id]=b.dataset.pv.split(',');openBrief(+i,id)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBrief()});
 function teamPanel(i){
   const t=S.teams[i];
   const rows=SLOTS.map(sl=>{
@@ -570,7 +593,7 @@ function teamPanel(i){
     const lines=[];
     for(let n=0;n<slotMax(sl);n++){
       const r=got[n];
-      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v">${esc(nm(r.p))}${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
+      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v"><button class="pv" data-pv="${i},${esc(r.p.id)}" title="${TR('看球員簡介','Player summary')}">${esc(nm(r.p))}</button>${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
       else if(n<slotMin(sl)) lines.push(`<span class="k">${sl.k}</span><span class="v empty">${TR('（必填）','(required)')}</span><span class="p"></span>`);
     }
     return lines.join('');
