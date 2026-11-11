@@ -5,6 +5,7 @@
 Writes ../index.html: single player, same device, and online play (Firebase, using the
 firebase-config.js at the top of the site, which the baseball page uses too).
 """
+import hashlib
 import os
 
 SRC = os.path.dirname(os.path.abspath(__file__))
@@ -12,6 +13,8 @@ SITE = os.path.dirname(SRC)
 
 page = open(os.path.join(SRC, 'template.html'), encoding='utf-8').read()
 page = page.replace('/*POOL*/{"season":"","source":"","players":[]}', open(os.path.join(SRC, 'pool.json'), encoding='utf-8').read(), 1)
+# stamp the build so two online players can tell they are running the same code
+page = page.replace("'dev'/*BUILD*/", repr(hashlib.sha1(page.encode()).hexdigest()[:10]), 1)
 head, body = page.split('</style>', 1)
 flags = '<script>window.STANDALONE=true</script>\n<script src="../firebase-config.js"></script>'
 body = body.replace('<script>\nconst DATA', flags + '\n<script>\nconst DATA', 1)

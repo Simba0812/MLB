@@ -8,6 +8,7 @@ Writes:
   ../../mlb-auction-單機版/index.html  the same 單機版, as the second Netlify site (outside the Git project)
   claude-artifact.html the claude.ai version (online play through claude.ai)
 """
+import hashlib
 import os
 
 SRC = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +18,8 @@ t = open(os.path.join(SRC, 'template.html'), encoding='utf-8').read()
 page = t.replace('/*POOL*/[]', open(os.path.join(SRC, 'pool.json'), encoding='utf-8').read())
 cpbl = os.path.join(SRC, 'pool_cpbl.json')
 page = page.replace('/*POOL_CPBL*/[]', open(cpbl, encoding='utf-8').read() if os.path.exists(cpbl) else '[]')
+# stamp the build so two online players can tell they are running the same code
+page = page.replace("'dev'/*BUILD*/", repr(hashlib.sha1(page.encode()).hexdigest()[:10]), 1)
 open(os.path.join(SRC, 'claude-artifact.html'), 'w', encoding='utf-8').write(page)
 
 
