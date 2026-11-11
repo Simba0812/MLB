@@ -164,9 +164,10 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .follow{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--panel2);border-top:3px solid var(--amber);
   padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));font-weight:700}
 .waiting{color:var(--dim);font-weight:500}
-.sta{display:inline-block;width:64px;height:8px;border-radius:4px;background:var(--board);border:1px solid var(--line);overflow:hidden;vertical-align:middle}
+.sta{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--board);border:1px solid var(--line);overflow:hidden;vertical-align:middle}
 .sta i{display:block;height:100%}
 .stan{font-size:12px;color:var(--dim);min-width:3.2em}
+@media (max-width:520px){.sta{width:80px}}
 .penlist{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;align-items:center;font-size:13px}
 .lued{display:flex;flex-direction:column;gap:4px;margin-top:6px}
 .lurow{display:grid;grid-template-columns:2.4em 2.4em minmax(0,1fr) auto;gap:6px;align-items:center;border-radius:3px}
@@ -1083,7 +1084,11 @@ function simGame(away,home,ctx){
       if(hitBlend(best)<=hitBlend(h)-.005) return;
       choice=decide({kind:'ph',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead:diff,suggest:choice,
         cur:{id:sid(h.id),name:nm(h),pos:h.fpos,avg:h.avg,ops:h.ops,ovr:ovr(h),today:TR(`${row.ab} 打數 ${row.hits} 安打`,`${row.hits}-for-${row.ab}`)},
-        opts:bench.map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,avg:p.avg,ops:p.ops,ovr:ovr(p)}))});
+        opts:bench.map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,avg:p.avg,ops:p.ops,ovr:ovr(p)})),tac:tacStr(s.tac)});
+      // the manager may change tactics along with the pinch-hit: the answer then reads "choice~tactics"
+      const cut=String(choice).indexOf('~');
+      if(cut>=0){const t=tacOf(choice.slice(cut+1));choice=choice.slice(0,cut);
+        if(tacStr(t)!==tacStr(s.tac)){s.tac=t;ev.push({k:'note',t:TR(`📋 ${s.tm.name} 調整戰術：打擊「${TACTL().off[t.off]}」、跑壘「${TACTL().run[t.run]}」、投球「${TACTL().pit[t.pit]}」。`,`📋 ${s.tm.name} change tactics: batting "${TACTL().off[t.off]}", running "${TACTL().run[t.run]}", pitching "${TACTL().pit[t.pit]}".`)})}}
     }
     if(choice==='keep') return;
     const ph=bench.find(p=>sid(p.id)===choice);if(!ph) return;
@@ -1464,9 +1469,9 @@ function showDecision(){
   if(AUTO[q.team]) return submitDecision(q.suggest);
   const sug=q.suggest, tag=v=>v===sug?`<span class="sugg">${TR('建議','Suggested')}</span>`:'';
   let body;
+  if(q.kind==='tac'||(q.kind==='ph'&&q.tac))G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.kind==='tac'?q.cur:q.tac)};
   if(q.kind==='tac'){
     // a tactics checkpoint: three rows of choices, then confirm
-    G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.cur)};
     const sg=tacOf(sug);
     const halfT=TR(`${q.inning} 局開始前 · 比分 ${G.res.away.name} ${q.score[0]} : ${q.score[1]} ${G.res.home.name}`,`Before the ${ord(q.inning)} · ${G.res.away.name} ${q.score[0]} : ${q.score[1]} ${G.res.home.name}`);
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：調整戰術',': tactics')}</h2>
@@ -1486,11 +1491,14 @@ function showDecision(){
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
      <div class="optlist"><button class="opt" data-choose="keep">${TR(`讓 ${esc(c.name)} 打`,`Let ${esc(c.name)} hit`)} ${tag('keep')}<span class="hint">${c.pos} · ${TR('打擊率','AVG')} ${c.avg} · OPS ${c.ops} · ${TR('評價','Rating')} ${c.ovr} · ${TR('今天','today')} ${c.today}</span></button>
      ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('代打','Pinch-hit with')} ${esc(o.name)} ${tag(o.id)}<span class="hint">${o.pos} · ${TR('打擊率','AVG')} ${o.avg} · OPS ${o.ops} · ${TR('評價','Rating')} ${o.ovr}</span></button>`).join('')}</div>
-     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>`;
+     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>
+     ${q.tac?`<details style="margin-top:10px" ${G.tsel.open?'open':''} id="phtac"><summary style="cursor:pointer;font-weight:700">${TR('同時調整戰術（選填）','Change tactics too (optional)')}</summary>${tacticsPicker(G.tsel.t,'tq',q.team)}<p class="hint" style="margin-top:6px">${TR('先調好戰術，再按上面的代打或不換人，會一起生效。','Set the tactics first, then pick above; both take effect together.')}</p></details>`:''}`;
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
   if(NET.on)decCountdown(60,()=>submitDecision(q.suggest));
-  box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(b.dataset.choose));
+  // a pinch-hit answer carries the tactics too when the manager changed them
+  box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(q.kind==='ph'&&q.tac&&G.tsel&&tacStr(G.tsel.t)!==q.tac?b.dataset.choose+'~'+tacStr(G.tsel.t):b.dataset.choose));
+  if($('#phtac'))$('#phtac').ontoggle=()=>{G.tsel.open=$('#phtac').open};
   // switching a choice only re-marks the buttons, so the online countdown keeps running
   box.querySelectorAll('[data-tq]').forEach(b=>b.onclick=()=>{const [,side,k]=b.dataset.tq.split(',');G.tsel.t={...G.tsel.t,[side]:k};
     box.querySelectorAll(`[data-tq^="${q.team},${side},"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));
@@ -1625,7 +1633,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ac2829f4ca';
+const BUILD='3b7f0a598f';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
