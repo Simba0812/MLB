@@ -1824,7 +1824,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='e87f9313be';
+const BUILD='ef8d0d23a0';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2428,7 +2428,7 @@ function openAcct(note){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
     $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
     $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere 密碼</code>（英文信就搜 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere password</code>），連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere password</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
+    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
