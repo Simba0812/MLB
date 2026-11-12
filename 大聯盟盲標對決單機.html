@@ -901,8 +901,12 @@ function tradeResult(pi,ai,oi,bi){
 }
 function renderTrade(){
   const T=S.trade,pi=NET.on&&NET.seat!=null?NET.seat:T.prop,oi=1-pi,P=S.teams[pi],O=S.teams[oi];
+  T.done=T.done||[false,false];
+  const online=NET.on&&!S.ai,myDone=online&&T.done[pi],oppDone=online&&T.done[oi];
+  // both sides done and nobody waiting on an answer: on to pregame (the last one to act moves everyone)
+  if(online&&T.done[0]&&T.done[1]&&!T.pending&&NET.seat!=null){S.screen='pregame';sync();return render()}
   const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}</h2>
-    <div role="radiogroup" aria-label="${esc(S.teams[i].name)} ${TR('球員','players')}" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]||!isMine(pi)?'disabled':''}><span class="mono" style="color:var(--dim);width:3.6em">${e.slot}${e.slot2?'+SP':''}</span><span class="spn">${esc(nm(e.p))}</span><span class="mono" style="color:var(--dim)">${TR('評價','Rating')} ${ovr(e.p)}</span>${e.traded?`<span style="color:var(--dim)">${TR('交易來','acquired')}</span>`:''}</label>`).join('')}</div></section>`;
+    <div role="radiogroup" aria-label="${esc(S.teams[i].name)} ${TR('球員','players')}" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]||!isMine(pi)||myDone?'disabled':''}><span class="mono" style="color:var(--dim);width:3.6em">${e.slot}${e.slot2?'+SP':''}</span><span class="spn">${esc(nm(e.p))}</span><span class="mono" style="color:var(--dim)">${TR('評價','Rating')} ${ovr(e.p)}</span>${e.traded?`<span style="color:var(--dim)">${TR('交易來','acquired')}</span>`:''}</label>`).join('')}</div></section>`;
   let status='';
   const both=T.sel[pi]!=null&&T.sel[oi]!=null;
   const valid=both&&tradeResult(pi,T.sel[pi],oi,T.sel[oi]);
@@ -922,13 +926,16 @@ function renderTrade(){
   ${pend}
   <div class="grid2">${list(pi,TR('送出（提案方）','You give'))}${list(oi,TR('換來（對手）','You get'))}</div>
   <section class="panel"><p style="margin:0 0 10px">${status}</p><div class="row">
-   <button class="${pi?'b':'a'} solid" id="tprop" ${!valid||T.pending||!T.left[pi]||!isMine(pi)?'disabled':''}>${TR('送出提案','Propose trade')}</button>
-   <button id="tdone" ${T.pending||(NET.on&&NET.seat==null)?'disabled':''}>${TR('交易結束，進入賽前準備','Done trading, go to pregame')}</button></div>
+   <button class="${pi?'b':'a'} solid" id="tprop" ${!valid||T.pending||!T.left[pi]||!isMine(pi)||myDone?'disabled':''}>${TR('送出提案','Propose trade')}</button>
+   ${online?`<button id="tdone" ${myDone||NET.seat==null?'disabled':''}>${myDone?TR('你已經交易完了','You\'re done trading'):TR('我交易完了','I\'m done trading')}</button>
+     <span class="hint">${TR('對手：','Opponent: ')}${oppDone?TR('✅ 交易完了','✅ done'):TR('⏳ 還在看','⏳ still looking')}${myDone?TR('。交易完了還是可以接受或拒絕對手的提案；雙方都完成後進入賽前準備。','. You can still accept or decline their proposals; pregame starts once both of you are done.'):''}</span>`
+    :`<button id="tdone" ${T.pending?'disabled':''}>${TR('交易結束，進入賽前準備','Done trading, go to pregame')}</button>`}</div>
    <div class="log" style="margin-top:12px">${T.log.map(l=>`<div>${l}</div>`).join('')}</div></section>`;
   document.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{T.prop=+b.dataset.tp;T.sel=[null,null];render()});
   [0,1].forEach(i=>document.querySelectorAll(`input[name="tr${i}"]`).forEach(r=>r.onchange=()=>{T.sel[i]=+r.value;render()}));
   $('#tprop').onclick=()=>{T.left[pi]--;T.pending={pi,a:T.sel[pi],b:T.sel[oi]};sync();render()};
-  $('#tdone').onclick=()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
+  $('#tdone').onclick=online?()=>{T.done[pi]=true;T.log.unshift(TR(`🤝 ${esc(P.name)} 交易完了`,`🤝 ${esc(P.name)} is done trading`));sync();render()}
+    :()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   if(T.pending&&$('#tacc')){
     const q=T.pending,A=S.teams[q.pi],B=S.teams[1-q.pi],an=nm(A.roster[q.a].p),bn=nm(B.roster[q.b].p);
     $('#tacc').onclick=()=>{const r=tradeResult(q.pi,q.a,1-q.pi,q.b);if(r){A.roster=r[0];B.roster=r[1];T.log.unshift(TR(`✅ 成交：${esc(A.name)} 的 ${esc(an)} ⇄ ${esc(B.name)} 的 ${esc(bn)}`,`✅ Done deal: ${esc(A.name)}'s ${esc(an)} ⇄ ${esc(B.name)}'s ${esc(bn)}`))}T.pending=null;T.sel=[null,null];sync();render()};
@@ -1691,7 +1698,7 @@ function finish(){
     ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${rankText()}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
-     ${rankedGame()?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>`:`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}</div>
+     ${rankedGame()||isRnd()?(seriesOver||S.rankAI?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>${isRnd()?`<button id="newmatch">🎲 ${TR('找新對手','Find a new opponent')}</button>`:''}`:''):`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}</div>
    </div>
    ${S.mode!=='single'?seriesPanel(G.gnum+1,seriesOver):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
@@ -1699,6 +1706,7 @@ function finish(){
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
   countGame();
   if($('#rkhome')){$('#rkhome').onclick=()=>{S.rankAI=null;S.ai=null;leaveRoom()};if(S.rankAI)finishAIRanked();else rankCheck()}
+  if($('#newmatch'))$('#newmatch').onclick=()=>{const kind=isRanked()?'ranked':'casual';leaveRoom();quickMatch(kind).catch(()=>{})};
   if($('#again'))$('#again').onclick=()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   if($('#restart'))$('#restart').onclick=()=>{S.screen=NET.on?'room':'setup';sync();render();window.scrollTo(0,0)};
   const shareTxt=TR(`⚾ ${res.away.name} ${res.R[0]}：${res.R[1]} ${res.home.name}，${winTm.name} 獲勝！${champ!=null&&S.mode!=='single'?`系列賽 ${w[0]}：${w[1]}，${S.teams[champ].name} 封王。`:''}MVP ${mvp(res)}`,
@@ -1825,7 +1833,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='1cf5ac6fcd';
+const BUILD='0991539cc0';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1864,7 +1872,7 @@ function commitRaw(){const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.sea
 function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,mode:S.mode,lotMax:S.lotMax,budget:S.budget,
   teams:S.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:!!t.done,roster:t.roster.map(e=>({id:e.p.id,price:e.price,slot:e.slot,slot2:e.slot2||null,traded:!!e.traded}))})),
   ...deckDiff(),lotNo:S.lotNo,lot:S.lot?{p:S.lot.p.id,price:S.lot.price,high:S.lot.high,turn:S.lot.turn,passed:S.lot.passed}:null,
-  log:S.log.slice(0,20),trade:S.trade?{left:S.trade.left,prop:S.trade.prop,pending:S.trade.pending,log:S.trade.log.slice(0,15)}:null,
+  log:S.log.slice(0,20),trade:S.trade?{left:S.trade.left,prop:S.trade.prop,pending:S.trade.pending,log:S.trade.log.slice(0,15),done:S.trade.done||[false,false]}:null,
   series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev}}
 function hydrate(o){
   const prevSel=S.trade&&S.trade.sel;
@@ -1906,6 +1914,7 @@ function netBadge(){
 function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=leaveRoom;const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()}}
 // let go of the room without touching the game on screen; the other player sees that this seat left
 function detachRoom(){
+  if(isRnd()&&NET.seat!=null){LAST_OPP=((NET.doc.seats||{})[1-NET.seat])||'';try{if(localStorage.getItem('mlbRoom')===NET.code)localStorage.removeItem('mlbRoom')}catch(e){}}
   if(NET.on&&NET.seat!=null&&NET.ref){const ref=NET.ref,seat=NET.seat,mm=NET.seat===0&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.mm;
     ref.update({setup:{[seat]:{left:true}},...(mm?{cfg:{mm:''}}:{})}).catch(()=>{})}
   if(NET.unsub)NET.unsub();clearInterval(NET.beat);clearInterval(NET.waitTick);
@@ -2079,7 +2088,7 @@ window.addEventListener('pagehide',()=>{if(NET.on&&NET.seat!=null&&NET.ref)NET.r
 
 /* ---------- ranked play ---------- */
 // fixed rules so every ranked game is comparable
-const RANKED={mode:'single',slots:{SP:4,RP:4,CL:2,BN:2},budget:200,lotMax:50};
+const RANKED={mode:'bo7',slots:{SP:4,RP:4,CL:2,BN:2},budget:200,lotMax:50};
 // which leagues this player accepts for ranked games; two players are matched when their choices overlap
 let RK_LG=(()=>{try{const v=(localStorage.getItem('mlbRkLg')||'MLB,CPBL').split(',').filter(x=>x==='MLB'||x==='CPBL');return v.length?v:['MLB','CPBL']}catch(e){return ['MLB','CPBL']}})();
 const saveRkLg=()=>{try{localStorage.setItem('mlbRkLg',RK_LG.join(','))}catch(e){}};
@@ -2100,15 +2109,21 @@ const PROF={doc:null,loaded:false};
 // ranked seasons: S1 runs to 31 Jan 2027, then each season is three months (Feb–Apr, May–Jul, ...), Taiwan time.
 // firestore.rules works the season out the same way from the server's clock.
 const twNow=()=>new Date(Date.now()+8*3600000);
-const curSeason=()=>{const d=twNow();return Math.floor(((d.getUTCFullYear()-2026)*12+d.getUTCMonth()+1-11)/3)+1};
-const seasonEnd=n=>{const k=10+n*3;return new Date(Date.UTC(2026+Math.floor(k/12),k%12,1)-86400000)};   // the last day of season n
+// before S1 opens (Mon 16 Nov 2026, Taiwan time) ranked play is a test season, numbered 0
+const S1_START=Date.UTC(2026,10,15,16);
+const curSeason=()=>{if(Date.now()<S1_START)return 0;const d=twNow();return Math.floor(((d.getUTCFullYear()-2026)*12+d.getUTCMonth()+1-11)/3)+1};
+const seasonEnd=n=>n<1?new Date(S1_START+8*3600000-86400000):(()=>{const k=10+n*3;return new Date(Date.UTC(2026+Math.floor(k/12),k%12,1)-86400000)})();   // the last day of season n
+const szName=n=>n<1?TR('測試賽季','Test season'):`S${n}`;
+// a record from before S1 opened counts as the test season (some were stamped season 1 early)
+const seasonOf=p=>{const v=p.season??0;return v===1&&(p.created||0)<S1_START?0:v};
 const seasonDaysLeft=()=>Math.max(0,Math.ceil((seasonEnd(curSeason()).getTime()+86400000-twNow().getTime())/86400000));
 const fmtDay=d=>`${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`;
 // a new season: the rating comes halfway back to 1000 and the season's record starts over; the old one is kept
 async function ensureSeason(){
   const p=PROF.doc;if(!p||p.pend)return;
-  const s0=p.season??1,cur=curSeason();if(s0>=cur)return;
-  await profRef().update({rating:1000+Math.floor((p.rating-1000)/2),games:0,wins:0,losses:0,streak:0,season:cur,hist:{[s0]:{r:p.rating,w:p.wins,l:p.losses}}});
+  const s0=seasonOf(p),cur=curSeason();if(s0>=cur)return;
+  // leaving the test season starts everyone at 1000; later seasons come halfway back to 1000
+  await profRef().update({rating:s0<1?1000:1000+Math.floor((p.rating-1000)/2),games:0,wins:0,losses:0,streak:0,season:cur,hist:{[s0]:{r:p.rating,w:p.wins,l:p.losses}}});
   await loadProfile();
 }
 // ranked tiers by rating; everyone starts at 1000, in the rookie league
@@ -2117,6 +2132,8 @@ const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1500,'🥉','1
 const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
 const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);
+const isRnd=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.rnd);   // a room from random matchmaking (casual or ranked)
+let LAST_OPP='';   // the opponent from the last matched room: matchmaking tries someone else first
 const rankedGame=()=>isRanked()||!!S.rankAI;
 const acctUser=()=>NET.acct&&NET.acct.user();
 const profRef=()=>NET.db.doc('players/'+acctUser().uid);
@@ -2138,6 +2155,7 @@ async function rankStart(){
     const d=NET.doc,me=NET.seat,code=NET.code,at=d.created;let p=await loadProfile();
     if(!p){NET.rk={state:'err'};return}
     if(p.pend===code&&p.pendAt===at){NET.rk={state:'on',d:p.pendD,before:p.rating+p.pendD};return}   // a reload: already booked
+    if(p.pend&&p.pend!=='ai'){await settlePending();p=PROF.doc}
     if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
     await ensureSeason();p=PROF.doc;
     // the opponent's rating before this game, the way firestore.rules works it out
@@ -2150,26 +2168,51 @@ async function rankStart(){
   updateNetBadge();
 }
 // after the game: each side reports who won; when the reports agree the winner adds K back
+// the series winner once someone has four wins (the last game fully played), otherwise null
 function rankWinner(){
-  if(!S.series||!S.series.games[0])return null;
-  const r=gameResult(0);if(!r||r.paused)return null;
-  const h=S.series.sched[0];return r.R[0]>r.R[1]?1-h:h;
+  const n=S.series&&S.series.games.length;if(!n)return null;
+  const r=gameResult(n-1);if(!r||r.paused)return null;
+  const w=winsThrough(n),need={single:1,bo3:2,bo7:4}[S.mode]||4;
+  return w[0]>=need?0:w[1]>=need?1:null;
+}
+// write a finished series to my record: a win adds K (plus the streak bonus) back, a loss just clears it
+async function applyRanked(p,won){
+  const bonus=streakBonus(p.streak);
+  if(won)await profRef().update({rating:p.rating+ELO_K+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,streak:(p.streak||0)+1});
+  else await profRef().update({pend:'',pendAt:0,pendD:0,streak:0});
+  return bonus;
+}
+// a ranked series still pending on my record (I left before it was settled): read its room and settle it now.
+// A win counts when both reports agree, or when the opponent left without reporting (firestore.rules checks).
+async function settlePending(){
+  const p=PROF.doc,a=acctUser();if(!p||!p.pend||p.pend==='ai'||!a)return null;
+  let d=null;try{const x=await NET.db.doc('rooms/'+p.pend).get();d=x.exists?x.data():null}catch(e){return null}
+  if(!d||d.created!==p.pendAt)return null;
+  const st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;if(me==null)return null;
+  const rp=d.rep||{},mine=rp[me]&&rp[me].w,theirs=rp[1-me]&&rp[1-me].w;
+  if(mine==null)return null;
+  const won=mine===String(me);
+  if(theirs!=null&&theirs!==mine)return null;          // the reports disagree: nothing to add
+  if(!won&&theirs==null)return null;                   // a loss waits for their report (it changes nothing anyway)
+  try{const before=p.rating+(won?0:p.pendD),bonus=await applyRanked(p,won);await loadProfile();return {won,before:p.rating+p.pendD,after:PROF.doc.rating,bonus}}
+  catch(e){return null}
 }
 async function rankCheck(){
-  if(!isRanked()||NET.seat==null||!NET.rk||NET.rk.state!=='on'&&NET.rk.state!=='wait')return;
+  if(!isRanked()||NET.seat==null||!NET.rk||!['on','wait','ffwait'].includes(NET.rk.state))return;
+  if(NET.rk.state==='ffwait'&&Date.now()-(NET.rk.tried||0)<60000)return;   // a forfeit the rules refused: try again in a minute
+  NET.rk.tried=Date.now();
   const me=NET.seat,o=1-me,rp=NET.doc.rep||{};
   if(!rp[me]){const w=rankWinner();if(w==null)return;NET.rk.state='wait';await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w)}}}).then(r,r)));return}
-  if(!rp[o]&&!rp[me].ff)return;
+  // no report from the opponent: settle as a forfeit once they have left (firestore.rules checks that)
+  if(!rp[o]&&!rp[me].ff&&!oppGone())return;
   if(rp[o]&&rp[o].w!==rp[me].w){NET.rk={...NET.rk,state:'disputed'};return showRank()}
   if(NET.rk.busy)return;NET.rk.busy=true;
   try{
     const p=await loadProfile(),won=rp[me].w===String(me);
     if(!p||p.pend!==NET.code)return;
-    const bonus=streakBonus(p.streak);
-    if(won)await profRef().update({rating:p.rating+ELO_K+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,streak:(p.streak||0)+1});
-    else await profRef().update({pend:'',pendAt:0,pendD:0,streak:0});
+    const bonus=await applyRanked(p,won);
     await loadProfile();NET.rk={...NET.rk,state:'done',won,after:PROF.doc.rating,bonus:won?bonus:0,streak:PROF.doc.streak||0};
-  }catch(e){NET.rk={...NET.rk,state:rp[me].ff?'ffwait':'err',msg:String(e&&e.message||e)}}
+  }catch(e){NET.rk={...NET.rk,state:rp[me].ff||!rp[o]?'ffwait':'err',msg:String(e&&e.message||e)}}
   finally{NET.rk&&(NET.rk.busy=false)}
   showRank();
 }
@@ -2177,6 +2220,7 @@ async function startAIRanked(){
   let p=await loadProfile();if(!p)throw new Error(TR('找不到你的排位紀錄。','No ranked record found.'));
   if(p.rating>=AI_RK.cap)throw new Error(TR('大聯盟以上只能和真人打排位。','From the major-league tier up, ranked games are against people only.'));
   if(aiLeft(p)<=0)throw new Error(TR(`今天的電腦排位已經打完 ${AI_RK.perDay} 場了。`,`You have played today's ${AI_RK.perDay} ranked games against the computer.`));
+  if(p.pend&&p.pend!=='ai'){await settlePending();p=PROF.doc}
   if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
   await ensureSeason();p=PROF.doc;
   const day=twDay(),n=(p.aiDay===day?(p.aiN||0):0)+1;
@@ -2193,8 +2237,8 @@ async function startAIRanked(){
 }
 async function finishAIRanked(){
   const k=S.rankAI;if(!k||k.state!=='on')return;
-  const r=gameResult(0);if(!r||r.paused)return;
-  const h=S.series.sched[0],won=(r.R[0]>r.R[1]?1-h:h)===0;k.state='saving';
+  const w=rankWinner();if(w==null)return;
+  const won=w===0;k.state='saving';
   try{const p=await loadProfile();
     if(p&&p.pend==='ai'){
       if(won)await profRef().update({rating:p.rating+AI_RK.win,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0});
@@ -2239,6 +2283,8 @@ async function quickMatch(kind){
   const free=q.docs.map(x=>({id:x.id,d:x.data()})).filter(({d})=>{const st=d.seats||{},h=(d.setup||{})[0]||{};
     return st[0]&&st[0]!==NET.uid&&!st[1]&&!roomExpired(d)&&!!(d.cfg||{}).ranked===(kind==='ranked')&&(kind!=='ranked'||RK_LG.includes((d.cfg||{}).league))&&!h.left&&h.ver===BUILD&&(d.cfg||{}).game!=='nba'&&(!h.hb||Math.abs(now-h.hb)<5*60000)});
   for(let i=free.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[free[i],free[j]]=[free[j],free[i]]}
+  // someone new first; the last opponent only when nobody else is waiting
+  free.sort((x,y)=>(x.d.seats[0]===LAST_OPP)-(y.d.seats[0]===LAST_OPP));
   for(const {id} of free.slice(0,5)){
     try{if(await claimSeat(id)){enterRoom(id,1,kind);return}}catch(e){}
   }
@@ -2407,33 +2453,36 @@ function renderRankBox(){
   if(NET.status!=='ready'||!NET.acct){box.hidden=true;return}
   box.hidden=false;
   if(!PROF.loaded){box.innerHTML=`<div></div><section class="rankpanel"><h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('讀取你的牌位…','Loading your tier…')}</p></section>`;
-    loadProfile().then(ensureSeason).then(()=>{if(S.screen==='home')renderRankBox()},()=>{});return}
+    loadProfile().then(settlePending).then(r=>{if(r)PROF.settled=r}).then(ensureSeason).then(()=>{if(S.screen==='home')renderRankBox()},()=>{});return}
   const a=acctUser(),p=PROF.doc,ti=p?tierIdx(p.rating):-1,T=TIERS[Math.max(0,ti)];
   box.style.setProperty('--tier',T[4]);
   // the tier path: done tiers in navy, the current one ringed in red
   const path=`<div class="rankpath" aria-label="${TR('牌位','Tiers')}">${TIERS.map((t,i)=>`${i?`<div class="seg ${i<=ti?'done':''}"></div>`:''}<div class="node ${i<ti?'done':i===ti?'cur':''}"><div class="c">${t[1]}</div>${i?TR(t[2],t[3]):TR('新人','Rookie')}</div>`).join('')}</div>`;
   const leagues=`<span class="row" style="gap:6px 12px">${['MLB','CPBL'].map(k=>`<label class="slotpick" style="font-weight:700;color:var(--navy)"><input type="checkbox" data-rklg="${k}" ${RK_LG.includes(k)?'checked':''}> ${k==='MLB'?TR('大聯盟','MLB'):TR('中職','CPBL')}</label>`).join('')}</span>`;
-  const SN=curSeason(),seasonTag=`<span class="sznum">S${SN}</span>`;
-  const seasonLine=`<p class="hint" style="margin-top:4px">${TR(`S${SN} 賽季到 ${fmtDay(seasonEnd(SN))}，還剩 ${seasonDaysLeft()} 天。新賽季積分會往 1000 回落一半。`,`Season ${SN} ends ${fmtDay(seasonEnd(SN))} (${seasonDaysLeft()} days left). A new season brings ratings halfway back to 1000.`)}</p>`;
-  const past=p&&p.hist?Object.keys(p.hist).sort((a,b)=>a-b).map(k=>{const h=p.hist[k],t=TIERS[tierIdx(h.r)];return `<span class="pastsz" title="${TR(`S${k} 最終積分 ${h.r}，${h.w} 勝 ${h.l} 敗`,`Season ${k}: ${h.r}, ${h.w}-${h.l}`)}">S${k} ${t[1]} ${TR(t[2],t[3])}</span>`}).join(''):'';
+  const SN=curSeason(),seasonTag=`<span class="sznum">${SN<1?TR('測試中','TEST'):'S'+SN}</span>`;
+  const seasonLine=SN<1?`<p class="hint" style="margin-top:4px">${TR(`🧪 測試賽季：S1 將於 11/16（一）正式開始，還有 ${seasonDaysLeft()} 天；測試期間的積分屆時會重置為 1000。`,`🧪 Test season: S1 opens Monday 16 Nov (${seasonDaysLeft()} days); test ratings reset to 1000 then.`)}</p>`
+    :`<p class="hint" style="margin-top:4px">${TR(`S${SN} 賽季到 ${fmtDay(seasonEnd(SN))}，還剩 ${seasonDaysLeft()} 天。新賽季積分會往 1000 回落一半。`,`Season ${SN} ends ${fmtDay(seasonEnd(SN))} (${seasonDaysLeft()} days left). A new season brings ratings halfway back to 1000.`)}</p>`;
+  const past=p&&p.hist?Object.keys(p.hist).sort((a,b)=>a-b).map(k=>{const h=p.hist[k],t=TIERS[tierIdx(h.r)];return `<span class="pastsz" title="${TR(`${szName(+k)} 最終積分 ${h.r}，${h.w} 勝 ${h.l} 敗`,`${szName(+k)}: ${h.r}, ${h.w}-${h.l}`)}">${szName(+k)} ${t[1]} ${TR(t[2],t[3])}</span>`}).join(''):'';
   const played=p?p.wins+p.losses:0,rate=played?Math.round(p.wins/played*100):0;
-  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">S${SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}</div>
+  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">${SN<1?TR('測試','TEST'):'S'+SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}</div>
       <div class="st"><div><b>${p.wins}</b><span>${TR('勝','W')}</span></div><div><b>${p.losses}</b><span>${TR('敗','L')}</span></div><div><b>${played?rate+'%':'—'}</b><span>${TR('勝率','Win %')}</span></div><div><b>${p.streak>=2?'🔥'+p.streak:p.streak||0}</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`
     :`<div class="pcard"><div class="in"><span class="no">No. ????</span><div class="em" style="opacity:.35">⚾</div><div class="tn" style="font-size:40px">${TR('你的球員卡','Your card')}</div><div class="nm" style="font-size:15px;font-weight:700;color:var(--dim)">${!a||a.anon?TR('登入後就會發一張給你','Sign in to get yours'):TR('取個暱稱就能拿到','Pick a nickname to get it')}</div>
       <div class="st"><div><b>—</b><span>${TR('勝','W')}</span></div><div><b>—</b><span>${TR('敗','L')}</span></div><div><b>—</b><span>${TR('勝率','Win %')}</span></div><div><b>—</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`;
   let body;
   if(!p){
-    body=`<h2>🏆 ${TR('排位賽','Ranked')} ${seasonTag}</h2>${seasonLine}<p class="hint" style="margin-top:2px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
+    body=`<h2>🏆 ${TR('排位賽','Ranked')} ${seasonTag}</h2>${seasonLine}<p class="hint" style="margin-top:2px">${TR('和真人七戰四勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','Best of seven against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
       <div class="row" style="margin-top:auto;padding-top:16px"><button class="solid rankgo" id="rkgo">${!a||a.anon?TR('登入開始排位','Sign in to play'):TR('取暱稱開始排位','Pick a nickname')}</button><button id="lb">📊 ${TR('排行榜','Leaderboard')}</button></div>`;
   }else{
     const next=TIERS[ti+1],lo=T[0]||1000,pct=next?Math.max(0,Math.min(100,(p.rating-lo)/(next[0]-lo)*100)):100,left=aiLeft(p);
-    body=`<h2>🏆 ${TR('排位賽','Ranked')} ${seasonTag}</h2>${seasonLine}<p class="hint" style="margin-top:2px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
+    body=`<h2>🏆 ${TR('排位賽','Ranked')} ${seasonTag}</h2>${seasonLine}<p class="hint" style="margin-top:2px">${TR('和真人七戰四勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','Best of seven against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
       <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="rankline"><span>${TR('積分','Rating')} <b class="r">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)} · ${TR('勝率','win')} ${played?rate+'%':'—'}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</span><span>${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier!')}</span></div>
       ${past?`<div class="row" style="margin-top:12px;gap:6px"><span class="eyebrow">${TR('歷屆賽季','Past seasons')}</span>${past}</div>`:''}
       <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="acct">${TR('帳號','Account')}</button></div>
       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50，連勝再加分；配不到人可以打電腦排位（±25','An even win is +50 plus a streak bonus; if nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
+  const st=PROF.settled;PROF.settled=null;
+  if(st)body=`<p style="font-weight:900;color:${st.won?'var(--good)':'var(--navy)'};margin:0 0 8px">${st.won?TR(`🏆 上一場排位已結算：${st.before} → ${st.after}（+${st.after-st.before}）`,`🏆 Your last ranked series is settled: ${st.before} → ${st.after} (+${st.after-st.before})`):TR('上一場排位已結算（輸）。','Your last ranked series is settled (a loss).')}</p>`+body;
   box.innerHTML=card+`<section class="rankpanel">${body}</section>`;
   const busy=async(btn,fn)=>{btn.disabled=true;try{await fn()}catch(e){alert(e&&e.message||e)}btn.disabled=false};
   $('#rkgo').onclick=()=>{const a2=acctUser();if(!a2||a2.anon||!PROF.doc)return openAcct(TR('排位賽要先登入並取暱稱，積分才會記在你的帳號。','Sign in and pick a nickname first, so your rating is saved to your account.'));busy($('#rkgo'),()=>quickMatch('ranked'))};
@@ -2489,8 +2538,8 @@ async function openBoard(){
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   try{
     const q=await NET.db.collection('players').orderBy('rating','desc').limit(30).get(),me=(acctUser()||{}).uid;
-    const SN=curSeason(),rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&(p.season??1)===SN);
-    $('#lbt').textContent=TR(`S${SN} 排行榜`,`Season ${SN} leaderboard`);
+    const SN=curSeason(),rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN);
+    $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
     $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
@@ -2513,7 +2562,7 @@ function renderRoom(){
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>
   <div class="grid2">${seat(0)}${seat(1)}</div>
-  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：單場決勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方到齊後自動開始選秀。','Fixed rules: one game · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來；中途離開等於輸。','Starting the draft books the loss; a win gives it back. Leaving early counts as a loss.')}</p>`
+  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來；中途離開等於輸。','Starting the draft books the loss; a win gives it back. Leaving early counts as a loss.')}</p>`
     :me===0?`<div><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end;margin-top:12px"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR(`總籤數（最少 ${lotsNeeded()}）`,`Total lots (min ${lotsNeeded()})`)}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
