@@ -1804,12 +1804,48 @@ function resultCard({res,winTm,w,champ,gnum,nmw,nml}){
   text(`simba0812.github.io/MLB　·　${new Date().toLocaleDateString(LANG==='zh'?'zh-TW':'en-US')}`,W/2,H-80,`500 {s}px ${mono}`,22,dim);
   return c;
 }
+// a picture of the player's ranked card: tier, rating, record, and the ladder with their rung marked
+function tierCard(p){
+  const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  const navy='#1d3557',red='#c8342b',paper='#f6efdc',ink='#1d2a3a',dim='#6b6255';
+  const serif='"Noto Serif TC","Songti TC",serif',sans='"Noto Sans TC","PingFang TC",sans-serif',mono='"IBM Plex Mono",Menlo,monospace',disp='"Big Shoulders Display","Arial Narrow",sans-serif';
+  const emo='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  const text=(t,X,Y,font,size,col,al='center',max=W-160)=>{let s2=size;x.font=font.replace('{s}',s2);while(x.measureText(t).width>max&&s2>14){s2-=2;x.font=font.replace('{s}',s2)}x.fillStyle=col;x.textAlign=al;x.fillText(t,X,Y)};
+  const ti=tierIdx(p.rating),T=TIERS[ti],next=TIERS[ti+1],col=T[4],SN=curSeason();
+  const played=p.wins+p.losses,rate=played?Math.round(p.wins/played*100)+'%':'—';
+  x.fillStyle='#e6d9b6';x.fillRect(0,0,W,H);x.fillStyle=paper;x.fillRect(36,36,W-72,H-72);
+  x.strokeStyle=navy;x.lineWidth=6;x.strokeRect(36,36,W-72,H-72);x.lineWidth=2;x.strokeRect(50,50,W-100,H-100);
+  text(TR('大聯盟盲標對決','MLB Blind Auction'),W/2,150,`900 {s}px ${serif}`,60,navy);
+  const tag=TR('排位賽','RANKED')+' · '+(SN<1?TR('測試賽季','TEST SEASON'):TR(`第 ${SN} 季`,`SEASON ${SN}`));
+  x.font=`700 26px ${sans}`;const tw=x.measureText(tag).width+48;x.fillStyle=red;x.fillRect(W/2-tw/2,180,tw,46);text(tag,W/2,212,`700 {s}px ${sans}`,26,paper);
+  // the tier badge: a ring in the tier colour around its emblem
+  x.beginPath();x.arc(W/2,420,150,0,Math.PI*2);x.fillStyle='#fffaf0';x.fill();x.lineWidth=14;x.strokeStyle=col;x.stroke();
+  x.beginPath();x.arc(W/2,420,128,0,Math.PI*2);x.lineWidth=3;x.strokeStyle=navy;x.stroke();
+  x.textBaseline='middle';text(T[1],W/2,428,`{s}px ${emo}`,150,ink);x.textBaseline='alphabetic';
+  text(TR(T[2],T[3]),W/2,680,`900 {s}px ${serif}`,104,col);
+  text(p.name,W/2,760,`900 {s}px ${serif}`,52,ink);
+  text(`${TR('積分','RATING')}  ${p.rating}`,W/2,840,`900 {s}px ${disp}`,64,navy);
+  // record
+  const st=[[p.wins,TR('勝','W')],[p.losses,TR('敗','L')],[rate,TR('勝率','WIN %')],[p.streak>=2?'🔥'+p.streak:(p.streak||0),TR('連勝','STREAK')]];
+  st.forEach(([v,l],k)=>{const cx=180+k*240;text(String(v),cx,950,`900 {s}px ${disp}`,60,ink,'center',220);text(l,cx,990,`700 {s}px ${sans}`,24,dim)});
+  // the ladder
+  const y=1090,x0=130,step=(W-260)/(TIERS.length-1);
+  x.strokeStyle='#cbbd97';x.lineWidth=6;x.beginPath();x.moveTo(x0,y);x.lineTo(W-x0,y);x.stroke();
+  x.strokeStyle=navy;x.beginPath();x.moveTo(x0,y);x.lineTo(x0+step*ti,y);x.stroke();
+  TIERS.forEach((t,i)=>{const cx=x0+step*i;x.beginPath();x.arc(cx,y,i===ti?34:24,0,Math.PI*2);x.fillStyle=i<=ti?'#fffaf0':'#ece1c3';x.fill();x.lineWidth=i===ti?6:3;x.strokeStyle=i===ti?red:i<ti?navy:'#cbbd97';x.stroke();
+    x.textBaseline='middle';x.globalAlpha=i<=ti?1:.35;text(t[1],cx,y+2,`{s}px ${emo}`,i===ti?36:26,ink);x.globalAlpha=1;x.textBaseline='alphabetic'});
+  text(next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} points to ${next[3]}`):TR('已經是最高段位','Top of the ladder'),W/2,1170,`700 {s}px ${sans}`,28,red);
+  x.strokeStyle=navy;x.lineWidth=3;x.beginPath();x.moveTo(110,H-150);x.lineTo(W-110,H-150);x.stroke();
+  text(TR('來挑戰我 · 免費遊玩','Come take me on · free to play'),W/2,H-102,`700 {s}px ${serif}`,26,navy);
+  text(`simba0812.github.io/MLB　·　${new Date().toLocaleDateString(LANG==='zh'?'zh-TW':'en-US')}`,W/2,H-68,`500 {s}px ${mono}`,22,dim);
+  return c;
+}
 // the phone's share sheet takes the picture (save to photos, LINE, ...); elsewhere it downloads
-async function shareImage(btn,canvas,text){
+async function shareImage(btn,canvas,text,fname){
   const o=btn.textContent;btn.disabled=true;
   try{
     await document.fonts.ready;
-    const blob=await new Promise(r=>canvas.toBlob(r,'image/png')),name='blind-auction-result.png';
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png')),name=fname||'blind-auction-result.png';
     const file=new File([blob],name,{type:'image/png'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:text+' '+pageUrl()}).catch(()=>{})}
     else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
@@ -2143,7 +2179,7 @@ const saveRkLg=()=>{try{localStorage.setItem('mlbRkLg',RK_LG.join(','))}catch(e)
 const pickLg=()=>RK_LG[Math.floor(Math.random()*RK_LG.length)];
 // ranked against the computer: half the points of a game against a person, five a day, and only below the
 // major-league tier, because the result is worked out on the player's own page and nothing on the server can check it
-const AI_RK={d:25,win:50,perDay:5,cap:3000};
+const AI_RK={d:25,win:50,perDay:5,cap:2500};   // cap: the major-league tier and up play people only (firestore.rules)
 // a win streak against people adds 10 for the 2nd win in a row, 20 for the 3rd, 30 from the 4th on
 const streakBonus=st=>Math.min(st||0,3)*10;
 const twDay=()=>Math.floor((Date.now()+8*3600000)/86400000);   // a day in Taiwan time; firestore.rules counts the same way
@@ -2174,9 +2210,10 @@ async function ensureSeason(){
   await profRef().update({rating:s0<1?1000:1000+Math.floor((p.rating-1000)/2),games:0,wins:0,losses:0,streak:0,season:cur,hist:{[s0]:{r:p.rating,w:p.wins,l:p.losses}}});
   await loadProfile();
 }
-// ranked tiers by rating; everyone starts at 1000, in the rookie league
-const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1500,'🥉','1A','Single-A','#a8642a'],[2000,'🥈','2A','Double-A','#6b7a89'],[2500,'🥇','3A','Triple-A','#b8860b'],
-  [3000,'🏟️','大聯盟','Major League','#2a6f97'],[3500,'⭐','明星','All-Star','#c99a1e'],[4000,'🏛️','名人堂','Hall of Fame','#7b4fa0']];
+// ranked tiers by rating; everyone starts at 1000, in the rookie league. The steps widen as you climb:
+// 300 to Single-A, 300 to Double-A, 400 to Triple-A, 500 to the majors, then 500 per tier
+const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1300,'🥉','1A','Single-A','#a8642a'],[1600,'🥈','2A','Double-A','#6b7a89'],[2000,'🥇','3A','Triple-A','#b8860b'],
+  [2500,'🏟️','大聯盟','Major League','#2a6f97'],[3000,'⭐','明星','All-Star','#c99a1e'],[3500,'🏛️','名人堂','Hall of Fame','#7b4fa0']];
 const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
 const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);
@@ -2570,7 +2607,7 @@ function renderRankBox(){
       <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="rankline"><span>${TR('積分','Rating')} <b class="r">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)} · ${TR('勝率','win')} ${played?rate+'%':'—'}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</span><span>${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier!')}</span></div>
       ${past?`<div class="row" style="margin-top:12px;gap:6px"><span class="eyebrow">${TR('歷屆賽季','Past seasons')}</span>${past}</div>`:''}
-      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="acct">${TR('帳號','Account')}</button></div>
+      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="rkshare">📤 ${TR('分享段位','Share my tier')}</button><button id="acct">${TR('帳號','Account')}</button></div>
       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50，連勝再加分；配不到人可以打電腦排位（±25','An even win is +50 plus a streak bonus; if nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
   const st=PROF.settled;PROF.settled=null;
@@ -2579,6 +2616,8 @@ function renderRankBox(){
   const busy=async(btn,fn)=>{btn.disabled=true;try{await fn()}catch(e){alert(e&&e.message||e)}btn.disabled=false};
   $('#rkgo').onclick=()=>{const a2=acctUser();if(!a2||a2.anon||!PROF.doc)return openAcct(TR('排位賽要先登入並取暱稱，積分才會記在你的帳號。','Sign in and pick a nickname first, so your rating is saved to your account.'));busy($('#rkgo'),()=>quickMatch('ranked'))};
   if($('#lb'))$('#lb').onclick=openBoard;
+  if($('#rkshare'))$('#rkshare').onclick=()=>{const q=PROF.doc;if(!q)return;const t=TIERS[tierIdx(q.rating)];
+    shareImage($('#rkshare'),tierCard(q),TR(`我在大聯盟盲標對決排位到了 ${t[1]} ${t[2]}（${q.rating} 分），來挑戰我！`,`I'm ${t[1]} ${t[3]} (${q.rating}) in MLB Blind Auction ranked. Come take me on!`),'blind-auction-tier.png')};
   if($('#acct'))$('#acct').onclick=()=>openAcct();
   box.querySelectorAll('[data-rklg]').forEach(c=>c.onchange=()=>{const v=[...box.querySelectorAll('[data-rklg]')].filter(x=>x.checked).map(x=>x.dataset.rklg);
     if(!v.length){c.checked=true;return}RK_LG=v;saveRkLg()});
