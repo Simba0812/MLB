@@ -1122,9 +1122,11 @@ function simGame(away,home,ctx){
     const order=Math.abs(lead)>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
     const best=a=>a.slice().sort((x,y)=>(pitBlend(x)-sta(x)/40)-(pitBlend(y)-sta(y)/40))[0];
     for(const min of [45,30])for(const r of order){const g=pen.filter(p=>p.pos!=='CL'&&s.roles[sid(p.id)]===r&&sta(p)>=min);if(g.length)return best(g)}
-    // nobody fresh: the closer from the 9th on, then whoever is left
-    const rest=pen.filter(p=>p.pos!=='CL'||inning>=9);
-    return rest.length?best(rest):cl||null;
+    // nobody fresh: whoever is left, the closer included from the 7th on. Before the 7th the computer never
+    // brings in a closer, even with the rest of the pen used up: the pitcher on the mound stays in.
+    // (A manager picking by hand can still call on the closer at any time.)
+    const rest=pen.filter(p=>p.pos!=='CL'||inning>=7);
+    return rest.length?best(rest):null;
   }
   function doChange(dt,np,lead){
     const s=st[dt],old=s.cur.p;
@@ -1835,7 +1837,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='826856d138';
+const BUILD='4c3e973754';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
