@@ -511,7 +511,9 @@ function needsCovered(t,p,slots){ // how many required slots this player fills
 }
 function maxBid(t,p){
   const slots=openSlotsFor(t,p); if(!slots.length) return 0;
-  const after=minRemaining(t)-needsCovered(t,p,slots);
+  // one player fills one spot (a two-way player two), however many open spots he could go into:
+  // counting each of them let a team spend the dollars it needed for its last required spots
+  const after=minRemaining(t)-Math.min(needsCovered(t,p,slots),p.twp?2:1);
   return Math.max(0,t.budget-after);
 }
 function canMeetMin(t){return SLOTS.every(sl=>slotCount(t,sl.k)>=slotMin(sl))}
@@ -1824,7 +1826,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ea5460fe17';
+const BUILD='1cf5ac6fcd';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
