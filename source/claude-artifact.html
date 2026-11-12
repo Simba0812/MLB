@@ -1824,8 +1824,17 @@ function shareIt(btn,title,text,url){
 // rooms expire 3 days after their last write; every write renews the stamp
 const ROOM_TTL=3*864e5;
 const roomExpired=d=>(d.exp||((d.created||0)+ROOM_TTL))<Date.now();
+// a room that is only waiting for a random opponent lives 10 minutes past its last heartbeat, so a closed
+// tab doesn't leave it in the matchmaking list for days; it gets the full three days once someone sits down
+const WAIT_TTL=10*60000;
 function roomDoc(code){
-  const r=NET.db.doc('rooms/'+code),stamp=d=>({...d,exp:Date.now()+ROOM_TTL});
+  const waiting=d=>{const c=d&&d.cfg;return !!(c&&c.mm&&!(d.seats||{})[1])};
+  // a new waiting room, or a write to our own waiting room that neither seats someone nor ends the wait
+  const ttl=d=>{
+    if(waiting(d))return WAIT_TTL;
+    const stillWaiting=NET.code===code&&waiting(NET.doc)&&!(d.cfg&&d.cfg.mm==='')&&!(d.seats&&d.seats[1]);
+    return stillWaiting?WAIT_TTL:ROOM_TTL};
+  const r=NET.db.doc('rooms/'+code),stamp=d=>({...d,exp:Date.now()+ttl(d)});
   return {get:()=>r.get(),onSnapshot:(a,b)=>r.onSnapshot(a,b),acquire:o=>r.acquire(o),set:d=>r.set(stamp(d)),update:d=>r.update(stamp(d))};
 }
 // opening the online menu clears out expired rooms, so old games don't pile up
@@ -1837,7 +1846,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='4c3e973754';
+const BUILD='61d746aa68';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1918,7 +1927,7 @@ function netBadge(){
 function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=leaveRoom;const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()}}
 // let go of the room without touching the game on screen; the other player sees that this seat left
 function detachRoom(){
-  if(isRnd()&&NET.seat!=null){LAST_OPP=((NET.doc.seats||{})[1-NET.seat])||'';try{if(localStorage.getItem('mlbRoom')===NET.code)localStorage.removeItem('mlbRoom')}catch(e){}}
+  if(isRnd()&&NET.seat!=null){const o=(NET.doc.seats||{})[1-NET.seat];if(o)LAST_OPP=o;try{if(localStorage.getItem('mlbRoom')===NET.code)localStorage.removeItem('mlbRoom')}catch(e){}}
   if(NET.on&&NET.seat!=null&&NET.ref){const ref=NET.ref,seat=NET.seat,mm=NET.seat===0&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.mm;
     ref.update({setup:{[seat]:{left:true}},...(mm?{cfg:{mm:''}}:{})}).catch(()=>{})}
   if(NET.unsub)NET.unsub();clearInterval(NET.beat);clearInterval(NET.waitTick);
@@ -2069,7 +2078,8 @@ function takeOver(){
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused){render();resumeGame()}else render();
   scheduleAI();
 }
-window.addEventListener('pagehide',()=>{if(NET.on&&NET.seat!=null&&NET.ref)NET.ref.update({setup:{[NET.seat]:{left:true}}}).catch(()=>{})});
+window.addEventListener('pagehide',()=>{if(NET.on&&NET.seat!=null&&NET.ref){const d=NET.doc,w=NET.seat===0&&d&&d.cfg&&d.cfg.mm&&!(d.seats||{})[1];
+  NET.ref.update({setup:{[NET.seat]:{left:true}},...(w?{cfg:{mm:''}}:{})}).catch(()=>{})}});
 
 /* ---------- ranked play ---------- */
 // fixed rules so every ranked game is comparable
@@ -2263,17 +2273,57 @@ async function claimSeat(code){
   const d2=(await ref.get()).data();if(!d2.seats||d2.seats[1])return false;
   await ref.update({seats:{1:NET.uid}});return true;
 }
-async function quickMatch(kind){
-  const now=Date.now(),q=await NET.db.collection('rooms').where('cfg.mm','==',kind).limit(20).get();
-  const free=q.docs.map(x=>({id:x.id,d:x.data()})).filter(({d})=>{const st=d.seats||{},h=(d.setup||{})[0]||{};
-    return st[0]&&st[0]!==NET.uid&&!st[1]&&!roomExpired(d)&&!!(d.cfg||{}).ranked===(kind==='ranked')&&(kind!=='ranked'||RK_LG.includes((d.cfg||{}).league))&&!h.left&&h.ver===BUILD&&(d.cfg||{}).game!=='nba'&&(!h.hb||Math.abs(now-h.hb)<5*60000)});
+// why a waiting room can't take this player: 'x' (gone, full, wrong kind), 'ver' (another build of the
+// page), 'lg' (a ranked league this player didn't tick), or '' when it can
+function mmWhy(d,kind,now){
+  const st=d.seats||{},h=(d.setup||{})[0]||{},c=d.cfg||{};
+  if(!st[0]||st[0]===NET.uid||st[1]||roomExpired(d)||h.left||c.game==='nba'||!!c.ranked!==(kind==='ranked')||(h.hb&&Math.abs(now-h.hb)>=2*60000))return 'x';
+  if(h.ver!==BUILD)return 'ver';
+  if(kind==='ranked'&&!RK_LG.includes(c.league))return 'lg';
+  return '';
+}
+async function mmScan(kind){
+  const now=Date.now(),q=await NET.db.collection('rooms').where('cfg.mm','==',kind).limit(60).get();
+  const all=q.docs.map(x=>({id:x.id,d:x.data()})).map(r=>({...r,why:mmWhy(r.d,kind,now)}));
+  const free=all.filter(r=>!r.why);
   for(let i=free.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[free[i],free[j]]=[free[j],free[i]]}
   // someone new first; the last opponent only when nobody else is waiting
   free.sort((x,y)=>(x.d.seats[0]===LAST_OPP)-(y.d.seats[0]===LAST_OPP));
-  for(const {id} of free.slice(0,5)){
+  return {free,ver:all.filter(r=>r.why==='ver').length,lg:[...new Set(all.filter(r=>r.why==='lg').map(r=>r.d.cfg.league))]};
+}
+// the page on the server may be newer than this one (phones keep old copies): returns true if it is
+let NEWER=null;
+function newerBuild(){
+  if(NEWER)return NEWER;
+  if(BUILD==='dev'||!/^https?:/.test(location.protocol)||window.OFFLINE)return Promise.resolve(false);
+  NEWER=fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=/const BUILD='([0-9a-f]{10})'/.exec(t);return !!m&&m[1]!==BUILD}).catch(()=>false);
+  NEWER.then(v=>{if(!v)setTimeout(()=>{NEWER=null},5*60000)});
+  return NEWER;
+}
+const reloadFresh=()=>location.replace(location.pathname+'?v='+Date.now());
+async function quickMatch(kind){
+  // two players on different builds can never be paired, so get the newest page first
+  if(await newerBuild()){if(confirm(TR('網頁有新版本，要先更新嗎？（舊版配不到用新版的玩家）','A newer version of the page is out. Update now? (Older pages can\'t be paired with newer ones.)')))return reloadFresh()}
+  const r=await mmScan(kind);
+  for(const {id} of r.free.slice(0,5)){
     try{if(await claimSeat(id)){enterRoom(id,1,kind);return}}catch(e){}
   }
-  await createRoom(kind);
+  await createRoom(kind);NET.mmMiss=r;
+}
+// while waiting in our own room, look again every few seconds: two players who pressed at the same moment
+// each opened a room, so the newer room's host moves into the older one
+async function mmRescan(){
+  const d=NET.doc,kind=d&&d.cfg&&d.cfg.mm;
+  if(NET.mmBusy||!NET.on||NET.seat!==0||!kind||(d.seats||{})[1])return;
+  NET.mmBusy=true;
+  try{
+    const r=await mmScan(kind);NET.mmMiss=r;
+    const mine=d.created||0,code=NET.code;
+    for(const {id,d:o} of r.free.filter(x=>(x.d.created||0)<mine||((x.d.created||0)===mine&&x.id<code)).slice(0,3)){
+      if(NET.code!==code||(NET.doc.seats||{})[1]||!(NET.doc.cfg||{}).mm)break;
+      if(await claimSeat(id).catch(()=>false)){const since=NET.mmStart;detachRoom();enterRoom(id,1,kind);NET.mmStart=since;return}
+    }
+  }catch(e){}finally{NET.mmBusy=false}
 }
 function genCode(){const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)];return s}
 async function createRoom(mm){
@@ -2292,6 +2342,8 @@ async function joinRoom(raw){
   const seats=s.data().seats||{};
   if(seats[0]===NET.uid) return enterRoom(code,0);
   if(seats[1]===NET.uid) return enterRoom(code,1);
+  // ranked opponents come only from matchmaking, so nobody can line up a friend to farm points
+  if((s.data().cfg||{}).rnd) throw new Error((s.data().cfg||{}).ranked?TR('排位賽的房間不能用房號加入，請按「開始排位」配對。','Ranked rooms can\'t be joined by code; press "Play ranked" to be matched.'):TR('這是隨機配對的房間，不能用房號加入。','That room is from random matchmaking and can\'t be joined by code.'));
   if(!seats[1]){
     const lease=await ref.acquire({holder:NET.uid,ttlMs:5000});
     if(lease.acquired){const d2=(await ref.get()).data();if(!d2.seats||!d2.seats[1]){await ref.update({seats:{1:NET.uid}});return enterRoom(code,1)}}
@@ -2543,17 +2595,17 @@ function renderRoom(){
   $('#app').innerHTML=`${header()}
   <section class="panel" id="mmwait" hidden></section>
   <section class="panel" id="rdy" hidden style="border-color:var(--red);box-shadow:6px 6px 0 var(--navy)"></section>
-  <section class="panel"><div class="eyebrow">${TR('線上房間','Online room')}</div>
+  ${(d.cfg||{}).rnd?'':`<section class="panel"><div class="eyebrow">${TR('線上房間','Online room')}</div>
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
-   <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>
+   <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>`}
   <div class="grid2">${seat(0)}${seat(1)}</div>
   <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 3 分鐘會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes counts as a forfeit.')}</p>`
     :me===0?`<div><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end;margin-top:12px"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR(`總籤數（最少 ${lotsNeeded()}）`,`Total lots (min ${lotsNeeded()})`)}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
     :`<h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:6px" id="cfgtxt"></p>`}</section>`;
-  $('#share').onclick=()=>shareIt($('#share'),TR('大聯盟盲標對決','MLB Blind Auction'),TR(`來玩大聯盟盲標對決！點連結直接加入房間，房號 ${NET.code}`,`Come play MLB Blind Auction! The link takes you straight into room ${NET.code}`),pageUrl()+'?room='+NET.code);
-  $('#copy').onclick=()=>{navigator.clipboard.writeText(NET.code).then(()=>{$('#copy').textContent=TR('已複製','Copied')},()=>{$('#copy').textContent=TR('房號：','Code: ')+NET.code})};
+  if($('#share'))$('#share').onclick=()=>shareIt($('#share'),TR('大聯盟盲標對決','MLB Blind Auction'),TR(`來玩大聯盟盲標對決！點連結直接加入房間，房號 ${NET.code}`,`Come play MLB Blind Auction! The link takes you straight into room ${NET.code}`),pageUrl()+'?room='+NET.code);
+  if($('#copy'))$('#copy').onclick=()=>{navigator.clipboard.writeText(NET.code).then(()=>{$('#copy').textContent=TR('已複製','Copied')},()=>{$('#copy').textContent=TR('房號：','Code: ')+NET.code})};
   if(me!=null){
     const pf=()=>{const p=PARKS[+$('#pk').value];$('#pkf').textContent=TR(`球場係數：得分 ${p.r}、全壘打 ${p.hr}（100 為聯盟平均）`,`Park factors: runs ${p.r}, home runs ${p.hr} (100 = league average)`)};pf();
     const save=()=>{clearTimeout(setupTimer);setupTimer=setTimeout(()=>dbWrite(()=>NET.ref.update({setup:{[me]:{name:$('#tn').value.trim(),park:+$('#pk').value}}})),400)};
@@ -2584,7 +2636,9 @@ function mmWait(d){
   const on=NET.seat===0&&d.cfg&&d.cfg.mm&&!(d.seats||{})[1];
   el.hidden=!on;if(on&&$('#mmsec'))return;   // already showing
   clearInterval(NET.waitTick);if(!on)return;
-  el.innerHTML=`<h2>🎲 ${TR('正在找隨機對手…','Looking for an opponent…')}</h2><p class="hint" style="margin-top:6px">${TR('已等 <span id="mmsec">0</span> 秒。有人按「隨機配對」就會進到這個房間。','Waiting <span id="mmsec">0</span>s. The next player who presses "Random match" joins this room.')}</p>
+  const rk=!!d.cfg.ranked;
+  el.innerHTML=`<h2>${rk?'🏆':'🎲'} ${rk?TR('正在找排位對手…','Looking for a ranked opponent…'):TR('正在找隨機對手…','Looking for an opponent…')}</h2><p class="hint" style="margin-top:6px">${rk?TR(`已等 <span id="mmsec">0</span> 秒。下一位按「開始排位」的玩家會和你配對（${S.league==='CPBL'?'中職':'MLB'}）。`,`Waiting <span id="mmsec">0</span>s. The next player who presses "Play ranked" is paired with you (${S.league}).`):TR('已等 <span id="mmsec">0</span> 秒。下一位按「隨機配對」的玩家會和你配對。','Waiting <span id="mmsec">0</span>s. The next player who presses "Random match" is paired with you.')}</p>
+   <p class="hint" id="mmmiss" role="status" style="margin-top:6px;color:var(--red);font-weight:700"></p>
    <div id="mmlate" hidden><p style="margin-top:8px">${TR('目前好像沒有其他玩家在線上。','Nobody else seems to be online right now.')}</p></div>
    <div class="row" style="margin-top:10px">${d.cfg.ranked&&PROF.doc&&PROF.doc.rating<AI_RK.cap&&aiLeft(PROF.doc)>0?`<button class="solid" id="mmrk" hidden>🤖 ${TR(`打電腦排位（算積分，今天還剩 ${aiLeft(PROF.doc)} 場）`,`Ranked vs the computer (counts; ${aiLeft(PROF.doc)} left today)`)}</button>`:''}<button class="${d.cfg.ranked?'ghost':'solid'}" id="mmai" hidden>🤖 ${d.cfg.ranked?TR('打電腦練習（不算分）','Practice vs the computer (no rating)'):TR('先和電腦打','Play the computer instead')}</button><button class="ghost" id="mmstop">${TR('取消配對','Stop looking')}</button></div>
    <p class="hint" id="mmerr" role="alert" style="margin-top:6px"></p>`;
@@ -2592,8 +2646,15 @@ function mmWait(d){
   $('#mmai').onclick=()=>{detachRoom();S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.teams[1].park=Math.floor(Math.random()*PARKS.length);S.screen='setup';render()};
   $('#mmstop').onclick=leaveRoom;
   // only the number and the late hint change each second, so a click on a button is never lost to a redraw
+  const lgName=l=>l==='CPBL'?TR('中職','CPBL'):'MLB';
+  const miss=()=>{const r=NET.mmMiss,box=$('#mmmiss');if(!box)return;let t='';
+    if(NET.newer)t=TR('網頁有新版本，對方可能用的是新版，請按這裡更新後再配對。','A newer version of the page is out; update, then look again.')+` <button class="ghost" id="mmrl">${TR('更新網頁','Update')}</button>`;
+    else if(r&&r.ver)t=TR(`有 ${r.ver} 位玩家也在等，但你們的網頁版本不同，配不到一起。請兩邊都重新整理（手機可在網址後加 ?v= 和任意數字）。`,`${r.ver} other player(s) are waiting on a different version of the page. Both of you should reload (on a phone, add ?v= and any number to the address).`)+` <button class="ghost" id="mmrl">${TR('重新整理','Reload')}</button>`;
+    else if(r&&r.lg&&r.lg.length)t=TR(`有玩家在等 ${r.lg.map(lgName).join('、')} 排位，但你沒有勾選這個聯盟。回大廳勾選後再配對就能配到。`,`Someone is waiting for ${r.lg.join('/')} ranked, which you haven't ticked. Tick it in the lobby and look again.`);
+    if(box.dataset.t!==t){box.dataset.t=t;box.innerHTML=t;if($('#mmrl'))$('#mmrl').onclick=reloadFresh}};
+  newerBuild().then(v=>{NET.newer=v;miss()});
   const draw=()=>{if(!$('#mmsec')||S.screen!=='room')return clearInterval(NET.waitTick);
-    const sec=Math.floor((Date.now()-NET.mmStart)/1000);$('#mmsec').textContent=sec;$('#mmlate').hidden=$('#mmai').hidden=sec<60;if($('#mmrk'))$('#mmrk').hidden=sec<60};
+    const sec=Math.floor((Date.now()-NET.mmStart)/1000);$('#mmsec').textContent=sec;if(sec%6===3)mmRescan().then(miss);miss();$('#mmlate').hidden=$('#mmai').hidden=sec<60;if($('#mmrk'))$('#mmrk').hidden=sec<60};
   draw();NET.waitTick=setInterval(draw,1000);
 }
 /* ---------- ready check for matched strangers ---------- */
