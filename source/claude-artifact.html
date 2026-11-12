@@ -6,11 +6,11 @@
 <meta property="og:title" content="大聯盟盲標對決｜MLB／中職 Fantasy 競標對戰">
 <meta property="og:description" content="和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。每位球員附傳統與進階數據（Baseball Savant、野球革命），可排打序、選先發、分配牛棚、調戰術。免註冊，傳邀請連結就能線上對戰。">
 <meta property="og:url" content="https://simba0812.github.io/MLB/">
-<meta property="og:image" content="https://simba0812.github.io/MLB/og/mlb.png">
+<meta property="og:image" content="https://simba0812.github.io/MLB/og/mlb-v2.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"大聯盟盲標對決","alternateName":["MLB Blind Auction","大聯盟盲標","MLB 盲標 Fantasy","中職盲標"],"url":"https://simba0812.github.io/MLB/","image":"https://simba0812.github.io/MLB/og/mlb.png","description":"和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。附傳統與進階數據，排位賽、隨機配對，免註冊。","genre":["Sports","Fantasy baseball"],"gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","inLanguage":["zh-TW","en"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"TWD"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"大聯盟盲標對決","alternateName":["MLB Blind Auction","大聯盟盲標","MLB 盲標 Fantasy","中職盲標"],"url":"https://simba0812.github.io/MLB/","image":"https://simba0812.github.io/MLB/og/mlb-v2.png","description":"和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。附傳統與進階數據，排位賽、隨機配對，免註冊。","genre":["Sports","Fantasy baseball"],"gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","inLanguage":["zh-TW","en"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"TWD"}}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -1825,7 +1825,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='8a09791b9c';
+const BUILD='32be665f5b';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
