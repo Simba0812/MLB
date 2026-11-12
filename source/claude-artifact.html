@@ -600,8 +600,19 @@ function nextLot(){
   if(over&&S.teams.every(canMeetMin)) return endDraft();
   const needAll=S.teams.reduce((s,t)=>s+minRemaining(t),0);
   const tight=over||(S.lotMax-S.lotNo)<=needAll+2;
-  let idx=S.deck.findIndex(p=>S.teams.some(t=>{const sl=openSlotsFor(t,p);return sl.length&&maxBid(t,p)>=1&&(!tight||needsCovered(t,p,sl)>0)}));
-  if(idx<0){ if(S.teams.every(canMeetMin)) return endDraft(); S.screen='stuck'; return render(); }
+  const fits=p=>S.teams.some(t=>{const sl=openSlotsFor(t,p);return sl.length&&maxBid(t,p)>=1&&(!tight||needsCovered(t,p,sl)>0)});
+  let idx=S.deck.findIndex(fits);
+  if(idx<0){
+    if(S.teams.every(canMeetMin)) return endDraft();
+    // a team still has a hole and the deck can't fill it: bring back players who went unsold or never came up
+    const taken=new Set(S.teams.flatMap(t=>t.roster.map(e=>sid(e.p.id)))),inDeck=new Set(S.deck.map(p=>sid(p.id)));
+    const back=POOL.filter(p=>!taken.has(sid(p.id))&&!inDeck.has(sid(p.id))&&S.teams.some(t=>{const sl=openSlotsFor(t,p);return maxBid(t,p)>=1&&needsCovered(t,p,sl)>0}));
+    for(let i=back.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[back[i],back[j]]=[back[j],back[i]]}
+    if(back.length){S.deck.push(...back);S.tail=(S.tail||[]).concat(back.map(p=>p.id));
+      S.log.unshift(TR(`🔄 牌堆裡沒有能補缺的球員了，放回 ${back.length} 位之前流標或還沒抽到的球員。`,`🔄 Nobody left in the deck fills the open spots, so ${back.length} unsold or undrawn players go back in.`))}
+    idx=S.deck.findIndex(fits);
+    if(idx<0){ S.screen='stuck'; return render(); }
+  }
   const p=S.deck.splice(idx,1)[0];S.tail=(S.tail||[]).filter(id=>sid(id)!==sid(p.id));
   S.lotNo++;
   const first=(S.lotNo-1)%2;
@@ -1623,7 +1634,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='3b7f0a598f';
+const BUILD='eea8823d39';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
