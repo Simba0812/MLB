@@ -1898,7 +1898,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='f3d9fefa8f';
+const BUILD='3c1dc9b9e7';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2391,7 +2391,8 @@ async function mmScan(kind){
   for(let i=free.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[free[i],free[j]]=[free[j],free[i]]}
   // someone new first; the last opponent only when nobody else is waiting
   free.sort((x,y)=>(x.d.seats[0]===LAST_OPP)-(y.d.seats[0]===LAST_OPP));
-  return {free,ver:all.filter(r=>r.why==='ver').length,lg:[...new Set(all.filter(r=>r.why==='lg').flatMap(r=>roomLgs(r.d.cfg)))]};
+  const vr=all.filter(r=>r.why==='ver');
+  return {free,ver:vr.length,verWho:vr.map(r=>({name:((r.d.setup||{})[0]||{}).name||'',since:r.d.created||0})),lg:[...new Set(all.filter(r=>r.why==='lg').flatMap(r=>roomLgs(r.d.cfg)))]};
 }
 // the page on the server may be newer than this one (phones keep old copies): returns true if it is
 let NEWER=null;
@@ -2753,7 +2754,8 @@ function mmWait(d){
   const lgName=l=>l==='CPBL'?TR('中職','CPBL'):'MLB';
   const miss=()=>{const r=NET.mmMiss,box=$('#mmmiss');if(!box)return;let t='';
     if(NET.newer)t=TR('網頁有新版本，對方可能用的是新版，請按這裡更新後再配對。','A newer version of the page is out; update, then look again.')+` <button class="ghost" id="mmrl">${TR('更新網頁','Update')}</button>`;
-    else if(r&&r.ver)t=TR(`有 ${r.ver} 位玩家也在等，但你們的網頁版本不同，配不到一起。請兩邊都重新整理（手機可在網址後加 ?v= 和任意數字）。`,`${r.ver} other player(s) are waiting on a different version of the page. Both of you should reload (on a phone, add ?v= and any number to the address).`)+` <button class="ghost" id="mmrl">${TR('重新整理','Reload')}</button>`;
+    else if(r&&r.ver){const who=(r.verWho||[]).map(v=>`${v.name?esc(v.name):TR('匿名玩家','a player')}（${TR(`已等 ${Math.max(1,Math.round((Date.now()-v.since)/60000))} 分鐘`,`waiting ${Math.max(1,Math.round((Date.now()-v.since)/60000))} min`)}）`).join('、');
+      t=TR(`有 ${r.ver} 位玩家在等：${who}，但對方開的是舊版網頁，配不到一起。如果那是你自己另一台裝置或沒關的分頁，請把那邊重新整理或關掉；如果是別人，要等他重新整理。`,`${r.ver} player(s) waiting: ${who}, but on an older version of the page, so you can't be paired. If that's your own other device or an open tab, reload or close it there.`);}
     else if(r&&r.lg&&r.lg.length)t=TR(`有玩家在等 ${r.lg.map(lgName).join('、')} 排位，但你沒有勾選這個聯盟。回大廳勾選後再配對就能配到。`,`Someone is waiting for ${r.lg.join('/')} ranked, which you haven't ticked. Tick it in the lobby and look again.`);
     if(box.dataset.t!==t){box.dataset.t=t;box.innerHTML=t;if($('#mmrl'))$('#mmrl').onclick=reloadFresh}};
   newerBuild().then(v=>{NET.newer=v;miss()});
