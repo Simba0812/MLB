@@ -77,6 +77,14 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .slots .k{font-family:var(--mono);color:var(--dim)} .slots .v{min-width:0;overflow-wrap:anywhere} .slots .p{font-family:var(--mono);color:var(--dim);text-align:right}
 .slots .empty{color:#6f9686}
 .slots .pv{all:unset;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px} .slots .pv:hover,.slots .pv:focus-visible{color:var(--amber)}
+#emobtn{position:fixed;right:14px;bottom:14px;z-index:40;width:52px;height:52px;border-radius:50%;font-size:24px;padding:0;background:var(--amber);color:#10261d;border:0;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+#emopal{position:fixed;right:14px;bottom:76px;z-index:40;background:var(--chalk);color:#10261d;border-radius:8px;padding:10px;width:min(300px,calc(100vw - 28px));box-shadow:0 6px 20px rgba(0,0,0,.4);display:flex;flex-wrap:wrap;gap:6px}
+#emopal button{background:#fff;color:#10261d;border:1.5px solid #c9c2a8;border-radius:16px;padding:4px 10px;font-weight:700}
+#emopal button.e{font-size:22px;padding:2px 8px}
+.emobub{position:fixed;left:50%;transform:translateX(-50%);z-index:45;background:var(--chalk);color:#10261d;border-radius:20px;padding:8px 16px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.4);animation:emoin .25s ease,emoout .4s ease 3.1s forwards;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+.emobub .big{font-size:26px;vertical-align:middle}
+@keyframes emoin{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes emoout{to{opacity:0;transform:translate(-50%,-10px)}}
 #pvwrap{position:fixed;inset:0;z-index:50;background:rgba(5,20,14,.72);display:flex;align-items:center;justify-content:center;padding:16px}
 #pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto}
 #pvwrap .pvx{align-self:flex-end;background:#10261d;color:var(--chalk);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
@@ -566,7 +574,10 @@ const AI_LV={
   r0:{rank:1,get label(){return TR('新人聯盟電腦','Rookie computer')},scale:.82,noise:.38,accept:-2},
   r1:{rank:1,get label(){return TR('1A 電腦','Single-A computer')},scale:.94,noise:.26,accept:0},
   r2:{rank:1,get label(){return TR('2A 電腦','Double-A computer')},scale:1.04,noise:.16,accept:1},
-  r3:{rank:1,get label(){return TR('3A 電腦','Triple-A computer')},scale:1.12,noise:.08,accept:2}};
+  r3:{rank:1,get label(){return TR('3A 電腦','Triple-A computer')},scale:1.08,noise:.1,accept:2},
+  r4:{rank:1,get label(){return TR('大聯盟電腦','Major-league computer')},scale:1.1,noise:.07,accept:2},
+  r5:{rank:1,get label(){return TR('明星電腦','All-Star computer')},scale:1.12,noise:.05,accept:3},
+  r6:{rank:1,get label(){return TR('名人堂電腦','Hall of Fame computer')},scale:1.14,noise:.03,accept:3}};
 let aiTimer=null;
 function scheduleAI(){clearTimeout(aiTimer);if(S.ai&&S.screen==='draft'&&S.lot&&S.lot.turn===S.ai.seat)aiTimer=setTimeout(aiAct,S.aiFast?0:300+Math.random()*300)}
 // what the computer is willing to pay for this player right now
@@ -628,6 +639,7 @@ function nextLot(){
     if(idx<0){ S.screen='stuck'; return render(); }
   }
   const p=S.deck.splice(idx,1)[0];S.tail=(S.tail||[]).filter(id=>sid(id)!==sid(p.id));
+  if(S.lotNo===0)bump('drafts');
   S.lotNo++;
   const first=(S.lotNo-1)%2;
   S.lot={p,price:0,high:null,turn:first,passed:[false,false],fresh:true};
@@ -1617,6 +1629,7 @@ function finish(){
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
    <div class="grid2" style="margin-top:10px">${boxScore(res,0)}${boxScore(res,1)}</div>`;
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
+  countGame();
   if($('#rkhome')){$('#rkhome').onclick=()=>{S.rankAI=null;S.ai=null;leaveRoom()};if(S.rankAI)finishAIRanked();else rankCheck()}
   if($('#again'))$('#again').onclick=()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   if($('#restart'))$('#restart').onclick=()=>{S.screen=NET.on?'room':'setup';sync();render();window.scrollTo(0,0)};
@@ -1651,7 +1664,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2ee3e7bfe7';
+const BUILD='e594ffc8e0';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1704,7 +1717,7 @@ function hydrate(o){
 }
 function onRoom(snap){
   if(!snap.exists){NET.err=TR('這個房間已經不存在。','This room no longer exists.');updateNetBadge();return}
-  const d=snap.data();NET.doc=d;watchOpp(d);
+  const d=snap.data();NET.doc=d;watchOpp(d);watchEmo(d);
   if(NET.seat===0&&d.cfg&&d.cfg.mm&&(d.seats||{})[1])dbWrite(()=>NET.ref.update({cfg:{mm:''}}));
   if(d.state&&d.rev!==S.rev&&!snap.metadata.hasPendingWrites){
     const st=JSON.parse(d.state);
@@ -1730,16 +1743,88 @@ function netBadge(){
   const me=NET.seat==null?TR('你正在觀戰','You are watching'):`${TR('你是 玩家 ','You are Player ')}${NET.seat?'B':'A'}${S.teams[NET.seat]&&S.teams[NET.seat].name&&S.screen!=='room'?' ('+esc(S.teams[NET.seat].name)+')':''}`;
   return `<span class="dot" aria-hidden="true"></span><span>${TR('線上房間','Room')} <b class="mono">${NET.code}</b></span><span>${me}</span>${NET.pend?`<span class="sync">${TR('傳送中…','Sending…')}</span>`:NET.lag!=null?`<span class="sync ok">${TR(`已同步 · ${(NET.lag/1000).toFixed(1)} 秒`,`Synced · ${(NET.lag/1000).toFixed(1)}s`)}</span>`:''}${NET.err?`<span class="warn">⚠ ${esc(NET.err)}</span>`:''}${verWarn()}${oppWarn()}${isRanked()&&NET.rk&&rankText()&&!(S.screen==='game'&&S.game&&S.game.res&&S.game.pos<S.game.res.ev.length)?`<span class="sync">${rankText()}</span>`:''}<button class="ghost" id="leave" style="margin-left:auto;padding:4px 10px">${TR('離開房間','Leave room')}</button>`;
 }
-function updateNetBadge(){const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=leaveRoom;const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()}}
+function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=leaveRoom;const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()}}
 // let go of the room without touching the game on screen; the other player sees that this seat left
 function detachRoom(){
   if(NET.on&&NET.seat!=null&&NET.ref){const ref=NET.ref,seat=NET.seat,mm=NET.seat===0&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.mm;
     ref.update({setup:{[seat]:{left:true}},...(mm?{cfg:{mm:''}}:{})}).catch(()=>{})}
   if(NET.unsub)NET.unsub();clearInterval(NET.beat);clearInterval(NET.waitTick);
-  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,err:'',unsub:null,beat:null,waitTick:null,opp:null,mm:null,rk:null});
+  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,err:'',unsub:null,beat:null,waitTick:null,opp:null,mm:null,rk:null,emoSeen:undefined});emoUI();
   $('#follow').hidden=true;S.rev=null;
 }
 function leaveRoom(){detachRoom();clearTimeout(timer);S.screen='home';render()}
+
+/* ---------- play statistics ---------- */
+// stats/all holds the running totals and stats/dYYYYMMDD each day's (Taiwan time). Nothing personal is stored.
+const STAT_KEYS=['players','active','drafts','games','solo','local','online','ranked','rankedAI'];
+const dayKey=(t=Date.now())=>'d'+new Date(t+8*3600000).toISOString().slice(0,10).replace(/-/g,'');
+function bump(...keys){if(!NET.bump)return;NET.bump('stats/all',keys);NET.bump('stats/'+dayKey(),keys)}
+function countVisit(){
+  try{
+    if(!localStorage.getItem('mlbSeen')){localStorage.setItem('mlbSeen','1');bump('players')}
+    const d=dayKey();if(localStorage.getItem('mlbDay')!==d){localStorage.setItem('mlbDay',d);bump('active')}
+  }catch(e){}
+}
+const gameKind=()=>S.rankAI?'rankedAI':isRanked()?'ranked':NET.on?'online':S.ai?'solo':'local';
+const COUNTED=new Set();
+// a game counts once, on one device (the host's when online)
+function countGame(){
+  if(!S.series||!S.game||(NET.on&&NET.seat!==0))return;
+  const k=(S.series.id||'')+'/'+S.game.gnum;if(COUNTED.has(k))return;COUNTED.add(k);bump('games',gameKind());
+}
+async function statLine(){
+  const el=$('#statline');if(!el||!NET.bump)return;
+  try{const [a,t]=await Promise.all([NET.db.doc('stats/all').get(),NET.db.doc('stats/'+dayKey()).get()]);
+    const A=a.exists?a.data():{},T=t.exists?t.data():{},n=v=>(v||0).toLocaleString();
+    el.innerHTML=`📈 ${TR(`累計 <b>${n(A.players)}</b> 位玩家 · <b>${n(A.games)}</b> 場比賽 · 今天 <b>${n(T.active)}</b> 人上線、打了 <b>${n(T.games)}</b> 場`,`<b>${n(A.players)}</b> players · <b>${n(A.games)}</b> games played · today <b>${n(T.active)}</b> online, <b>${n(T.games)}</b> games`)} <button class="ghost" id="statbtn" style="padding:2px 10px;margin-left:6px">${TR('詳細','Details')}</button>`;
+    $('#statbtn').onclick=openStats;
+  }catch(e){}
+}
+async function openStats(){
+  closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('遊玩統計','Play statistics')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📈 ${TR('遊玩統計','Play statistics')}</h2><div id="stt" style="color:#10261d;overflow-x:auto">${TR('載入中…','Loading…')}</div></div>`;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  const cols=[['active',TR('上線','Online')],['players',TR('新玩家','New')],['drafts',TR('選秀','Drafts')],['games',TR('比賽','Games')],['solo',TR('單人','Solo')],['local',TR('同機','Same device')],['online',TR('線上','Online')],['ranked',TR('排位','Ranked')],['rankedAI',TR('電腦排位','Ranked vs CPU')]];
+  try{
+    const days=[...Array(14)].map((_,i)=>dayKey(Date.now()-i*86400000));
+    const docs=await Promise.all(['all',...days].map(k=>NET.db.doc('stats/'+k).get()));
+    const row=(label,x,b)=>`<tr style="border-top:1px solid #c9c2a8;${b?'font-weight:900':''}"><td style="padding:4px 6px;white-space:nowrap">${label}</td>${cols.map(([k])=>`<td class="mono" style="padding:4px 6px;text-align:right">${(x[k]||0).toLocaleString()}</td>`).join('')}</tr>`;
+    $('#stt').innerHTML=`<table style="border-collapse:collapse;font-size:13px;min-width:560px"><tr><th></th>${cols.map(([,l])=>`<th style="padding:4px 6px;text-align:right;font-size:12px">${l}</th>`).join('')}</tr>
+      ${row(TR('累計','All time'),docs[0].exists?docs[0].data():{},true)}${days.map((d,i)=>row(`${d.slice(5,7)}/${d.slice(7)}`,docs[i+1].exists?docs[i+1].data():{})).join('')}</table>
+      <p class="hint" style="color:#4d6a5d;margin-top:8px">${TR('「上線」是當天打開網頁的瀏覽器數；「累計」那列的上線是所有天數加總。同一個人換手機或清除瀏覽器資料會被算成新玩家。','"Online" counts browsers that opened the page that day; in the all-time row it is the sum of all days. Someone on a new phone or with cleared browser data counts as a new player.')}</p>`;
+  }catch(e){$('#stt').textContent=TR('統計載入失敗。','The statistics did not load.')}
+}
+
+/* ---------- emoji and quick phrases between the two players ---------- */
+// fixed choices only, so nothing anyone sends needs moderating
+const EMOS=['👍','😂','😱','🔥','😭','👏','🤔','😤','🙏','💸'];
+const PHRASES=()=>[TR('好球！','Nice one!'),TR('運氣真好','Lucky!'),TR('這價錢太扯了','That price is crazy'),TR('讓給你吧','All yours'),TR('等我一下','One sec'),TR('再來一場？','Rematch?'),TR('GG','GG'),TR('謝謝指教','Good game, thanks')];
+const emoText=k=>k<EMOS.length?`<span class="big">${EMOS[k]}</span>`:esc(PHRASES()[k-EMOS.length]||'');
+function emoUI(){
+  const on=NET.on&&NET.seat!=null&&!!(NET.doc&&(NET.doc.seats||{})[1-NET.seat]);
+  let b=$('#emobtn');
+  if(!on){if(b)b.remove();const p=$('#emopal');if(p)p.remove();return}
+  if(b)return;
+  b=document.createElement('button');b.id='emobtn';b.setAttribute('aria-label',TR('傳表情給對手','Send a reaction'));b.textContent='😀';document.body.appendChild(b);
+  b.onclick=()=>{let p=$('#emopal');if(p)return p.remove();p=document.createElement('div');p.id='emopal';
+    p.innerHTML=EMOS.map((e,k)=>`<button class="e" data-emo="${k}">${e}</button>`).join('')+PHRASES().map((t,k)=>`<button data-emo="${EMOS.length+k}">${esc(t)}</button>`).join('');
+    document.body.appendChild(p);p.onclick=e=>{const x=e.target.closest('[data-emo]');if(x){sendEmo(+x.dataset.emo);p.remove()}}};
+}
+function sendEmo(k){
+  if(!NET.on||NET.seat==null||Date.now()-(NET.emoLast||0)<1500)return;   // one every 1.5 s
+  NET.emoLast=Date.now();const seat=NET.seat,n=Date.now();
+  dbWrite(()=>NET.ref.update({emo:{[seat]:{k,n}}}));showEmo(seat,k);
+}
+function watchEmo(d){
+  if(NET.seat==null)return;const o=1-NET.seat,e=(d.emo||{})[o];
+  if(NET.emoSeen===undefined){NET.emoSeen=e?e.n:null;return}   // an old message from before this page opened stays quiet
+  if(e&&e.n!==NET.emoSeen){NET.emoSeen=e.n;showEmo(o,e.k)}
+}
+function showEmo(seat,k){
+  const su=((NET.doc&&NET.doc.setup)||{})[seat]||{},name=(S.teams[seat]&&S.teams[seat].name)||su.name||TR('玩家','Player');
+  const el=document.createElement('div');el.className='emobub';el.style.bottom=(seat===NET.seat?84:140)+'px';
+  el.innerHTML=`${esc(name)}：${emoText(k)}`;document.body.appendChild(el);setTimeout(()=>el.remove(),3600);
+}
 
 /* ---------- presence: is the other player still here? ---------- */
 // each seated player stamps setup[seat].hb every 30 s. Phones' clocks disagree, so staleness is judged by
@@ -1785,20 +1870,22 @@ const RANKED={mode:'single',slots:{SP:4,RP:4,CL:2,BN:2},budget:200,lotMax:50};
 let RK_LG=(()=>{try{const v=(localStorage.getItem('mlbRkLg')||'MLB,CPBL').split(',').filter(x=>x==='MLB'||x==='CPBL');return v.length?v:['MLB','CPBL']}catch(e){return ['MLB','CPBL']}})();
 const saveRkLg=()=>{try{localStorage.setItem('mlbRkLg',RK_LG.join(','))}catch(e){}};
 const pickLg=()=>RK_LG[Math.floor(Math.random()*RK_LG.length)];
-// ranked against the computer: fewer points, five a day, and only below the major-league tier, because
-// the result is worked out on the player's own page and nothing on the server can check it
-const AI_RK={d:8,win:16,perDay:5,cap:1300};
+// ranked against the computer: half the points of a game against a person, five a day, and only below the
+// major-league tier, because the result is worked out on the player's own page and nothing on the server can check it
+const AI_RK={d:25,win:50,perDay:5,cap:3000};
+// a win streak against people adds 10 for the 2nd win in a row, 20 for the 3rd, 30 from the 4th on
+const streakBonus=st=>Math.min(st||0,3)*10;
 const twDay=()=>Math.floor((Date.now()+8*3600000)/86400000);   // a day in Taiwan time; firestore.rules counts the same way
 const aiLeft=p=>!p?0:AI_RK.perDay-((p.aiDay||0)===twDay()?(p.aiN||0):0);
-const aiLevelFor=r=>['r0','r1','r2','r3'][Math.min(3,tierIdx(r))];
-const ELO_K=32;
+const aiLevelFor=r=>'r'+tierIdx(r);
+const ELO_K=100,ELO_SCALE=1250;   // Elo with bigger steps: an even game is worth 50; 1250 keeps the odds of the usual 400 at this scale
 // Elo: a game starts by booking the loss (K × the expected score); a confirmed win adds K back.
 // So leaving a lost game early saves nothing, and firestore.rules can check every step.
-const eloLoss=(me,opp)=>Math.round(ELO_K/(1+Math.pow(10,(opp-me)/400)));
+const eloLoss=(me,opp)=>Math.round(ELO_K/(1+Math.pow(10,(opp-me)/ELO_SCALE)));
 const PROF={doc:null,loaded:false};
 // ranked tiers by rating; everyone starts at 1000, in the rookie league
-const TIERS=[[0,'🌱','新人聯盟','Rookie League'],[1050,'⚾','1A','Single-A'],[1125,'⚾','2A','Double-A'],[1200,'⚾','3A','Triple-A'],
-  [1300,'🏟️','大聯盟','Major League'],[1450,'⭐','明星','All-Star'],[1600,'🏛️','名人堂','Hall of Fame']];
+const TIERS=[[0,'🌱','新人聯盟','Rookie League'],[1500,'⚾','1A','Single-A'],[2000,'⚾','2A','Double-A'],[2500,'⚾','3A','Triple-A'],
+  [3000,'🏟️','大聯盟','Major League'],[3500,'⭐','明星','All-Star'],[4000,'🏛️','名人堂','Hall of Fame']];
 const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
 const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);
@@ -1823,7 +1910,7 @@ async function rankStart(){
     const d=NET.doc,me=NET.seat,code=NET.code,at=d.created;let p=await loadProfile();
     if(!p){NET.rk={state:'err'};return}
     if(p.pend===code&&p.pendAt===at){NET.rk={state:'on',d:p.pendD,before:p.rating+p.pendD};return}   // a reload: already booked
-    if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0});p=await loadProfile()}
+    if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
     // the opponent's rating before this game, the way firestore.rules works it out
     const op=(await NET.db.doc('players/'+(d.seats||{})[1-me]).get()).data();
     if(!op){NET.rk={state:'err',msg:TR('找不到對手的排位紀錄。','The opponent has no ranked record.')};return}
@@ -1849,9 +1936,10 @@ async function rankCheck(){
   try{
     const p=await loadProfile(),won=rp[me].w===String(me);
     if(!p||p.pend!==NET.code)return;
-    if(won)await profRef().update({rating:p.rating+ELO_K,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0});
-    else await profRef().update({pend:'',pendAt:0,pendD:0});
-    await loadProfile();NET.rk={...NET.rk,state:'done',won,after:PROF.doc.rating};
+    const bonus=streakBonus(p.streak);
+    if(won)await profRef().update({rating:p.rating+ELO_K+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,streak:(p.streak||0)+1});
+    else await profRef().update({pend:'',pendAt:0,pendD:0,streak:0});
+    await loadProfile();NET.rk={...NET.rk,state:'done',won,after:PROF.doc.rating,bonus:won?bonus:0,streak:PROF.doc.streak||0};
   }catch(e){NET.rk={...NET.rk,state:rp[me].ff?'ffwait':'err',msg:String(e&&e.message||e)}}
   finally{NET.rk&&(NET.rk.busy=false)}
   showRank();
@@ -1859,15 +1947,15 @@ async function rankCheck(){
 async function startAIRanked(){
   let p=await loadProfile();if(!p)throw new Error(TR('找不到你的排位紀錄。','No ranked record found.'));
   if(p.rating>=AI_RK.cap)throw new Error(TR('大聯盟以上只能和真人打排位。','From the major-league tier up, ranked games are against people only.'));
-  if(aiLeft(p)<=0)throw new Error(TR('今天的電腦排位已經打完 5 場了。','You have played today\'s 5 ranked games against the computer.'));
-  if(p.pend)await profRef().update({pend:'',pendAt:0,pendD:0});
+  if(aiLeft(p)<=0)throw new Error(TR(`今天的電腦排位已經打完 ${AI_RK.perDay} 場了。`,`You have played today's ${AI_RK.perDay} ranked games against the computer.`));
+  if(p.pend)await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});
   const day=twDay(),n=(p.aiDay===day?(p.aiN||0):0)+1;
   await profRef().update({rating:p.rating-AI_RK.d,games:p.games+1,losses:p.losses+1,pend:'ai',pendAt:0,pendD:AI_RK.d,aiDay:day,aiN:n});
   const lv=aiLevelFor(p.rating);
   setLeague(pickLg());S.mode=RANKED.mode;S.slots={...RANKED.slots};
   S.ai={seat:1,level:lv};S.rankAI={state:'on',d:AI_RK.d,before:p.rating,ai:true};
   S.budget=RANKED.budget;S.lotMax=RANKED.lotMax;
-  S.teams.forEach((t,i)=>{t.name=i?TR(`電腦（${TIERS[Math.min(3,tierIdx(p.rating))][2]}）`,`Computer (${TIERS[Math.min(3,tierIdx(p.rating))][3]})`):p.name;t.park=Math.floor(Math.random()*PARKS.length);t.budget=RANKED.budget;t.roster=[];t.done=false});
+  S.teams.forEach((t,i)=>{t.name=i?TR(`電腦（${TIERS[tierIdx(p.rating)][2]}）`,`Computer (${TIERS[tierIdx(p.rating)][3]})`):p.name;t.park=Math.floor(Math.random()*PARKS.length);t.budget=RANKED.budget;t.roster=[];t.done=false});
   S.deck=POOL.slice();
   for(let i=S.deck.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]]}
   newDeckOrder();S.lotNo=0;S.log=[];S.lot=null;S.trade=null;S.series=null;S.game=null;S.screen='draft';
@@ -1897,7 +1985,7 @@ function rankText(){
   const sg=v=>(v>0?'+':'')+v;
   if(k.state==='done'){const to=k.won?k.after:k.before-k.d,mv=tierIdx(to)-tierIdx(k.before);
     const line=k.won?TR(`🏆 排位積分 ${k.before} → ${to}（${sg(to-k.before)}）`,`🏆 Rating ${k.before} → ${to} (${sg(to-k.before)})`):TR(`排位積分 ${k.before} → ${to}（${sg(to-k.before)}）`,`Rating ${k.before} → ${to} (${sg(to-k.before)})`);
-    return line+(mv>0?TR(` · 🎉 升上 ${tierName(to)}！`,` · 🎉 Promoted to ${tierName(to)}!`):mv<0?TR(` · 降到 ${tierName(to)}`,` · Down to ${tierName(to)}`):` · ${tierName(to)}`)}
+    return line+(k.bonus?TR(` · 🔥 ${k.streak} 連勝加 ${k.bonus} 分`,` · 🔥 ${k.streak}-game streak bonus +${k.bonus}`):'')+(mv>0?TR(` · 🎉 升上 ${tierName(to)}！`,` · 🎉 Promoted to ${tierName(to)}!`):mv<0?TR(` · 降到 ${tierName(to)}`,` · Down to ${tierName(to)}`):` · ${tierName(to)}`)}
   if(k.state==='wait')return TR('等待對手確認比賽結果…','Waiting for your opponent to confirm the result…');
   if(k.state==='disputed')return TR('雙方回報的結果不一致，這場不計勝場（已扣的積分不退）。','The two reports disagree, so this game does not count as a win.');
   if(k.state==='ffwait')return TR('對手還沒離線夠久（10 分鐘），稍後再按一次「判對手棄賽」。','Your opponent has not been gone long enough (10 min). Try again later.');
@@ -1958,7 +2046,7 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false});
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined});
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -1979,7 +2067,7 @@ function enterRoom(code,seat,mm){
       const uid=await user.id(),cw=await user.can('data.write');
       if(!uid){NET.status='off';NET.msg=TR('請先登入 claude.ai 再使用線上對戰。','Sign in to claude.ai to play online.')}
       else if(cw===false){NET.status='off';NET.msg=TR('你目前只有檢視權限，沒辦法加入對戰。請房主從頁面的 Share 選單把你設為可以編輯（Editor）。','You only have view access. Ask the host to make you an Editor from the page\'s Share menu.')}
-      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink()}
+      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink();countVisit();if(S.screen==='home')statLine()}
     }
   }catch(e){NET.status='off';NET.msg=window.STANDALONE?TR(`Firebase 連線失敗，請確認設定正確、匿名登入已啟用。（${(e&&(e.code||e.message))||''}）`,`Couldn't connect to Firebase. Check the config and that anonymous sign-in is enabled. (${(e&&(e.code||e.message))||''})`):TR('線上功能暫時無法使用，請重新整理頁面。','Online play is unavailable right now. Reload the page.')}
   renderNetBox();
@@ -2015,6 +2103,8 @@ async function firebaseBackend(cfg){
       tx.set(r,{lease:{holder,exp:Date.now()+ttlMs}},{merge:true});return {acquired:true};
     }).catch(e=>{throw err(e)}),
     onSnapshot:(next,onErr)=>r.onSnapshot(x=>next(wrap(x)),e=>onErr&&onErr(err(e)))}}};
+  // play statistics: add one to each named counter (firestore.rules allows exactly that)
+  NET.bump=(path,keys)=>{const o={};keys.forEach(k=>o[k]=fb.firestore.FieldValue.increment(1));return fs.doc(path).set(o,{merge:true}).catch(()=>{})};
   // accounts: a visitor plays on an anonymous account; signing up or in with Google turns that same
   // account permanent (so a ranked record carries over), or switches to an existing one. The page reloads
   // after a switch so every room seat and record lines up with the new account.
@@ -2045,7 +2135,9 @@ function renderHome(){
    <section class="panel"><h2>${TR('單人對戰','Single player')}</h2><p class="hint" style="margin-top:6px">${TR('你和電腦競標、交易，再模擬對戰。電腦會依球員評價、缺的位置和剩下的預算出價。','Bid and trade against the computer, then play the games. The computer bids by rating, the positions it needs and the budget it has left.')}</p><button class="solid" id="solo" style="margin-top:14px">${TR('開始','Start')}</button></section>
    <section class="panel"><h2>${TR('同一台輪流玩','Same device')}</h2><p class="hint" style="margin-top:6px">${TR('兩個人用同一台電腦或手機，輪流出價、輪流選先發。','Two people share one computer or phone and take turns.')}</p><button class="solid" id="local" style="margin-top:14px">${TR('開始','Start')}</button></section>
    ${window.OFFLINE?`<section class="panel soon"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('和朋友各用自己的裝置連線對戰，敬請期待。','Play a friend from your own devices. Coming soon.')}</p><button disabled style="margin-top:14px">${TR('敬請期待','Coming soon')}</button></section>`:`<section class="panel"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('你和朋友各用自己的裝置，同步看到同一場選秀和比賽，輪到誰誰才能出手。','You and a friend each use your own device and see the same draft and games; only the player whose turn it is can act.')}${window.STANDALONE?TR('把網址和房號傳給朋友就能一起玩，不用註冊。',' Send your friend the link and room code; no sign-up needed.'):TR('朋友需要登入 claude.ai，並被你從 Share 選單加為可以編輯的成員。',' Your friend needs a claude.ai account and Editor access from the Share menu.')}</p><div id="netbox" style="margin-top:14px"></div></section>`}
-  </div>`;
+  </div>
+  <p class="hint" id="statline" style="margin-top:14px"></p>`;
+  statLine();
   $('#local').onclick=()=>{S.ai=null;S.screen='setup';render()};
   $('#solo').onclick=()=>{S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.teams[1].park=Math.floor(Math.random()*PARKS.length);S.screen='setup';render()};
   renderNetBox();
@@ -2078,7 +2170,7 @@ function renderNetBox(){
 function acctLine(){
   if(!NET.acct)return '';
   const a=acctUser(),p=PROF.doc;
-  const who=!a||a.anon?TR('目前是訪客','Playing as a guest'):p?`👤 <b>${esc(p.name)}</b> · ${tierName(p.rating)} · ${TR('積分','Rating')} <b class="mono">${p.rating}</b> <span class="hint">（${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)}）</span>`:`👤 ${esc(a.email||'Google')} · ${TR('還沒取暱稱','no nickname yet')}`;
+  const who=!a||a.anon?TR('目前是訪客','Playing as a guest'):p?`👤 <b>${esc(p.name)}</b> · ${tierName(p.rating)} · ${TR('積分','Rating')} <b class="mono">${p.rating}</b>${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight wins`)}`:''} <span class="hint">（${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)}）</span>`:`👤 ${esc(a.email||'Google')} · ${TR('還沒取暱稱','no nickname yet')}`;
   return `<div class="row" style="margin-bottom:12px;gap:8px 12px"><span>${who}</span><button class="ghost" id="acct" style="padding:4px 10px">${!a||a.anon?TR('登入／註冊','Sign in / sign up'):TR('帳號','Account')}</button><button class="ghost" id="lb" style="padding:4px 10px">📊 ${TR('排行榜','Leaderboard')}</button></div>`;
 }
 const AUTHERR={'auth/email-already-in-use':['這個 Email 已經註冊過，請改按「登入」。','That email is already registered. Sign in instead.'],
