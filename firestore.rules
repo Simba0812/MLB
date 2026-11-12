@@ -1,23 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    // a real account (email/password or Google), not the anonymous one every visitor gets
+    function permanent() { return signedIn() && request.auth.token.get('email', '') != ''; }
+
     // One document per room. Anyone signed in (anonymously) can watch a room.
     // Its two seated players can change the game; everyone else can only claim the empty seat B,
     // or take the short lease that guards that claim. Nobody can move or remove a seated player.
     // Every write stamps `exp` (milliseconds) three days ahead; it can't be pushed further out,
     // and once it passes anyone may delete the room.
     match /rooms/{code} {
-      function signedIn() { return request.auth != null; }
       function me() { return request.auth.uid; }
       function seats() { return resource.data.seats; }
       function seated() { return seats()['0'] == me() || ('1' in seats() && seats()['1'] == me()); }
+      function mySeat() { return seats()['0'] == me() ? '0' : '1'; }
       function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
       // the only fields the game writes, and a cap on the game state so a room can't be blown up
       function shapeOK(d) {
         return d.keys().hasOnly(['v', 'seats', 'setup', 'cfg', 'picks', 'dec', 'state', 'rev', 'deck0',
-                                 'created', 'exp', 'expireAt', 'lease'])
+                                 'created', 'exp', 'expireAt', 'lease', 'rep'])
           && (!('state' in d) || (d.state is string && d.state.size() < 200000))
           && d.exp is number && d.exp <= request.time.toMillis() + 4 * 86400000;
+      }
+      // a player writes only their own entry in `setup` (name, heartbeat, "left") ...
+      function ownSetup() {
+        return !('setup' in changed())
+          || request.resource.data.setup.diff(resource.data.get('setup', {})).affectedKeys().hasOnly([mySeat()]);
+      }
+      // ... and reports a ranked result once, for their own seat only
+      function ownReport() {
+        return !('rep' in changed())
+          || (request.resource.data.rep.diff(resource.data.get('rep', {})).affectedKeys().hasOnly([mySeat()])
+              && !(mySeat() in resource.data.get('rep', {})));
       }
 
       allow read: if signedIn();
@@ -30,7 +45,7 @@ service cloud.firestore {
 
       allow update: if signedIn() && shapeOK(request.resource.data) && (
         // a seated player: anything in the game, but the seats stay as they are
-        (seated() && request.resource.data.seats == seats())
+        (seated() && request.resource.data.seats == seats() && ownSetup() && ownReport())
         // anyone else: sit down in the empty seat B, and change nothing but that and the timestamps
         || (!('1' in seats()) && seats()['0'] != me()
             && changed().hasOnly(['seats', 'exp', 'expireAt', 'lease'])
@@ -43,6 +58,66 @@ service cloud.firestore {
       );
 
       allow delete: if signedIn() && resource.data.exp < request.time.toMillis();
+    }
+
+    // One record per account for ranked play. Only its owner writes it, and only in these steps:
+    // pick or change a nickname; start a ranked game (book the loss: K x expected score, Elo);
+    // a confirmed win (add K back); or drop a pending game (the booked loss stays).
+    match /players/{uid} {
+      function nd() { return request.resource.data; }
+      function od() { return resource.data; }
+      function pchanged() { return nd().diff(od()).affectedKeys(); }
+      function shape() {
+        return nd().keys().hasOnly(['name', 'rating', 'games', 'wins', 'losses', 'pend', 'pendAt', 'pendD', 'created'])
+          && nd().name is string && nd().name.size() >= 2 && nd().name.size() <= 16
+          && nd().rating is int && nd().games is int && nd().wins is int && nd().losses is int
+          && nd().pend is string && nd().pendAt is int && nd().pendD is int;
+      }
+      function room(c) { return get(/databases/$(database)/documents/rooms/$(c)).data; }
+      function seatOf(r) { return r.seats['0'] == uid ? '0' : '1'; }
+      function other(s) { return s == '0' ? '1' : '0'; }
+      function inRoom(r) { return r.seats['0'] == uid || r.seats.get('1', '') == uid; }
+      // the opponent's rating before this game (their record may already have booked its loss)
+      function preRating(p, r) { return p.pend == nd().pend && p.pendAt == r.created ? p.rating + p.pendD : p.rating; }
+      function lossFor(mine, theirs) { return math.round(32.0 / (1.0 + math.pow(10.0, (theirs - mine) / 400.0))); }
+
+      function startOK() {
+        let r = room(nd().pend);
+        let opp = get(/databases/$(database)/documents/players/$(r.seats[other(seatOf(r))])).data;
+        let d = lossFor(od().rating, preRating(opp, r));
+        return r.cfg.get('ranked', false) == true && inRoom(r) && ('1' in r.seats)
+          && nd().pendAt == r.created && nd().pendD == d
+          && nd().rating == od().rating - d
+          && nd().games == od().games + 1 && nd().losses == od().losses + 1;
+      }
+      function winOK() {
+        let r = room(od().pend);
+        let s = seatOf(r);
+        let o = other(s);
+        let rep = r.get('rep', {});
+        let mine = rep.get(s, {}).get('w', '');
+        let theirs = rep.get(o, {}).get('w', '');
+        let them = r.setup.get(o, {});
+        // a forfeit counts when the opponent left, or has sent no heartbeat for 10 minutes
+        let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 600000;
+        return inRoom(r) && r.created == od().pendAt
+          && mine == s && (theirs == s || (theirs == '' && gone))
+          && nd().rating == od().rating + 32 && nd().wins == od().wins + 1 && nd().losses == od().losses - 1
+          && nd().games == od().games && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0;
+      }
+
+      allow read: if signedIn();
+
+      allow create: if permanent() && request.auth.uid == uid && shape()
+        && nd().rating == 1000 && nd().games == 0 && nd().wins == 0 && nd().losses == 0
+        && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0;
+
+      allow update: if permanent() && request.auth.uid == uid && shape() && (
+        pchanged().hasOnly(['name'])
+        || (od().pend == '' && nd().pend != '' && pchanged().hasOnly(['rating', 'games', 'losses', 'pend', 'pendAt', 'pendD']) && startOK())
+        || (od().pend != '' && pchanged().hasOnly(['rating', 'wins', 'losses', 'pend', 'pendAt', 'pendD']) && winOK())
+        || (pchanged().hasOnly(['pend', 'pendAt', 'pendD']) && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0)
+      );
     }
   }
 }
