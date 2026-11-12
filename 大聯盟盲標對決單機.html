@@ -1785,7 +1785,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='bdbf95203e';
+const BUILD='253a98c4bb';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2249,7 +2249,8 @@ async function firebaseBackend(cfg){
         // this Google account already has a record: switch to it (the visitor's anonymous games stay behind)
         if(e&&e.code==='auth/credential-already-in-use'&&e.credential)return auth.signInWithCredential(e.credential).then(switched);throw e}}
       return auth.signInWithPopup(G()).then(switched)},
-    reset:email=>auth.sendPasswordResetEmail(email),
+    // Firebase writes the reset email in this language
+    reset:email=>{auth.languageCode=LANG==='en'?'en':'zh-TW';return auth.sendPasswordResetEmail(email)},
     out:()=>auth.signOut().then(()=>auth.signInAnonymously()).then(switched)};
   return [db,{id:async()=>uid,can:async()=>true}];
 }
@@ -2365,7 +2366,7 @@ function openAcct(note){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
     $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
     $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>msg(TR('重設密碼的信寄出了，請收信。','A reset email is on its way.')));
+    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>msg(TR('如果這個 Email 有註冊過，重設密碼的信已經寄出（找不到的話看一下垃圾郵件匣）。','If that email has an account, a reset link is on its way (check your spam folder too).')));
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
