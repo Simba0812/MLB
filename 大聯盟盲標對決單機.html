@@ -64,6 +64,9 @@ h3{margin:0;font-size:16px;font-weight:700}
 .pcard .nm{font-family:var(--serif);font-weight:900;font-size:21px;line-height:1.3;color:var(--navy);overflow-wrap:anywhere;margin-top:8px;padding-bottom:14px}
 .pcard .st{display:grid;grid-template-columns:repeat(4,1fr);width:100%;margin-top:auto;border-top:2px solid var(--navy);padding-top:10px;gap:2px}
 .pcard .st b{display:block;font-family:var(--mono);font-size:19px;color:var(--red)}.pcard .st span{font-size:12px;color:var(--dim)}
+.sznum{display:inline-block;vertical-align:middle;font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:.06em;background:var(--red);color:var(--paper);padding:0 9px;border-radius:3px;margin-left:6px}
+.pcard .szc{position:absolute;top:10px;right:10px;background:var(--red);color:var(--paper);font-family:var(--display);font-weight:800;padding:1px 8px;border-radius:3px;font-size:15px}
+.pastsz{font-size:13px;font-weight:700;border:1.5px solid var(--navy);border-radius:12px;padding:2px 10px;background:#fff}
 .rankpanel{background:var(--panel);border:3px solid var(--navy);box-shadow:8px 8px 0 var(--navy);padding:22px 26px;display:flex;flex-direction:column;min-width:0}
 .rankpath{display:flex;align-items:flex-start;margin:22px 0 6px;overflow-x:auto;padding:6px 2px}
 .rankpath .node{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;width:62px;font-size:12.5px;font-weight:700;color:var(--dim);text-align:center}
@@ -1785,7 +1788,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='253a98c4bb';
+const BUILD='6e9923d6bc';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2010,6 +2013,20 @@ const ELO_K=100,ELO_SCALE=1250;   // Elo with bigger steps: an even game is wort
 // So leaving a lost game early saves nothing, and firestore.rules can check every step.
 const eloLoss=(me,opp)=>Math.round(ELO_K/(1+Math.pow(10,(opp-me)/ELO_SCALE)));
 const PROF={doc:null,loaded:false};
+// ranked seasons: S1 runs to 31 Jan 2027, then each season is three months (Feb–Apr, May–Jul, ...), Taiwan time.
+// firestore.rules works the season out the same way from the server's clock.
+const twNow=()=>new Date(Date.now()+8*3600000);
+const curSeason=()=>{const d=twNow();return Math.floor(((d.getUTCFullYear()-2026)*12+d.getUTCMonth()+1-11)/3)+1};
+const seasonEnd=n=>{const k=10+n*3;return new Date(Date.UTC(2026+Math.floor(k/12),k%12,1)-86400000)};   // the last day of season n
+const seasonDaysLeft=()=>Math.max(0,Math.ceil((seasonEnd(curSeason()).getTime()+86400000-twNow().getTime())/86400000));
+const fmtDay=d=>`${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`;
+// a new season: the rating comes halfway back to 1000 and the season's record starts over; the old one is kept
+async function ensureSeason(){
+  const p=PROF.doc;if(!p||p.pend)return;
+  const s0=p.season??1,cur=curSeason();if(s0>=cur)return;
+  await profRef().update({rating:1000+Math.floor((p.rating-1000)/2),games:0,wins:0,losses:0,streak:0,season:cur,hist:{[s0]:{r:p.rating,w:p.wins,l:p.losses}}});
+  await loadProfile();
+}
 // ranked tiers by rating; everyone starts at 1000, in the rookie league
 const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1500,'🥉','1A','Single-A','#a8642a'],[2000,'🥈','2A','Double-A','#6b7a89'],[2500,'🥇','3A','Triple-A','#b8860b'],
   [3000,'🏟️','大聯盟','Major League','#2a6f97'],[3500,'⭐','明星','All-Star','#c99a1e'],[4000,'🏛️','名人堂','Hall of Fame','#7b4fa0']];
@@ -2027,7 +2044,7 @@ async function loadProfile(){
 async function saveNick(name){
   name=String(name||'').trim().slice(0,16);if(name.length<2)throw new Error(TR('暱稱至少 2 個字。','A nickname needs at least 2 characters.'));
   if(PROF.doc)await profRef().update({name});
-  else await profRef().set({name,rating:1000,games:0,wins:0,losses:0,pend:'',pendAt:0,pendD:0,created:Date.now()});
+  else await profRef().set({name,rating:1000,games:0,wins:0,losses:0,pend:'',pendAt:0,pendD:0,created:Date.now(),season:curSeason()});
   await loadProfile();
 }
 // the draft has started: book this game's loss on my record
@@ -2038,6 +2055,7 @@ async function rankStart(){
     if(!p){NET.rk={state:'err'};return}
     if(p.pend===code&&p.pendAt===at){NET.rk={state:'on',d:p.pendD,before:p.rating+p.pendD};return}   // a reload: already booked
     if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
+    await ensureSeason();p=PROF.doc;
     // the opponent's rating before this game, the way firestore.rules works it out
     const op=(await NET.db.doc('players/'+(d.seats||{})[1-me]).get()).data();
     if(!op){NET.rk={state:'err',msg:TR('找不到對手的排位紀錄。','The opponent has no ranked record.')};return}
@@ -2075,7 +2093,8 @@ async function startAIRanked(){
   let p=await loadProfile();if(!p)throw new Error(TR('找不到你的排位紀錄。','No ranked record found.'));
   if(p.rating>=AI_RK.cap)throw new Error(TR('大聯盟以上只能和真人打排位。','From the major-league tier up, ranked games are against people only.'));
   if(aiLeft(p)<=0)throw new Error(TR(`今天的電腦排位已經打完 ${AI_RK.perDay} 場了。`,`You have played today's ${AI_RK.perDay} ranked games against the computer.`));
-  if(p.pend)await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});
+  if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
+  await ensureSeason();p=PROF.doc;
   const day=twDay(),n=(p.aiDay===day?(p.aiN||0):0)+1;
   await profRef().update({rating:p.rating-AI_RK.d,games:p.games+1,losses:p.losses+1,pend:'ai',pendAt:0,pendD:AI_RK.d,aiDay:day,aiN:n});
   const lv=aiLevelFor(p.rating);
@@ -2301,26 +2320,30 @@ function renderRankBox(){
   if(NET.status!=='ready'||!NET.acct){box.hidden=true;return}
   box.hidden=false;
   if(!PROF.loaded){box.innerHTML=`<div></div><section class="rankpanel"><h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('讀取你的牌位…','Loading your tier…')}</p></section>`;
-    loadProfile().then(()=>{if(S.screen==='home')renderRankBox()},()=>{});return}
+    loadProfile().then(ensureSeason).then(()=>{if(S.screen==='home')renderRankBox()},()=>{});return}
   const a=acctUser(),p=PROF.doc,ti=p?tierIdx(p.rating):-1,T=TIERS[Math.max(0,ti)];
   box.style.setProperty('--tier',T[4]);
   // the tier path: done tiers in navy, the current one ringed in red
   const path=`<div class="rankpath" aria-label="${TR('牌位','Tiers')}">${TIERS.map((t,i)=>`${i?`<div class="seg ${i<=ti?'done':''}"></div>`:''}<div class="node ${i<ti?'done':i===ti?'cur':''}"><div class="c">${t[1]}</div>${i?TR(t[2],t[3]):TR('新人','Rookie')}</div>`).join('')}</div>`;
   const leagues=`<span class="row" style="gap:6px 12px">${['MLB','CPBL'].map(k=>`<label class="slotpick" style="font-weight:700;color:var(--navy)"><input type="checkbox" data-rklg="${k}" ${RK_LG.includes(k)?'checked':''}> ${k==='MLB'?TR('大聯盟','MLB'):TR('中職','CPBL')}</label>`).join('')}</span>`;
+  const SN=curSeason(),seasonTag=`<span class="sznum">S${SN}</span>`;
+  const seasonLine=`<p class="hint" style="margin-top:4px">${TR(`S${SN} 賽季到 ${fmtDay(seasonEnd(SN))}，還剩 ${seasonDaysLeft()} 天。新賽季積分會往 1000 回落一半。`,`Season ${SN} ends ${fmtDay(seasonEnd(SN))} (${seasonDaysLeft()} days left). A new season brings ratings halfway back to 1000.`)}</p>`;
+  const past=p&&p.hist?Object.keys(p.hist).sort((a,b)=>a-b).map(k=>{const h=p.hist[k],t=TIERS[tierIdx(h.r)];return `<span class="pastsz" title="${TR(`S${k} 最終積分 ${h.r}，${h.w} 勝 ${h.l} 敗`,`Season ${k}: ${h.r}, ${h.w}-${h.l}`)}">S${k} ${t[1]} ${TR(t[2],t[3])}</span>`}).join(''):'';
   const played=p?p.wins+p.losses:0,rate=played?Math.round(p.wins/played*100):0;
-  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}</div>
+  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">S${SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}</div>
       <div class="st"><div><b>${p.wins}</b><span>${TR('勝','W')}</span></div><div><b>${p.losses}</b><span>${TR('敗','L')}</span></div><div><b>${played?rate+'%':'—'}</b><span>${TR('勝率','Win %')}</span></div><div><b>${p.streak>=2?'🔥'+p.streak:p.streak||0}</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`
     :`<div class="pcard"><div class="in"><span class="no">No. ????</span><div class="em" style="opacity:.35">⚾</div><div class="tn" style="font-size:40px">${TR('你的球員卡','Your card')}</div><div class="nm" style="font-size:15px;font-weight:700;color:var(--dim)">${!a||a.anon?TR('登入後就會發一張給你','Sign in to get yours'):TR('取個暱稱就能拿到','Pick a nickname to get it')}</div>
       <div class="st"><div><b>—</b><span>${TR('勝','W')}</span></div><div><b>—</b><span>${TR('敗','L')}</span></div><div><b>—</b><span>${TR('勝率','Win %')}</span></div><div><b>—</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`;
   let body;
   if(!p){
-    body=`<h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
+    body=`<h2>🏆 ${TR('排位賽','Ranked')} ${seasonTag}</h2>${seasonLine}<p class="hint" style="margin-top:2px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
       <div class="row" style="margin-top:auto;padding-top:16px"><button class="solid rankgo" id="rkgo">${!a||a.anon?TR('登入開始排位','Sign in to play'):TR('取暱稱開始排位','Pick a nickname')}</button><button id="lb">📊 ${TR('排行榜','Leaderboard')}</button></div>`;
   }else{
     const next=TIERS[ti+1],lo=T[0]||1000,pct=next?Math.max(0,Math.min(100,(p.rating-lo)/(next[0]-lo)*100)):100,left=aiLeft(p);
-    body=`<h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
+    body=`<h2>🏆 ${TR('排位賽','Ranked')} ${seasonTag}</h2>${seasonLine}<p class="hint" style="margin-top:2px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
       <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="rankline"><span>${TR('積分','Rating')} <b class="r">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)} · ${TR('勝率','win')} ${played?rate+'%':'—'}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</span><span>${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier!')}</span></div>
+      ${past?`<div class="row" style="margin-top:12px;gap:6px"><span class="eyebrow">${TR('歷屆賽季','Past seasons')}</span>${past}</div>`:''}
       <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="acct">${TR('帳號','Account')}</button></div>
       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50，連勝再加分；配不到人可以打電腦排位（±25','An even win is +50 plus a streak bonus; if nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
@@ -2375,11 +2398,12 @@ function openAcct(note){
 function closeAcct(){const w=document.querySelector('.acctwrap');if(w)w.remove()}
 async function openBoard(){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
-  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 ${TR('排位排行榜','Ranked leaderboard')}</h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${TR('排位排行榜','Ranked leaderboard')}</span></h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   try{
     const q=await NET.db.collection('players').orderBy('rating','desc').limit(30).get(),me=(acctUser()||{}).uid;
-    const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0);
+    const SN=curSeason(),rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&(p.season??1)===SN);
+    $('#lbt').textContent=TR(`S${SN} 排行榜`,`Season ${SN} leaderboard`);
     $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
