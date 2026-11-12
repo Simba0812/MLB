@@ -370,6 +370,8 @@ const PARKS_CPBL = [
 ].map(([n,r,hr])=>parkObj(n,r,hr));
 const PARKSETS = {MLB:PARKS_MLB, CPBL:PARKS_CPBL};
 let PARKS = PARKS_MLB;
+// a team's park; an index from the other league's longer list wraps instead of breaking the page
+const parkOf=k=>PARKS[k]||PARKS[(k|0)%PARKS.length]||PARKS[0];
 const LGNAME = biMap({MLB:'2026 MLB 例行賽', CPBL:'2026 中職例行賽'},{MLB:'2026 MLB regular season', CPBL:'2026 CPBL regular season'});
 const SLOTS=[
  {k:'C',label:'捕手',min:1,max:1},{k:'1B',label:'一壘手',min:1,max:1},{k:'2B',label:'二壘手',min:1,max:1},{k:'3B',label:'三壘手',min:1,max:1},
@@ -819,7 +821,7 @@ function teamPanel(i){
   }).join('');
   const mr=minRemaining(t);
   return `<section class="panel teamcard ${i?'B':''}">
-   <div class="eyebrow ${i?'tb':'ta'}">${S.ai?(S.ai.seat===i?TR('電腦','Computer'):TR('你','You')):TR('玩家 ','Player ')+(i?'B':'A')}${NET.on&&NET.seat===i?TR('（你）',' (you)'):''} · ${esc(PARKS[t.park].n)}</div>
+   <div class="eyebrow ${i?'tb':'ta'}">${S.ai?(S.ai.seat===i?TR('電腦','Computer'):TR('你','You')):TR('玩家 ','Player ')+(i?'B':'A')}${NET.on&&NET.seat===i?TR('（你）',' (you)'):''} · ${esc(parkOf(t.park).n)}</div>
    <h2 style="margin-top:4px">${esc(t.name)}</h2>
    <div class="row" style="justify-content:space-between;margin-top:6px"><div class="money ${i?'tb':'ta'}">$${t.budget}</div>
    <div class="need">${TR(`還差 ${mr} 個必要位置`,`${mr} required spot${mr===1?'':'s'} left`)}${t.done?`<br><b>${TR('已宣布完成','Roster done')}</b>`:''}</div></div>
@@ -977,7 +979,7 @@ function buildTeam(i,lu){
   const sps=t.roster.filter(r=>r.slot==='SP'||r.slot2==='SP').map(asPitcher).sort((a,b)=>pitBlend(a)-pitBlend(b));
   const rps=t.roster.filter(r=>r.slot==='RP').map(r=>r.p).sort((a,b)=>pitBlend(a)-pitBlend(b));
   const cl=t.roster.filter(r=>r.slot==='CL').map(r=>r.p);
-  return {i,name:t.name,park:PARKS[t.park],order,bench,sps,rps,cl};
+  return {i,name:t.name,park:parkOf(t.park),order,bench,sps,rps,cl};
 }
 
 /* ---------- stamina ---------- */
@@ -1440,7 +1442,7 @@ function renderPick(){
      ${sent?`<p class="hint" style="margin-top:8px">${TR('已送出，等待對手準備好。','Sent. Waiting for your opponent.')}</p>`:lineupEditor(i)+`<div class="eyebrow" style="margin-top:14px">${TR('戰術（4 局、7 局開始前可以再調整）','Tactics (you can change them before the 4th and the 7th)')}</div>`+tacticsPicker(TACSEL[i],'tpk',i)}</section>`};
   const mySent=NET.on&&NET.seat!=null&&picks[NET.seat]!=null;
   $('#app').innerHTML=`${header()}
-  <section class="panel"><div class="eyebrow">${S.mode==='single'?TR('決勝戰','Winner-take-all'):TR('第 '+(g+1)+' 戰','Game '+(g+1))} · ${esc(PARKS[S.teams[homeIdx].park].n)}</div>
+  <section class="panel"><div class="eyebrow">${S.mode==='single'?TR('決勝戰','Winner-take-all'):TR('第 '+(g+1)+' 戰','Game '+(g+1))} · ${esc(parkOf(S.teams[homeIdx].park).n)}</div>
    <h2 style="margin-top:4px">${TR('賽前調度','Pregame')}</h2>
    <p class="hint" style="margin-top:6px">${coinText(g)} ${TR('選這場的先發投手、排好打序。','Pick a starter and set the lineup.')}${restN()?TR(`先發投手要休息 ${restN()} 場才能再先發（${restN()+1} 人輪值）。`,` A starter must rest ${restN()} games before starting again (${restN()+1}-man rotation).`):''}${TR('前幾場投過的投手體力會比較低，體力越低越容易失分。',' Pitchers who worked recently start with less stamina, and tired pitchers give up more runs.')}${S.mode!=='single'&&g>0?`<br><span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></section>
   <div class="grid2">${tms.map(panel).join('')}</div>
@@ -2363,6 +2365,8 @@ async function claimSeat(code){
   const d2=(await ref.get()).data();if(!d2.seats||d2.seats[1])return false;
   await ref.update({seats:{1:NET.uid}});return true;
 }
+// a ranked room still waiting for an opponent, open to more than one league
+const lgPending=d=>!!(d&&d.cfg&&d.cfg.ranked&&d.cfg.mm&&roomLgs(d.cfg).length>1);
 // the leagues a ranked room's host is happy with (older rooms only carry the one league)
 const roomLgs=c=>(c&&Array.isArray(c.lgs)&&c.lgs.length?c.lgs:[c&&c.league||'MLB']);
 // why a waiting room can't take this player: 'x' (gone, full, wrong kind), 'ver' (another build of the
@@ -2680,12 +2684,14 @@ let setupTimer=null;
 function renderRoom(){
   const d=NET.doc||{},su=d.setup||{},cfg=d.cfg||{budget:200,lotMax:50},me=NET.seat;
   NET.drawn=!!NET.doc;
+  // a ranked room open to both leagues settles its league only when the opponent arrives
+  const lgPend=lgPending(d);NET.lgPend=lgPend;
   const mine=me!=null?(su[me]||{name:'',park:me}):null;
   const opts=sel=>PARKS.map((p,j)=>`<option value="${j}" ${sel===j?'selected':''}>${esc(p.n)}</option>`).join('');
   const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}</div>
      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <label for="tn">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:-8px"><input id="tn" maxlength="18" style="flex:1" placeholder="${TR('例：高雄海神','e.g. Kaohsiung Sea Kings')}" value="${esc(mine.name)}" ${(d.cfg||{}).ranked?'readonly':''}><button type="button" class="ghost" id="rn" ${(d.cfg||{}).ranked?'hidden':''}>🎲 ${TR('隨機取名','Random name')}</button></div>
-      <label>${TR('主場','Home park')}<select id="pk">${opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p></div></section>`
+      <label>${TR('主場','Home park')}<select id="pk" ${lgPend?'disabled':''}>${opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel" id="mmwait" hidden></section>
@@ -2694,7 +2700,7 @@ function renderRoom(){
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>`}
   <div class="grid2">${seat(0)}${seat(1)}</div>
-  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')}</p>`
+  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${lgPend?TR('美國職棒大聯盟或中華職棒（配到對手後，從雙方都有勾的聯盟決定）','MLB or CPBL (settled from the leagues both players ticked once an opponent is found)'):S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')}</p>`
     :me===0?`<div><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end;margin-top:12px"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR(`總籤數（最少 ${lotsNeeded()}）`,`Total lots (min ${lotsNeeded()})`)}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
@@ -2788,7 +2794,15 @@ function updateRoom(){
   if(S.screen!=='room'||!$('#app'))return;
   const d=NET.doc||{},seats=d.seats||{},su=d.setup||{},cfg=d.cfg||{budget:200,lotMax:50};
   const want=POOLS[cfg.league]&&POOLS[cfg.league].length?cfg.league:'MLB';
-  if(want!==S.league){setLeague(want);return renderRoom()}
+  const settled=NET.lgPend&&!lgPending(d);
+  // a park picked before the room's league was known can point past the end of this league's list
+  const myPk=NET.seat!=null?(su[NET.seat]||{}).park:null,badPk=myPk!=null&&myPk>=PARKSETS[want].length;
+  if((settled||badPk)&&NET.seat!=null){const pk=Math.floor(Math.random()*PARKSETS[want].length),me=NET.seat;
+    NET.doc={...d,setup:{...su,[me]:{...(su[me]||{}),park:pk}}};dbWrite(()=>NET.ref.update({setup:{[me]:{park:pk}}}))}
+  if(want!==S.league||settled){if(want!==S.league)setLeague(want);return renderRoom()}
+  // keep my park menu on what the room holds (a late snapshot can redraw it with an older pick)
+  {const pk=$('#pk'),v=NET.seat!=null?(su[NET.seat]||{}).park:null;
+   if(pk&&v!=null&&v<PARKS.length&&document.activeElement!==pk&&pk.value!==String(v)){pk.value=String(v);const f=$('#pkf'),q=PARKS[v];if(f)f.textContent=TR(`球場係數：得分 ${q.r}、全壘打 ${q.hr}（100 為聯盟平均）`,`Park factors: runs ${q.r}, home runs ${q.hr} (100 = league average)`)}}
   if((cfg.mode||'single')!==S.mode){S.mode=cfg.mode||'single';return renderRoom()}
   if(cfg.slots&&JSON.stringify(cfg.slots)!==JSON.stringify(S.slots)){S.slots={...cfg.slots};return renderRoom()}
   [0,1].forEach(i=>{const el=$('#seat'+i);if(!el)return;const s=su[i]||{},joined=!!seats[i];
