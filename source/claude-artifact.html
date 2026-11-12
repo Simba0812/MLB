@@ -84,6 +84,9 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .ticket .tbody{padding:18px 20px;flex:1;min-width:0}
 .statline{text-align:center;font-family:var(--mono);color:var(--navy);font-size:14px;margin:0;border-top:2px solid var(--navy);padding-top:12px}
 .statline button{padding:2px 10px;margin-left:6px}
+.fbrow{display:flex;justify-content:center;align-items:center;gap:8px 14px;flex-wrap:wrap;font-weight:700;color:var(--navy)}
+button.fbstar{font-size:24px;padding:0 6px;border:0;color:var(--amber);background:transparent}
+[data-fbt][aria-pressed="true"]{background:var(--navy);color:var(--paper);border-color:var(--navy)}
 .disc{display:flex;gap:16px;align-items:center;border:2px dashed var(--navy);padding:14px 18px;background:rgba(255,255,255,.35)}
 .disc .stamp{flex:none;width:80px;height:80px;border-radius:50%;border:3px solid var(--red);color:var(--red);display:grid;place-items:center;text-align:center;font-family:var(--serif);font-weight:900;font-size:14px;line-height:1.2;transform:rotate(-12deg)}
 .disc p{margin:0;font-size:13px;line-height:1.75;color:#3d3a33}.disc b{color:var(--navy)}
@@ -1677,7 +1680,7 @@ function finish(){
     ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${rankText()}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
-     ${rankedGame()?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>`:`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button></div>
+     ${rankedGame()?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>`:`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}</div>
    </div>
    ${S.mode!=='single'?seriesPanel(G.gnum+1,seriesOver):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
@@ -1691,6 +1694,38 @@ function finish(){
        `⚾ ${res.away.name} ${res.R[0]}-${res.R[1]} ${res.home.name}: ${winTm.name} win!${champ!=null&&S.mode!=='single'?` ${S.teams[champ].name} take the series ${Math.max(...w)}-${Math.min(...w)}.`:''} MVP ${mvp(res)}`);
   $('#sharer').onclick=()=>shareImage($('#sharer'),resultCard({res,winTm,w,champ,gnum:G.gnum,nmw,nml}),shareTxt);
   if(NET.pending) showFollow();
+}
+
+/* ---------- feedback ---------- */
+// written to Firestore feedback/{id}; nobody can read it back from the page, the owner reads it in the Firebase console
+const FB_TAGS=()=>[['fun',TR('好玩','Fun')],['bug',TR('有 bug','Bug')],['idea',TR('建議','Idea')],['balance',TR('平衡','Balance')],['ui',TR('介面','Looks')]];
+function feedbackBtn(page){return NET.bump?`<button class="ghost" data-fb="${page}">💬 ${TR('意見回饋','Feedback')}</button>`:''}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-fb]');if(b)openFeedback(b.dataset.fb)});
+function openFeedback(page){
+  closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';const st={tags:[],stars:0};
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('意見回饋','Feedback')}" style="gap:10px">
+   <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
+   <h2>💬 ${TR('意見回饋','Feedback')}</h2>
+   <p class="hint">${TR('好玩、有 bug、想要什麼功能都歡迎說，每一則都會看。','Fun, bugs, wishes: every note gets read.')}</p>
+   <div class="row" style="gap:6px">${FB_TAGS().map(([k,l])=>`<button class="ghost mini" data-fbt="${k}" aria-pressed="false">${l}</button>`).join('')}</div>
+   <div class="row" style="gap:2px" aria-label="${TR('評分','Rating')}">${[1,2,3,4,5].map(n=>`<button class="ghost mini fbstar" data-fbs="${n}" aria-label="${n}">☆</button>`).join('')}</div>
+   <textarea id="fbtext" maxlength="1000" rows="5" placeholder="${TR('想說的話（最多 1000 字）','Your note (up to 1000 characters)')}" style="font:inherit;width:100%;padding:8px 10px;border:2px solid var(--navy);background:#fff;color:var(--chalk)"></textarea>
+   <label>${TR('聯絡方式（選填，想收到回覆再留，例如 Email 或 IG）','Contact (optional, only if you want a reply)')}<input id="fbcontact" maxlength="100" style="width:100%"></label>
+   <div class="row"><button class="solid" id="fbsend">${TR('送出','Send')}</button><span id="fbmsg" class="hint" role="alert"></span></div></div>`;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  w.querySelectorAll('[data-fbt]').forEach(b=>b.onclick=()=>{const k=b.dataset.fbt,on=!st.tags.includes(k);st.tags=on?[...st.tags,k]:st.tags.filter(x=>x!==k);b.setAttribute('aria-pressed',on)});
+  w.querySelectorAll('[data-fbs]').forEach(b=>b.onclick=()=>{st.stars=+b.dataset.fbs;w.querySelectorAll('[data-fbs]').forEach(x=>x.textContent=+x.dataset.fbs<=st.stars?'★':'☆')});
+  $('#fbsend').onclick=async()=>{
+    const text=$('#fbtext').value.trim();if(!text&&!st.stars&&!st.tags.length)return $('#fbmsg').textContent=TR('先寫點什麼或選個星星吧。','Write something or pick a rating first.');
+    if(Date.now()-(window.__fbAt||0)<60000)return $('#fbmsg').textContent=TR('剛剛才送過，等一分鐘再送一次。','You just sent one; wait a minute.');
+    $('#fbsend').disabled=true;
+    try{
+      const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8),p=PROF.doc;
+      await NET.db.doc('feedback/'+id).set({text,stars:st.stars,tags:st.tags,contact:$('#fbcontact').value.trim(),page,league:S.league,lang:LANG,ver:BUILD,
+        created:Date.now(),uid:NET.uid||'',name:p?p.name:'',ua:navigator.userAgent.slice(0,160)});
+      window.__fbAt=Date.now();$('#fbsend').textContent=TR('已送出，謝謝！','Sent. Thank you!');setTimeout(closeAcct,1400);
+    }catch(e){$('#fbsend').disabled=false;$('#fbmsg').textContent=TR('送出失敗，請稍後再試。','Could not send; try again later.')}
+  };
 }
 
 /* ---------- the result as a picture ---------- */
@@ -1779,7 +1814,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2a2949f045';
+const BUILD='c0b7176e9b';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2278,16 +2313,19 @@ function renderHome(){
    ${window.OFFLINE?`<section class="panel soon"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('和朋友各用自己的裝置連線對戰，敬請期待。','Play a friend from your own devices. Coming soon.')}</p><button disabled style="margin-top:14px">${TR('敬請期待','Coming soon')}</button></section>`:`<section class="panel"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('你和朋友各用自己的裝置，同步看到同一場選秀和比賽，輪到誰誰才能出手。','You and a friend each use your own device and see the same draft and games; only the player whose turn it is can act.')}${window.STANDALONE?TR('把網址和房號傳給朋友就能一起玩，不用註冊。',' Send your friend the link and room code; no sign-up needed.'):TR('朋友需要登入 claude.ai，並被你從 Share 選單加為可以編輯的成員。',' Your friend needs a claude.ai account and Editor access from the Share menu.')}</p><div id="netbox" style="margin-top:14px"></div></section>`}
   </div>
   <p class="statline" id="statline"></p>
+  ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我。','How was it? Tell me about bugs or features you want.')}</span><span id="fbhome"></span></div>`}
   <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
   // the three ways to play are drawn as tickets: a stub on the left, the details on the right
   document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub"><span class="si">${['🤖','👥','🌐'][i]}</span><span class="sl">${[TR('單人','SOLO'),TR('雙人','2P'),TR('線上','ONLINE')][i]}</span></div>`);
     const st=p.firstElementChild,rest=[...p.children].slice(1),b=document.createElement('div');b.className='tbody';rest.forEach(x=>b.appendChild(x));p.appendChild(b)});
   statLine();
+  if($('#fbhome'))$('#fbhome').innerHTML=feedbackBtn('home');
   $('#local').onclick=()=>{S.ai=null;S.screen='setup';render()};
   $('#solo').onclick=()=>{S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.teams[1].park=Math.floor(Math.random()*PARKS.length);S.screen='setup';render()};
   renderNetBox();
 }
 function renderNetBox(){
+  if($('#fbhome'))$('#fbhome').innerHTML=feedbackBtn('home');   // Firebase may only just have connected
   const box=$('#netbox');if(!box)return;
   if(NET.status==='loading'){box.innerHTML=`<p class="hint">${TR('正在確認線上功能…','Checking online play…')}</p>`;return}
   if(NET.status!=='ready'){box.innerHTML=`<p class="hint">${esc(NET.msg)}</p>`;return}

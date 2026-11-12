@@ -82,6 +82,21 @@ service cloud.firestore {
       allow create, update: if signedIn() && id.matches('^(all|d[0-9]{8})$') && countersOK();
     }
 
+    // Feedback from players: anyone signed in may add a note; nobody can read, change or delete it from
+    // the page (the owner reads them in the Firebase console).
+    match /feedback/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['text', 'stars', 'tags', 'contact', 'page', 'league', 'lang', 'ver', 'created', 'uid', 'name', 'ua'])
+        && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+        && request.resource.data.contact is string && request.resource.data.contact.size() <= 100
+        && request.resource.data.stars is int && request.resource.data.stars >= 0 && request.resource.data.stars <= 5
+        && request.resource.data.tags is list && request.resource.data.tags.size() <= 5
+        && request.resource.data.page in ['home', 'result']
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.get('ua', '').size() <= 200 && request.resource.data.get('name', '').size() <= 20;
+      allow read, update, delete: if false;
+    }
+
     // One record per account for ranked play. Only its owner writes it, and only in these steps:
     // pick or change a nickname; start a ranked game (book the loss: K x expected score, Elo);
     // a confirmed win (add K back); or drop a pending game (the booked loss stays).
