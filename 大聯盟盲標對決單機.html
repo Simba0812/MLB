@@ -1707,7 +1707,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='0a5a8f5ec5';
+const BUILD='51d8980480';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2269,15 +2269,15 @@ function openAcct(note){
    ${note?`<p style="font-weight:700">${esc(note)}</p>`:''}
    ${a.anon?`<h2>${TR('登入或註冊','Sign in or sign up')}</h2>
     <p class="hint" style="color:#4d6a5d">${TR('登入後才能打排位賽，積分會記在帳號上，換手機也看得到。','Sign in to play ranked; your rating stays with your account on any device.')}</p>
-    <button class="solid" id="ggl" style="background:#10261d;color:var(--chalk)">G ${TR('用 Google 登入','Continue with Google')}</button>
+    <button id="ggl" style="background:#fff;font-size:16px;padding:12px">🔵 ${TR('用 Google 登入','Continue with Google')}</button>
     <p class="hint" style="color:#4d6a5d">${TR('在 LINE、FB 的內建瀏覽器裡 Google 登入可能被擋，請改用 Safari 或 Chrome 開啟。','Google sign-in may not work inside the LINE or Facebook app browser; open the page in Safari or Chrome.')}</p>
     <div style="border-top:1px solid #c9c2a8;margin:4px 0"></div>
-    <label style="color:#10261d">Email<input id="ae" type="email" autocomplete="email" style="color:#10261d;background:#fff;width:100%"></label>
-    <label style="color:#10261d">${TR('密碼（至少 6 個字元）','Password (6+ characters)')}<input id="ap" type="password" autocomplete="current-password" style="color:#10261d;background:#fff;width:100%"></label>
-    <div class="row"><button class="solid" id="asin" style="background:#10261d;color:var(--chalk)">${TR('登入','Sign in')}</button><button id="asup" style="color:#10261d;border-color:#10261d">${TR('註冊新帳號','Create account')}</button><button class="ghost" id="arst" style="color:#10261d">${TR('忘記密碼','Forgot password')}</button></div>`
+    <label style="color:var(--chalk)">Email<input id="ae" type="email" autocomplete="email" style="width:100%"></label>
+    <label style="color:var(--chalk)">${TR('密碼（至少 6 個字元）','Password (6+ characters)')}<input id="ap" type="password" autocomplete="current-password" style="width:100%"></label>
+    <div class="row"><button class="solid" id="asin">${TR('登入','Sign in')}</button><button id="asup">${TR('註冊新帳號','Create account')}</button><button class="ghost" id="arst">${TR('忘記密碼','Forgot password')}</button></div>`
    :`<h2>${TR('帳號','Account')}</h2><p style="color:#10261d">${esc(a.email||'')}${a.google?' · Google':''}</p>
-    <label style="color:#10261d">${TR('暱稱（排行榜和排位賽會顯示）','Nickname (shown in ranked games and on the leaderboard)')}<input id="an" maxlength="16" value="${esc(p?p.name:'')}" style="color:#10261d;background:#fff;width:100%"></label>
-    <div class="row"><button class="solid" id="anick" style="background:#10261d;color:var(--chalk)">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout" style="color:#10261d">${TR('登出','Sign out')}</button></div>`}
+    <label style="color:var(--chalk)">${TR('暱稱（排行榜和排位賽會顯示）','Nickname (shown in ranked games and on the leaderboard)')}<input id="an" maxlength="16" value="${esc(p?p.name:'')}" style="width:100%"></label>
+    <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>`}
    <p id="amsg" role="alert" style="color:#a8441a;font-weight:700"></p></div>`;
   document.body.appendChild(w);
   const msg=t=>{$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
