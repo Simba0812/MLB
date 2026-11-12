@@ -1304,14 +1304,16 @@ const restN=()=>Math.min(({single:0,bo3:2,bo7:3})[S.mode],S.slots.SP-1);
 function recentStarters(i,g){const n=restN();return n?S.series.games.slice(0,g).map(x=>x.sp[i]).slice(-n).map(sid):[]}
 function renderPregame(){
   const tms=[buildTeam(0),buildTeam(1)], watch=NET.on&&NET.seat==null;
-  const lu=tm=>`<div class="lineup">${tm.order.map((h,j)=>`<span class="k">${j+1}</span><span class="k">${h.fpos}</span><span>${esc(nm(h))}</span><span class="mono" style="color:var(--dim)">${h.ops}</span>`).join('')}</div>
-   ${tm.bench.length?`<div class="eyebrow" style="margin-top:12px">${TR('替補','Bench')}</div><div class="lineup">${tm.bench.map(h=>`<span class="k"></span><span class="k">${h.pos}</span><span>${esc(nm(h))}</span><span class="mono" style="color:var(--dim)">${h.ops}</span>`).join('')}</div>`:''}
-   <div class="eyebrow" style="margin-top:12px">${TR('先發輪值','Rotation')}</div><div class="lineup">${tm.sps.map((p,j)=>`<span class="k">${j+1}</span><span class="k">SP</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>
-   <div class="eyebrow" style="margin-top:12px">${TR('牛棚','Bullpen')}</div><div class="lineup">${[...tm.rps.map(p=>[ROLEL()[defaultRoles(tm.rps)[sid(p.id)]],p]),...tm.cl.map(p=>['CL',p])].map(([k,p])=>`<span class="k"></span><span class="k">${k}</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>`;
+  // each list says what its number is: OPS for hitters, ERA for pitchers
+  const hd=(t,k,top=12)=>`<div class="eyebrow" style="margin-top:${top}px;display:flex;justify-content:space-between"><span>${t}</span><span class="mono" style="letter-spacing:.05em">${k}</span></div>`;
+  const lu=tm=>`${hd(TR('建議打序','Suggested lineup'),'OPS',10)}<div class="lineup">${tm.order.map((h,j)=>`<span class="k">${j+1}</span><span class="k">${h.fpos}</span><span>${esc(nm(h))}</span><span class="mono" style="color:var(--dim)">${h.ops}</span>`).join('')}</div>
+   ${tm.bench.length?`${hd(TR('替補','Bench'),'OPS')}<div class="lineup">${tm.bench.map(h=>`<span class="k"></span><span class="k">${h.pos}</span><span>${esc(nm(h))}</span><span class="mono" style="color:var(--dim)">${h.ops}</span>`).join('')}</div>`:''}
+   ${hd(TR('先發輪值','Rotation'),'ERA')}<div class="lineup">${tm.sps.map((p,j)=>`<span class="k">${j+1}</span><span class="k">SP</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>
+   ${hd(TR('牛棚','Bullpen'),'ERA')}<div class="lineup">${[...tm.rps.map(p=>[ROLEL()[defaultRoles(tm.rps)[sid(p.id)]],p]),...tm.cl.map(p=>['CL',p])].map(([k,p])=>`<span class="k"></span><span class="k">${k}</span><span>${esc(nm(p))}</span><span class="mono" style="color:var(--dim)">${p.era}</span>`).join('')}</div>`;
   $('#app').innerHTML=`${header()}
   <section class="panel"><h2>${TR('選秀結束','Draft complete')}</h2><p class="hint" style="margin-top:6px">${TR(`賽制：${MODEZH[S.mode]}${S.mode==='bo7'?'，4 人先發輪值':S.mode==='bo3'?'，3 人先發輪值':''}。每場開打前可以調整打序、選先發；比賽中的關鍵時刻會問你要不要換投或換代打。剩餘預算不影響比賽。`,`Format: ${MODEZH[S.mode]}${S.mode==='bo7'?', 4-man rotation':S.mode==='bo3'?', 3-man rotation':''}. Before each game you set the lineup and pick a starter; at key moments you'll be asked whether to change pitchers or pinch-hit. Leftover budget doesn't affect the games.`)}</p>
    <div class="row" style="margin-top:14px"><button class="solid" id="play" ${watch?'disabled':''}>${TR('進入第一戰 ⚾','Go to Game 1 ⚾')}</button></div></section>
-  <div class="grid2">${tms.map((tm,i)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${esc(tm.park.n)}</div><h2>${esc(tm.name)}</h2><div class="eyebrow" style="margin-top:10px">${TR('建議打序','Suggested lineup')}</div>${lu(tm)}</section>`).join('')}</div>`;
+  <div class="grid2">${tms.map((tm,i)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${esc(tm.park.n)}</div><h2>${esc(tm.name)}</h2>${lu(tm)}</section>`).join('')}</div>`;
   $('#play').onclick=()=>{
     const coin=rnd()<.5?0:1;
     const sched=S.mode==='single'?[coin]:S.mode==='bo3'?[0,1,coin]:[coin,coin,1-coin,1-coin,1-coin,coin,coin];
@@ -1711,7 +1713,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='4d85ffb6f3';
+const BUILD='9e2b0ac541';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
