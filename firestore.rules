@@ -124,15 +124,23 @@ service cloud.firestore {
       function preRating(p, r) { return p.pend == nd().pend && p.pendAt == r.created ? p.rating + p.pendD : p.rating; }
       function lossFor(mine, theirs) { return math.round(100.0 / (1.0 + math.pow(10.0, (theirs - mine) / 1250.0))); }
 
-      // seasons: S1 runs to the end of Jan 2027, then three months each (Feb–Apr, May–Jul, ...), Taiwan time
+      // seasons: a test season (0) until S1 opens on Mon 16 Nov 2026 (Taiwan time); S1 runs to the end of
+      // Jan 2027, then three months each (Feb–Apr, May–Jul, ...)
+      function s1Start() { return 1794758400000; }
       function twNow() { return timestamp.value(request.time.toMillis() + 28800000); }
-      function season() { return math.floor(((twNow().year() - 2026) * 12 + twNow().month() - 11) / 3.0) + 1; }
-      function inSeason() { return od().get('season', 1) == season(); }
-      // a new season: the rating comes halfway back to 1000, the record starts over, the old one is kept in hist
+      function season() {
+        return request.time.toMillis() < s1Start() ? 0
+          : math.floor(((twNow().year() - 2026) * 12 + twNow().month() - 11) / 3.0) + 1;
+      }
+      // a record stamped season 1 before S1 opened belongs to the test season
+      function seasonOf(d) { return d.get('season', 0) == 1 && d.get('created', 0) < s1Start() ? 0 : d.get('season', 0); }
+      function inSeason() { return seasonOf(od()) == season(); }
+      // a new season: the rating comes halfway back to 1000 (all the way after the test season), the record
+      // starts over, the old one is kept in hist
       function rollOK() {
-        let s0 = od().get('season', 1);
+        let s0 = seasonOf(od());
         return od().pend == '' && s0 < season() && nd().season == season()
-          && nd().rating == 1000 + math.floor((od().rating - 1000) / 2.0)
+          && nd().rating == (s0 < 1 ? 1000 : 1000 + math.floor((od().rating - 1000) / 2.0))
           && nd().games == 0 && nd().wins == 0 && nd().losses == 0 && nd().get('streak', 0) == 0
           && nd().hist.diff(od().get('hist', {})).affectedKeys().hasOnly([string(s0)])
           && nd().hist[string(s0)] == {'r': od().rating, 'w': od().wins, 'l': od().losses};
@@ -172,7 +180,7 @@ service cloud.firestore {
         let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 600000;
         return inRoom(r) && r.created == od().pendAt
           && mine == s && (theirs == s || (theirs == '' && gone))
-          && nd().rating == od().rating + 100 + math.min(od().get('streak', 0), 3) * 10
+          && nd().rating == od().rating + 100 + (od().get('streak', 0) >= 3 ? 30 : od().get('streak', 0) * 10)
           && nd().streak == od().get('streak', 0) + 1
           && nd().wins == od().wins + 1 && nd().losses == od().losses - 1
           && nd().games == od().games && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0;
