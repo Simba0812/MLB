@@ -59,9 +59,9 @@ h3{margin:0;font-size:16px;font-weight:700}
 .pcard{background:linear-gradient(160deg,#dfe4e9,#a9b3bd 50%,#eef1f4);border-radius:16px;padding:11px;box-shadow:0 14px 28px rgba(60,40,10,.3);transform:rotate(-2deg);width:100%}
 .pcard .in{background:var(--paper);border-radius:10px;border:3px solid var(--navy);height:100%;padding:16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;gap:2px}
 .pcard .no{position:absolute;top:10px;left:10px;background:var(--navy);color:var(--paper);font-family:var(--display);font-weight:800;padding:1px 9px;border-radius:3px;font-size:15px;letter-spacing:.04em}
-.pcard .em{font-size:84px;line-height:1;margin-top:20px;filter:drop-shadow(0 5px 5px rgba(0,0,0,.2))}
-.pcard .tn{font-family:var(--display);font-weight:900;font-size:58px;line-height:1;color:var(--tier,var(--navy));margin-top:4px}
-.pcard .nm{font-family:var(--serif);font-weight:900;font-size:21px;color:var(--navy);overflow-wrap:anywhere}
+.pcard .em{font-size:76px;line-height:1.25;height:1.25em;margin-top:auto;padding-top:26px;box-sizing:content-box;filter:drop-shadow(0 5px 5px rgba(0,0,0,.2))}
+.pcard .tn{font-family:var(--display);font-weight:900;font-size:58px;line-height:1.1;color:var(--tier,var(--navy));margin-top:10px}
+.pcard .nm{font-family:var(--serif);font-weight:900;font-size:21px;line-height:1.3;color:var(--navy);overflow-wrap:anywhere;margin-top:8px;padding-bottom:14px}
 .pcard .st{display:grid;grid-template-columns:repeat(4,1fr);width:100%;margin-top:auto;border-top:2px solid var(--navy);padding-top:10px;gap:2px}
 .pcard .st b{display:block;font-family:var(--mono);font-size:19px;color:var(--red)}.pcard .st span{font-size:12px;color:var(--dim)}
 .rankpanel{background:var(--panel);border:3px solid var(--navy);box-shadow:8px 8px 0 var(--navy);padding:22px 26px;display:flex;flex-direction:column;min-width:0}
@@ -1707,7 +1707,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='fd053740c8';
+const BUILD='0a5a8f5ec5';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
