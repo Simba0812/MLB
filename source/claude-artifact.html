@@ -1824,7 +1824,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='8e99a8e39a';
+const BUILD='0991539cc0';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2124,7 +2124,7 @@ const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
 const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);
 const isRnd=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.rnd);   // a room from random matchmaking (casual or ranked)
-let LAST_OPP='';   // the opponent from the last matched room: matchmaking doesn't pair the two straight back
+let LAST_OPP='';   // the opponent from the last matched room: matchmaking tries someone else first
 const rankedGame=()=>isRanked()||!!S.rankAI;
 const acctUser=()=>NET.acct&&NET.acct.user();
 const profRef=()=>NET.db.doc('players/'+acctUser().uid);
@@ -2272,8 +2272,10 @@ async function claimSeat(code){
 async function quickMatch(kind){
   const now=Date.now(),q=await NET.db.collection('rooms').where('cfg.mm','==',kind).limit(20).get();
   const free=q.docs.map(x=>({id:x.id,d:x.data()})).filter(({d})=>{const st=d.seats||{},h=(d.setup||{})[0]||{};
-    return st[0]&&st[0]!==NET.uid&&st[0]!==LAST_OPP&&!st[1]&&!roomExpired(d)&&!!(d.cfg||{}).ranked===(kind==='ranked')&&(kind!=='ranked'||RK_LG.includes((d.cfg||{}).league))&&!h.left&&h.ver===BUILD&&(d.cfg||{}).game!=='nba'&&(!h.hb||Math.abs(now-h.hb)<5*60000)});
+    return st[0]&&st[0]!==NET.uid&&!st[1]&&!roomExpired(d)&&!!(d.cfg||{}).ranked===(kind==='ranked')&&(kind!=='ranked'||RK_LG.includes((d.cfg||{}).league))&&!h.left&&h.ver===BUILD&&(d.cfg||{}).game!=='nba'&&(!h.hb||Math.abs(now-h.hb)<5*60000)});
   for(let i=free.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[free[i],free[j]]=[free[j],free[i]]}
+  // someone new first; the last opponent only when nobody else is waiting
+  free.sort((x,y)=>(x.d.seats[0]===LAST_OPP)-(y.d.seats[0]===LAST_OPP));
   for(const {id} of free.slice(0,5)){
     try{if(await claimSeat(id)){enterRoom(id,1,kind);return}}catch(e){}
   }
