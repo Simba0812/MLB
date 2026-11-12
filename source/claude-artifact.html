@@ -1814,7 +1814,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='c0b7176e9b';
+const BUILD='e87f9313be';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2411,14 +2411,14 @@ function openAcct(note){
     <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>`}
    <p id="amsg" role="alert" style="color:#a8441a;font-weight:700"></p></div>`;
   document.body.appendChild(w);
-  const msg=t=>{$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
+  const msg=t=>{$('#amsg').style.color='';$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
   w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   const after=()=>{loadProfile().then(()=>{closeAcct();openAcct(TR('登入成功！取個暱稱就能打排位賽。','Signed in! Pick a nickname to play ranked.'));renderNetBox()})};
   if(a.anon){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
     $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
     $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>msg(TR('如果這個 Email 是用「Email＋密碼」註冊的，重設密碼的信已經寄出，找不到請看垃圾郵件匣。用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','If that email signed up with a password, a reset link is on its way (check spam too). Accounts made with Google have no password: just use "Continue with Google".')));
+    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere 密碼</code>（英文信就搜 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere password</code>），連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere password</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
