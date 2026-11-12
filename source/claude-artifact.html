@@ -874,7 +874,7 @@ function renderDraft(){
     if($('#passbtn'))$('#passbtn').onclick=()=>{pass();sync()};
   }
   document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{declareDone(+b.dataset.done);sync()});
-  scheduleAI();
+  scheduleAI();afkWatch();
 }
 function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[null,null],pending:null,log:[]};render()}
 
@@ -1814,7 +1814,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ef8d0d23a0';
+const BUILD='a66f5e141f';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1900,7 +1900,7 @@ function detachRoom(){
   if(NET.on&&NET.seat!=null&&NET.ref){const ref=NET.ref,seat=NET.seat,mm=NET.seat===0&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.mm;
     ref.update({setup:{[seat]:{left:true}},...(mm?{cfg:{mm:''}}:{})}).catch(()=>{})}
   if(NET.unsub)NET.unsub();clearInterval(NET.beat);clearInterval(NET.waitTick);
-  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,err:'',unsub:null,beat:null,waitTick:null,opp:null,mm:null,rk:null,emoSeen:undefined});emoUI();
+  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,err:'',unsub:null,beat:null,waitTick:null,opp:null,mm:null,rk:null,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0});clearInterval(NET.afkTick);NET.afkTick=null;closeAfkAsk();emoUI();
   $('#follow').hidden=true;S.rev=null;
 }
 function leaveRoom(){detachRoom();clearTimeout(timer);S.screen='home';render()}
@@ -1981,6 +1981,54 @@ function showEmo(seat,k){
   el.innerHTML=`${esc(name)}：${emoText(k)}`;document.body.appendChild(el);setTimeout(()=>el.remove(),3600);
 }
 
+/* ---------- an online bidder who doesn't move ---------- */
+// Ranked games only. After 60 s on your turn a window asks "still thinking?"; 30 s without an answer skips the lot for you
+// (or bids the minimum when you must fill a spot). Three such skips in a row and you count as gone.
+// If the other phone has stopped running (locked, app in the background), this phone makes the same
+// skip after 100 s, so the draft never waits forever.
+const AFK_ASK=60000,AFK_GRACE=30000,AFK_REMOTE=100000,AFK_MAX=3;
+function afkAct(){if(mustBid())bid(S.lot.price+1);else pass();sync()}
+function afkWatch(){
+  // ranked games only: friends in a room of their own can take as long as they like
+  if(!isRanked()||NET.seat==null||S.screen!=='draft'||!S.lot||!(NET.doc&&(NET.doc.seats||{})[1])){afkStop();return}
+  const L=S.lot,key=[S.lotNo,L.turn,L.price,L.passed.join()].join('|');
+  if(!NET.afk||NET.afk.key!==key){
+    // the other side moved by itself: their missed-turn count starts over
+    if(NET.afk&&NET.afk.turn!==NET.seat&&!NET.afk.forced)NET.oppAfk=0;
+    NET.afk={key,turn:L.turn,since:Date.now(),forced:false};closeAfkAsk();
+  }
+  if(!NET.afkTick)NET.afkTick=setInterval(afkTick,1000);
+}
+function afkStop(){clearInterval(NET.afkTick);NET.afkTick=null;closeAfkAsk()}
+function afkTick(){
+  const a=NET.afk;if(!a||!NET.on||S.screen!=='draft'||!S.lot)return afkStop();
+  const t=Date.now()-a.since;
+  if(a.turn===NET.seat){
+    if(t>=AFK_ASK&&!$('#afkwrap'))openAfkAsk();
+    const el=$('#afkleft');if(el)el.textContent=Math.max(0,Math.ceil((AFK_ASK+AFK_GRACE-t)/1000));
+    if(t>=AFK_ASK+AFK_GRACE){
+      closeAfkAsk();NET.myAfk=(NET.myAfk||0)+1;
+      if(NET.myAfk>=AFK_MAX){afkStop();leaveRoom();const e=$('#neterr');if(e)e.textContent=TR('你連續 3 次沒有回應，已經離開房間。','You missed 3 turns in a row, so you left the room.');return}
+      a.forced=true;afkAct();
+    }
+  }else if(t>=AFK_REMOTE&&!a.forced){
+    a.forced=true;NET.oppAfk=(NET.oppAfk||0)+1;
+    S.log.unshift(TR(`⏱ ${esc(S.teams[a.turn].name)} 太久沒有動作，這支籤自動跳過（連續 ${NET.oppAfk} 次）。`,`⏱ ${esc(S.teams[a.turn].name)} took too long; this lot is skipped for them (${NET.oppAfk} in a row).`));
+    afkAct();updateNetBadge();
+  }
+}
+function openAfkAsk(){
+  const w=document.createElement('div');w.id='afkwrap';w.className='acctwrap';
+  w.innerHTML=`<div class="card" role="alertdialog" aria-modal="true" aria-label="${TR('還在思考嗎？','Still thinking?')}" style="gap:12px;text-align:center;align-items:center">
+   <h2>⏱ ${TR('還在思考嗎？','Still thinking?')}</h2>
+   <p>${TR('輪到你出價已經超過 1 分鐘了。','It has been your turn to bid for over a minute.')}</p>
+   <p class="hint">${TR('<b id="afkleft">30</b> 秒內沒有回應，這支籤會自動跳過；連續 3 次沒回應會判定離開。','No answer in <b id="afkleft">30</b> s and this lot is skipped for you; three in a row and you count as gone.')}${NET.myAfk?TR(`（目前連續 ${NET.myAfk} 次）`,` (${NET.myAfk} so far)`):''}</p>
+   <button class="solid rankgo" id="afkyes">${TR('還在！','Still here!')}</button></div>`;
+  document.body.appendChild(w);
+  $('#afkyes').onclick=()=>{NET.myAfk=0;if(NET.afk)NET.afk.since=Date.now();closeAfkAsk()};
+}
+function closeAfkAsk(){const w=$('#afkwrap');if(w)w.remove()}
+
 /* ---------- presence: is the other player still here? ---------- */
 // each seated player stamps setup[seat].hb every 30 s. Phones' clocks disagree, so staleness is judged by
 // how long ago this device last saw the stamp change, not by the stamp itself.
@@ -1998,6 +2046,7 @@ function watchOpp(d){
 }
 function oppGone(){
   if(!NET.on||NET.seat==null||!NET.opp)return '';
+  if((NET.oppAfk||0)>=AFK_MAX)return 'afk';
   // a reload sets "left" for a moment too, so it has to stay a while: 15 s, or a minute in a ranked game
   if(NET.opp.left){if(Date.now()-NET.opp.leftAt>(isRanked()?60000:15000))return 'left';setTimeout(updateNetBadge,isRanked()?60500:15500)}
   return Date.now()-NET.opp.seen>90000?'quiet':'';
@@ -2005,7 +2054,7 @@ function oppGone(){
 function oppWarn(){
   const g=oppGone();if(!g)return '';
   const playing=['draft','trade','pregame','pick','game'].includes(S.screen);
-  return `<span class="warn">⚠ ${g==='left'?TR('對手已離開房間。','Your opponent has left.'):TR('對手已超過 90 秒沒有回應，可能已經離線。','Your opponent has not responded for 90 s and may be offline.')}</span>${playing?(isRanked()?`<button class="solid" id="ffclaim" style="padding:4px 10px">${TR('判對手棄賽（我方勝）','Claim the win by forfeit')}</button>`:`<button class="solid" id="takeover" style="padding:4px 10px">${TR('改由電腦接手','Let the computer take over')}</button>`):''}`;
+  return `<span class="warn">⚠ ${g==='afk'?TR('對手連續 3 次沒有出價，判定離開。','Your opponent missed 3 turns in a row and counts as gone.'):g==='left'?TR('對手已離開房間。','Your opponent has left.'):TR('對手已超過 90 秒沒有回應，可能已經離線。','Your opponent has not responded for 90 s and may be offline.')}</span>${playing?(isRanked()?`<button class="solid" id="ffclaim" style="padding:4px 10px">${TR('判對手棄賽（我方勝）','Claim the win by forfeit')}</button>`:`<button class="solid" id="takeover" style="padding:4px 10px">${TR('改由電腦接手','Let the computer take over')}</button>`):''}`;
 }
 // the opponent is gone: finish the game on this device against the computer
 function takeOver(){
@@ -2218,7 +2267,7 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined});
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0});
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
