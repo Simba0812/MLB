@@ -73,8 +73,11 @@ h3{margin:0;font-size:16px;font-weight:700}
 /* the three ways to play, as tickets */
 @media (max-width:520px){.rankpath .node{width:38px;font-size:10.5px}.rankpath .c{width:30px;height:30px;font-size:16px}
   .rankpath .cur .c{width:40px;height:40px;font-size:22px;margin-top:-5px}.rankpath .seg{min-width:4px;margin-top:13px}.rankpanel{padding:18px 16px;box-shadow:5px 5px 0 var(--navy)}}
-.ticket{display:flex;padding:0;overflow:hidden}
-.ticket .stub{flex:none;width:58px;background:var(--navy);color:var(--paper);writing-mode:vertical-rl;text-align:center;font-family:var(--display);font-weight:800;letter-spacing:.25em;font-size:17px;padding:12px 0;border-right:3px dashed var(--paper)}
+.panel.ticket{display:flex;padding:0;overflow:hidden}
+.ticket .stub{flex:none;width:62px;background:var(--navy);color:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px 0;border-right:3px dashed var(--paper)}
+.ticket .stub .si{width:40px;height:40px;border-radius:50%;background:var(--paper);display:grid;place-items:center;font-size:22px}
+.ticket .stub .sl{writing-mode:vertical-rl;text-orientation:upright;font-family:var(--serif);font-weight:900;font-size:19px;letter-spacing:.35em}
+html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixed;font-family:var(--display);letter-spacing:.2em}
 .ticket .tbody{padding:18px 20px;flex:1;min-width:0}
 .statline{text-align:center;font-family:var(--mono);color:var(--navy);font-size:14px;margin:0;border-top:2px solid var(--navy);padding-top:12px}
 .statline button{padding:2px 10px;margin-left:6px}
@@ -1698,7 +1701,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='51d8980480';
+const BUILD='4d85ffb6f3';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2182,7 +2185,7 @@ function renderHome(){
   <p class="statline" id="statline"></p>
   <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
   // the three ways to play are drawn as tickets: a stub on the left, the details on the right
-  document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub">${['SOLO','2 P','ONLINE'][i]}</div>`);
+  document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub"><span class="si">${['🤖','👥','🌐'][i]}</span><span class="sl">${[TR('單人','SOLO'),TR('雙人','2P'),TR('線上','ONLINE')][i]}</span></div>`);
     const st=p.firstElementChild,rest=[...p.children].slice(1),b=document.createElement('div');b.className='tbody';rest.forEach(x=>b.appendChild(x));p.appendChild(b)});
   statLine();
   $('#local').onclick=()=>{S.ai=null;S.screen='setup';render()};
