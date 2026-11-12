@@ -16,6 +16,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"大聯盟盲標對決","alternateName":["MLB Blind Auction","大聯盟盲標","MLB 盲標 Fantasy","中職盲標"],"url":"https://simba0812.github.io/MLB/","image":"https://simba0812.github.io/MLB/og/mlb.png","description":"和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。附傳統與進階數據，排位賽、隨機配對，免註冊。","genre":["Sports","Fantasy baseball"],"gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","inLanguage":["zh-TW","en"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"TWD"}}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -587,7 +588,7 @@ function srcLine(){return S.league==='CPBL'
   :`<div class="src">${TR('數據：','Data: ')}<a href="https://www.mlb.com/stats" target="_blank" rel="noopener">MLB.com</a> ${TR('例行賽統計','season stats')}<br><a href="https://baseballsavant.mlb.com" target="_blank" rel="noopener">Baseball Savant</a> xwOBA · xERA · ${TR('擊球初速 · 衝刺速度','exit velo · sprint speed')}</div>`}
 const modeSeg=()=>`<div class="seg" role="group" aria-label="${TR('賽制','Format')}">${Object.entries(MODEZH).map(([k,l])=>`<button data-m="${k}" aria-pressed="${S.mode===k}">${l}</button>`).join('')}</div>`;
 const leagueSeg=dis=>`<div class="seg" role="group" aria-label="${TR('聯盟','League')}">${[['MLB',TR('美國職棒大聯盟','MLB')],['CPBL',TR('中華職棒','CPBL')]].map(([k,l])=>`<button data-lg="${k}" aria-pressed="${S.league===k}" ${dis||!POOLS[k].length?'disabled':''}>${l}</button>`).join('')}</div>`;
-function header(){return `<header class="top"><h1>${S.league==='CPBL'?TR('中職盲標對決','CPBL Blind Auction'):TR('大聯盟盲標對決','MLB Blind Auction')}<small>${TR('2026 球季真實數據 · 雙人競標 · 模擬對戰','Real 2026 stats · head-to-head auction · simulated games')}</small></h1>
+function header(){return `<header class="top"><h1>${TR('大聯盟盲標對決','MLB Blind Auction')}<small>${TR('2026 球季真實數據 · 雙人競標 · 模擬對戰','Real 2026 stats · head-to-head auction · simulated games')}</small></h1>
 <div class="hdr-r">${srcLine()}<button class="ghost mini" id="langbtn" lang="${TR('en','zh-Hant')}">${TR('English','中文')}</button></div></header>${lobbyBar()}<div class="netbar" id="netbar" ${NET.on?'':'hidden'}>${netBadge()}</div>`}
 
 /* ---------- back to lobby ---------- */
@@ -1760,7 +1761,7 @@ function resultCard({res,winTm,w,champ,gnum,nmw,nml}){
   x.fillStyle='#e6d9b6';x.fillRect(0,0,W,H);x.fillStyle=paper;x.fillRect(36,36,W-72,H-72);
   x.strokeStyle=navy;x.lineWidth=6;x.strokeRect(36,36,W-72,H-72);x.lineWidth=2;x.strokeRect(50,50,W-100,H-100);
   // title and tag
-  text(S.league==='CPBL'?TR('中職盲標對決','CPBL Blind Auction'):TR('大聯盟盲標對決','MLB Blind Auction'),W/2,150,`900 {s}px ${serif}`,64,navy);
+  text(TR('大聯盟盲標對決','MLB Blind Auction'),W/2,150,`900 {s}px ${serif}`,64,navy);
   const tag=(S.mode==='single'?TR('比賽結束','FINAL'):TR(`第 ${gnum+1} 戰結束`,`GAME ${gnum+1} FINAL`))+(rankedGame()?TR(' · 排位賽',' · RANKED'):'');
   x.font=`700 26px ${sans}`;const tw=x.measureText(tag).width+48;x.fillStyle=red;x.fillRect(W/2-tw/2,180,tw,46);text(tag,W/2,212,`700 {s}px ${sans}`,26,paper);
   // the winner and the score
@@ -1834,7 +1835,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='0991539cc0';
+const BUILD='8a09791b9c';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
