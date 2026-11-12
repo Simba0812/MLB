@@ -191,6 +191,7 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 @media (max-width:520px){.sta{width:80px}}
 .penlist{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;align-items:center;font-size:13px}
 .lued{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.lustat{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin:2px 0 2px 2px}
 .lurow{display:grid;grid-template-columns:2.4em 2.4em minmax(0,1fr) auto;gap:6px;align-items:center;border-radius:3px}
 .lurow.picked{background:var(--panel2);outline:2px solid var(--amber)}
 .lunum{padding:5px 0;border-color:var(--line);font-weight:700}
@@ -1169,7 +1170,7 @@ function simGame(away,home,ctx){
         }
         // stolen base attempt
         if(bases[0]&&!bases[1]&&outs<2){const r=bases[0];const att=clamp(r.r.sbr*3.2*tf(to,'off','steal')*tf(to,'run','steal'),0,.45);
-          if(rnd()<att){ if(rnd()<.76+((r.spd||27)-27)*.04-(tf(to,'run','steal')>1?.04:0)){bases[1]=r;bases[0]=null;say(TR(`${nm(r)} 起跑盜二壘，成功！`,`${nm(r)} takes off for second: safe!`))} else {bases[0]=null;outs++;s.cur.outs++;pbox(dt).outs++;say(TR(`${nm(r)} 盜壘被捕手 ${nm(s.field.C||{n:''})} 阻殺。${outs}出局。`,`${nm(r)} is thrown out stealing by catcher ${nm(s.field.C||{n:''})}. ${outs} out${outs>1?'s':''}.`)); if(outs>=3)break;}}}
+          if(rnd()<att){ if(rnd()<.76+((r.spd||27)-27)*.04-(tf(to,'run','steal')>1?.04:0)){bases[1]=r;bases[0]=null;say(TR(`🏃 ${nm(r)} 起跑盜二壘，成功！`,`🏃 ${nm(r)} takes off for second: safe!`))} else {bases[0]=null;outs++;s.cur.outs++;pbox(dt).outs++;say(TR(`🚫 ${nm(r)} 盜壘被捕手 ${nm(s.field.C||{n:''})} 阻殺。${outs}出局。`,`🚫 ${nm(r)} is thrown out stealing by catcher ${nm(s.field.C||{n:''})}. ${outs} out${outs>1?'s':''}.`)); if(outs>=3)break;}}}
         const p=s.cur.p, tt=Math.floor(s.cur.bf/9), sta=curSta(s.cur);
         const fat=1+.04*Math.max(0,tt-1)+Math.max(0,40-sta)/100*.6;   // tiring below 40% strength
         const pr=paProbs(h,p,park,fat,defAt(dt,'C'),to,tp);
@@ -1201,7 +1202,7 @@ function simGame(away,home,ctx){
           if(bases[1]){if(rnd()<.58+.12*spd+(outs===2?.2:0)+send){if(send>0&&rnd()<.08){outs++;s.cur.outs++;pb.outs++;cut=true}else score(bases[1],bb)}else bases[2]=bases[1];bases[1]=null}
           if(bases[0]){if(!bases[2]&&rnd()<.27+.1*spd+send*.5)bases[2]=bases[0];else bases[1]=bases[0];bases[0]=null}
           bases[0]=h;
-          if(flip==='boot') say(TR(`${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`));
+          if(flip==='boot') say(TR(`😬 ${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`😬 ${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`));
           else if(DIRZH[fpos]) say(pick(TR([`${B} 擊出${DIRZH[fpos]}方向的平飛球，一壘安打。`,`${B} 輕巧一推，${DIRZH[fpos]}前一壘安打。`],[`${B} lines a single to ${DIRZH[fpos]}.`,`${B} pokes a single into ${DIRZH[fpos]}.`])));
           else say(pick(TR([`${B} 敲出穿越${fielder(dt,fpos)}身邊的滾地安打。`,`${B} 打成${POSZH[fpos]}前的內野高彈跳，跑出內野安打。`],[`${B} rips a grounder past ${fielder(dt,fpos)} for a single.`,`${B} chops a high bouncer in front of the ${POSZH[fpos]} and beats it out.`])));
           if(cut){ev[ev.length-1].t+=TR(` 二壘跑者衝本壘，被傳殺出局！${outs}出局。`,` The runner from second is sent and thrown out at the plate! ${outs} out${outs>1?'s':''}.`);ev[ev.length-1].t3=outs>=3}}
@@ -1225,7 +1226,7 @@ function simGame(away,home,ctx){
           const who=fielder(dt,fpos), rob=flip==='rob';
           if(otype==='g'){
             const d=defAt(dt,fpos);
-            if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`));}
+            if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`❗ ${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`❗ ${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`));}
             else if(bases[0]&&outs<2&&rnd()<.5-.08*spd+(defAt(dt,'SS')+defAt(dt,'2B'))*.003){outs+=2;s.cur.outs+=2;pb.outs+=2;
               if(outs<3){if(bases[2]&&rnd()<.5){score(bases[2],null);bases[2]=null} if(bases[1]&&!bases[2]){bases[2]=bases[1];bases[1]=null}}
               bases[0]=null; say(TR(`${B} 擊出${POSZH[fpos]}方向滾地球，${who} 起手，形成雙殺！${outs>=3?'三出局。':''}`,`${B} grounds to the ${POSZH[fpos]}; ${who} starts the double play!${outs>=3?' Inning over.':''}`));ev[ev.length-1].t3=outs>=3;}
@@ -1341,9 +1342,14 @@ function ensureLued(g){
 }
 function lineupEditor(i){
   const lu=LUED[i],hit=teamHitters(i).map(r=>r.p),byId=new Map(hit.map(p=>[sid(p.id),p]));
+  // season line, and the line so far in this series (games already played against this opponent)
+  const g=S.game?S.game.gnum:0,ser=g>0?new Map(seriesStats(g)[i].bat.map(a=>[sid(a.p.id),a])):null;
+  const f3s=v=>v==null?'—':v.toFixed(3).replace(/^0/,'');
+  const line=p=>{const a=ser&&ser.get(sid(p.id));
+    return `<div class="lustat">${TR('本季','Season')} ${esc(String(p.avg))} / ${esc(String(p.ops))}${ser?` · ${TR('本系列','Series')} ${a&&a.ab?`${f3s(a.avg)} / ${f3s(a.ops)} <span style="opacity:.75">(${a.h}-${a.ab})</span>`:'—'}`:''}</div>`};
   const rows=lu.map((x,r)=>{const p=byId.get(sid(x.id)),alt=x.pos!=='DH'&&p.pos!==x.pos&&(p.alt||[]).includes(x.pos),off=x.pos!=='DH'&&p.pos!==x.pos&&!alt;
     return `<div class="lurow ${LUPICK&&LUPICK[0]===i&&LUPICK[1]===r?'picked':''}"><button class="lunum mono" data-pick="${i},${r}" aria-label="${TR(`第 ${r+1} 棒，點選後再點另一棒互換`,`Batting ${ord(r+1)}: tap, then tap another spot to swap`)}">${r+1}</button><span class="mono lupos">${x.pos}</span>
-      <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
+      <div style="min-width:0"><select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}" style="width:100%">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>${line(p)}</div>
       ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:alt?`<span class="hint">${TR('副守位','secondary')}</span>`:'<span></span>'}</div>`}).join('');
   return `<div class="eyebrow" style="margin-top:14px">${TR('打序與守位','Batting order and positions')}</div><div class="lued">${rows}</div>
     <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場，中職是 150 局），用他在那個位置的真實守備數據；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season; 150+ innings in the CPBL) he fields as his numbers there say; anywhere else, much worse.')}</p>
@@ -1676,7 +1682,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ab5f3f3004';
+const BUILD='a98bba93ad';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
