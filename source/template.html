@@ -1881,10 +1881,8 @@ function onRoom(snap){
   // redraw the lineup screen only when something on it changed: a redraw closes a menu the player has open
   if(S.screen==='pick'){maybeFinalizePick();if(S.screen==='pick'){const sig=S.rev+'|'+JSON.stringify((d.picks||{})[pickKey()]||null);if(sig!==NET.pickSig){NET.pickSig=sig;renderPick()}}}
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length&&decList(S.game.gnum).length>S.game.res.paused.di) resumeGame();
-  if(isRanked()&&NET.seat!=null){
-    if(S.screen==='room'&&NET.seat===0&&(d.seats||{})[1]&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;startOnlineDraft()}
-    if(S.screen!=='room')rankStart().then(rankCheck);
-  }
+  if(S.screen==='room'&&NET.seat===0&&(d.cfg||{}).rnd&&bothReady(d)&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;closeReady();startOnlineDraft()}
+  if(isRanked()&&NET.seat!=null&&S.screen!=='room')rankStart().then(rankCheck);
   updateNetBadge();
 }
 function showFollow(){const f=$('#follow');f.hidden=false;document.querySelectorAll('#endbtns button').forEach(b=>b.disabled=true)}
@@ -2239,7 +2237,7 @@ function genCode(){const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let s='';for(let i=
 async function createRoom(mm){
   if(mm==='ranked'){setLeague(pickLg());S.mode=RANKED.mode;S.slots={...RANKED.slots}}
   let code;for(let k=0;k<6;k++){code=genCode();const s=await NET.db.doc('rooms/'+code).get();if(!s.exists)break}
-  await roomDoc(code).set({v:1,seats:{0:NET.uid},setup:{0:{name:'',park:0},1:{name:'',park:1}},cfg:{budget:200,lotMax:50,league:S.league,mode:S.mode,slots:S.slots,...(mm?{mm}:{}),...(mm==='ranked'?{ranked:true}:{})},picks:{},state:'',rev:'',created:Date.now()});
+  await roomDoc(code).set({v:1,seats:{0:NET.uid},setup:{0:{name:'',park:0},1:{name:'',park:1}},cfg:{budget:200,lotMax:50,league:S.league,mode:S.mode,slots:S.slots,...(mm?{mm,rnd:true}:{}),...(mm==='ranked'?{ranked:true}:{})},picks:{},state:'',rev:'',created:Date.now()});
   enterRoom(code,0,mm);
 }
 async function joinRoom(raw){
@@ -2267,7 +2265,7 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0});
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -2499,6 +2497,7 @@ function renderRoom(){
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel" id="mmwait" hidden></section>
+  <section class="panel" id="rdy" hidden style="border-color:var(--red);box-shadow:6px 6px 0 var(--navy)"></section>
   <section class="panel"><div class="eyebrow">${TR('線上房間','Online room')}</div>
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>
@@ -2552,6 +2551,37 @@ function mmWait(d){
     const sec=Math.floor((Date.now()-NET.mmStart)/1000);$('#mmsec').textContent=sec;$('#mmlate').hidden=$('#mmai').hidden=sec<60;if($('#mmrk'))$('#mmrk').hidden=sec<60};
   draw();NET.waitTick=setInterval(draw,1000);
 }
+/* ---------- ready check for matched strangers ---------- */
+// once two strangers are in a room from random matchmaking, each presses "Ready" within 60 s;
+// the draft starts when both have. Whoever didn't goes back to the lobby; whoever did looks for a new match.
+const READY_MS=60000;
+const bothReady=d=>[0,1].every(i=>((d.setup||{})[i]||{}).ready);
+function closeReady(){clearInterval(NET.rdyTick);NET.rdyTick=null}
+function readyPanel(d){
+  const el=$('#rdy');if(!el)return;
+  const on=!!((d.cfg||{}).rnd&&NET.seat!=null&&(d.seats||{})[0]&&(d.seats||{})[1]&&!d.state);
+  el.hidden=!on;if(!on){closeReady();return}
+  if(!NET.rdySince)NET.rdySince=Date.now();
+  const me=NET.seat,su=d.setup||{},st=i=>(su[i]||{}).ready?'✅ '+TR('已準備','Ready'):'⌛ '+TR('還沒準備','Not ready');
+  if(!$('#rdybtn'))el.innerHTML=`<h2>🤝 ${TR('找到對手了！','Opponent found!')}</h2>
+    <p class="hint" style="margin-top:6px">${TR(`${(d.cfg||{}).ranked?'排位賽':'隨機配對'}：兩邊都按「準備開始」就開始選秀。<b id="rdyleft">60</b> 秒內沒按的人會回到大廳。`,`${(d.cfg||{}).ranked?'Ranked':'Random match'}: the draft starts once both press "Ready". Whoever hasn't within <b id="rdyleft">60</b> s goes back to the lobby.`)}</p>
+    <div class="row" style="margin-top:10px;gap:8px 24px;font-weight:700"><span id="rdy0"></span><span id="rdy1"></span></div>
+    <div class="row" style="margin-top:12px"><button class="solid rankgo" id="rdybtn">${TR('準備開始','Ready')}</button></div>`;
+  [0,1].forEach(i=>{const x=$('#rdy'+i);if(x)x.textContent=`${i===me?TR('你','You'):TR('對手','Opponent')}（${(su[i]||{}).name||'—'}）：${st(i)}`});
+  const mine=!!(su[me]||{}).ready,b=$('#rdybtn');b.disabled=mine;b.textContent=mine?TR('已準備，等對手…','Ready, waiting…'):TR('準備開始','Ready');
+  b.onclick=()=>{b.disabled=true;NET.doc={...NET.doc,setup:{...su,[me]:{...(su[me]||{}),ready:true}}};dbWrite(()=>NET.ref.update({setup:{[me]:{ready:true}}}));readyPanel(NET.doc)};
+  if(!NET.rdyTick)NET.rdyTick=setInterval(()=>{
+    const d2=NET.doc||{};if(S.screen!=='room'||!NET.on||d2.state)return closeReady();
+    const left=Math.max(0,Math.ceil((READY_MS-(Date.now()-NET.rdySince))/1000));const x=$('#rdyleft');if(x)x.textContent=left;
+    if(left>0||bothReady(d2))return;
+    closeReady();
+    const wasReady=!!((d2.setup||{})[NET.seat]||{}).ready,kind=(d2.cfg||{}).ranked?'ranked':'casual';
+    leaveRoom();
+    const msg=t=>{const e=$('#neterr');if(e)e.textContent=t};
+    if(wasReady){msg(TR('對手沒有在時間內按準備，幫你重新配對…','Your opponent wasn\'t ready in time; finding you a new match…'));quickMatch(kind).catch(()=>msg(TR('重新配對失敗，請再按一次。','Could not find a new match; try again.')))}
+    else msg(TR('你沒有在 60 秒內按準備，已回到大廳。','You didn\'t press Ready within 60 s, so you are back in the lobby.'));
+  },1000);
+}
 function roomNames(){const su=(NET.doc&&NET.doc.setup)||{};return [0,1].map(i=>NET.seat===i&&$('#tn')?$('#tn').value.trim():((su[i]||{}).name||'').trim())}
 function updateRoom(){
   if(S.screen!=='room'||!$('#app'))return;
@@ -2565,7 +2595,7 @@ function updateRoom(){
      <h2 style="margin-top:6px"></h2><p class="hint" style="margin-top:6px"></p>`;
     el.querySelector('h2').textContent=joined?(s.name||TR('（還沒取隊名）','(no name yet)')):TR('等待朋友加入…','Waiting for your friend…');
     el.querySelector('p').textContent=joined?TR('主場：','Home park: ')+PARKS[Math.min(s.park??i,PARKS.length-1)].n:TR('把房號傳給朋友。','Send the code to your friend.')});
-  mmWait(d);
+  mmWait(d);readyPanel(d);
   const n=roomNames();
   const why=!seats[1]?TR('等待玩家 B 加入。','Waiting for Player B to join.'):(!n[0]||!n[1])?TR('兩隊都要先取好隊名。','Both teams need a name.'):n[0]===n[1]?TR('兩隊隊名不能相同。','The two teams need different names.'):'';
   if($('#go')){$('#go').disabled=!!why;$('#gowhy').textContent=why}
