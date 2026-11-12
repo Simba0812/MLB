@@ -12,13 +12,13 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
 /* Look: a vintage baseball program — cream paper, navy ink, red accents; tickets and a collectible card on the home page.
    --chalk is the ink colour (the name is from the earlier dark scoreboard look), --paper the light surface. */
 :root{
-  --board:#e6d9b6; --panel:#f6efdc; --panel2:#ece1c3; --line:#1d3557; --rule:#cbbd97; --paper:#fbf6e8;
-  --chalk:#1d2a3a; --dim:#6b6255; --amber:#b8561c; --sky:#2a6f97; --red:#c8342b; --good:#2f7d4f; --navy:#1d3557;
+  --board:#e8ddc2; --panel:#fdf9ef; --panel2:#f1e8d2; --line:#1d3557; --rule:#bfae86; --paper:#fffcf4;
+  --chalk:#141d29; --dim:#4a4337; --amber:#ad4a10; --sky:#1f6390; --red:#c42f26; --good:#256b42; --navy:#1d3557;
   --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
   --serif:"Noto Serif TC","Songti TC","PMingLiU",serif;
   --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
@@ -26,7 +26,7 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
-body{background:var(--board);color:var(--chalk);font-family:var(--body);font-size:15px;line-height:1.55;
+body{background:var(--board);color:var(--chalk);font-family:var(--body);font-size:16px;font-weight:500;line-height:1.6;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
 .wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
@@ -97,9 +97,9 @@ button:disabled{opacity:.35;cursor:not-allowed}
 button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;background:rgba(255,255,255,.35)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .ta{color:var(--amber)} .tb{color:var(--sky)}
-.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700}
+.eyebrow{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);font-weight:900}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.hint{font-size:13px;color:var(--dim);margin:0}
+.hint{font-size:14px;color:var(--dim);margin:0}
 
 /* draft */
 .draft{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.8fr) minmax(0,.8fr);gap:12px;align-items:start}
@@ -108,9 +108,9 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .teamcard .money{font-family:var(--display);font-weight:900;font-size:clamp(30px,2.6vw,40px);line-height:1}
 .slotpick{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--chalk)}
 .slotpick select{padding:4px 8px}
-.slots{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;font-size:12.5px;line-height:1.4;margin-top:8px}
+.slots{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;font-size:13.5px;line-height:1.4;margin-top:8px}
 .slots .k{font-family:var(--mono);color:var(--dim)} .slots .v{min-width:0;overflow-wrap:anywhere} .slots .p{font-family:var(--mono);color:var(--dim);text-align:right}
-.slots .empty{color:#a3977a}
+.slots .empty{color:#857756}
 .slots .pv{all:unset;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px} .slots .pv:hover,.slots .pv:focus-visible{color:var(--amber)}
 #emobtn{position:fixed;right:14px;bottom:14px;z-index:40;width:52px;height:52px;border-radius:50%;font-size:24px;padding:0;background:var(--red);color:var(--paper);border:2.5px solid var(--navy);box-shadow:3px 3px 0 var(--navy)}
 #emopal{position:fixed;right:14px;bottom:76px;z-index:40;background:var(--paper);border:2px solid var(--navy);color:var(--chalk);border-radius:8px;padding:10px;width:min(300px,calc(100vw - 28px));box-shadow:0 6px 20px rgba(0,0,0,.4);display:flex;flex-wrap:wrap;gap:6px}
@@ -129,21 +129,21 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .card.flip{animation:flip .6s ease}
 @keyframes flip{from{transform:rotateY(90deg);opacity:.2}to{transform:rotateY(0);opacity:1}}
 @media (prefers-reduced-motion:reduce){.card.flip{animation:none}}
-.card .lotno{font-family:var(--mono);font-size:12px;color:#4d6a5d}
+.card .lotno{font-family:var(--mono);font-size:12px;color:var(--dim)}
 .card .name{font-family:var(--display);font-weight:900;font-size:clamp(26px,3vw,38px);line-height:.95;text-transform:uppercase}
 .card .zh{font-size:17px;font-weight:900}
 .card .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px}
 .pos{display:inline-block;background:var(--navy);color:var(--paper);font-family:var(--mono);font-weight:600;padding:2px 8px;border-radius:2px}
 .ovr{margin-left:auto;font-family:var(--display);font-weight:900;font-size:34px;line-height:1;text-align:right}
-.ovr span{display:block;font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.1em;color:#4d6a5d}
+.ovr span{display:block;font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--dim)}
 .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:4px}
-.stat{border:1.5px solid #c9c2a8;border-radius:3px;padding:3px 6px;line-height:1.3}
-.stat b{display:block;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
-.stat i{display:block;font-style:normal;font-size:10.5px;line-height:1.2;color:#4d6a5d;overflow-wrap:anywhere}
+.stat{border:1.5px solid var(--rule);border-radius:3px;padding:3px 6px;line-height:1.3}
+.stat b{display:block;font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+.stat i{display:block;font-style:normal;font-size:11.5px;font-weight:700;line-height:1.2;color:var(--dim);overflow-wrap:anywhere}
 .stat.sv{border-color:#10261d}
 .stat.sv i{color:#10261d}
 .stat.wide{grid-column:span 2}
-.stat em{display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;color:#4d6a5d}
+.stat em{display:block;font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
 .stat.t90{border:3px solid #c99a1e;background:#fbefc8}
 .stat.t75{border:3px solid #c8372d}
 .stat.t50{border:3px solid #2f8f4e}
@@ -153,7 +153,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .spopt{flex-direction:row;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--rule);cursor:pointer;color:var(--chalk);font-size:14px}
 .spopt .spn{flex:1;min-width:8em;font-weight:700}
 .spopt:has(input:disabled){opacity:.45;cursor:not-allowed}
-.statlabel{font-size:10.5px;letter-spacing:.1em;margin-top:2px;font-weight:700;color:#4d6a5d;text-transform:uppercase}
+.statlabel{font-size:11.5px;letter-spacing:.1em;margin-top:2px;font-weight:700;color:var(--dim);text-transform:uppercase}
 .facedown{background:repeating-linear-gradient(45deg,#1d3557 0 12px,#264573 12px 24px);border:2px dashed var(--paper);color:var(--paper);border-radius:6px;min-height:340px;display:grid;place-items:center;text-align:center;padding:20px}
 .facedown .q{font-family:var(--display);font-size:120px;font-weight:900;line-height:1;color:rgba(251,246,232,.35)}
 /* the bid box stays on screen even when a long card pushes it down */
@@ -161,7 +161,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .price{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .price .big{font-family:var(--display);font-weight:900;font-size:40px;line-height:1}
 .turn{font-weight:700}
-.log{max-height:180px;overflow:auto;font-size:13px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
+.log{max-height:180px;overflow:auto;font-size:14px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
 .log div b{color:var(--chalk);font-weight:500}
 
 /* game */
@@ -183,7 +183,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .pbp .pa.err{border-left-color:var(--amber);background:rgba(184,86,28,.1)}
 .pbtag{display:inline-block;font-size:11.5px;font-weight:900;letter-spacing:.06em;color:var(--paper);border-radius:3px;padding:1px 7px;margin-right:8px;vertical-align:1px}
 .pa.sb .pbtag{background:var(--sky)}.pa.cs .pbtag{background:var(--dim)}.pa.err .pbtag{background:var(--amber)}
-.pbp .note{color:var(--dim);font-size:13px;padding-left:12px}
+.pbp .note{color:var(--dim);font-size:14px;padding-left:12px}
 .pbp .sc{font-family:var(--mono);font-size:12px;color:var(--good);margin-left:6px}
 .reveal{text-align:center;padding:28px 18px;border:3px solid var(--navy);border-radius:2px;background:var(--paper);box-shadow:6px 6px 0 var(--navy)}
 .reveal .w{font-family:var(--display);font-weight:900;font-size:clamp(40px,8vw,84px);line-height:1;text-transform:uppercase}
@@ -219,7 +219,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 @media (max-width:520px){.sta{width:80px}}
 .penlist{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;align-items:center;font-size:13px}
 .lued{display:flex;flex-direction:column;gap:4px;margin-top:6px}
-.lustat{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin:2px 0 2px 2px}
+.lustat{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin:2px 0 2px 2px}
 .lurow{display:grid;grid-template-columns:2.4em 2.4em minmax(0,1fr) auto;gap:6px;align-items:center;border-radius:3px}
 .lurow.picked{background:var(--panel2);outline:2px solid var(--amber)}
 .lunum{padding:5px 0;border-color:var(--line);font-weight:700}
@@ -1564,16 +1564,15 @@ function showDecision(){
     const c=q.cur;
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換代打嗎？',': pinch-hit?')}</h2>
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
+     ${q.tac?`<div style="margin-top:12px;padding:10px 12px;border:1.5px solid var(--rule);background:var(--panel2)"><div class="eyebrow">${TR('戰術（可以順便調整，選好再按下面的打者）','Tactics (change them if you like, then pick a batter below)')}</div>${tacticsPicker(G.tsel.t,'tq',q.team)}</div>`:''}
      <div class="optlist"><button class="opt" data-choose="keep">${TR(`讓 ${esc(c.name)} 打`,`Let ${esc(c.name)} hit`)} ${tag('keep')}<span class="hint">${c.pos} · ${TR('打擊率','AVG')} ${c.avg} · OPS ${c.ops} · ${TR('評價','Rating')} ${c.ovr} · ${TR('今天','today')} ${c.today}</span></button>
      ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('代打','Pinch-hit with')} ${esc(o.name)} ${tag(o.id)}<span class="hint">${o.pos} · ${TR('打擊率','AVG')} ${o.avg} · OPS ${o.ops} · ${TR('評價','Rating')} ${o.ovr}</span></button>`).join('')}</div>
-     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>
-     ${q.tac?`<details style="margin-top:10px" ${G.tsel.open?'open':''} id="phtac"><summary style="cursor:pointer;font-weight:700">${TR('同時調整戰術（選填）','Change tactics too (optional)')}</summary>${tacticsPicker(G.tsel.t,'tq',q.team)}<p class="hint" style="margin-top:6px">${TR('先調好戰術，再按上面的代打或不換人，會一起生效。','Set the tactics first, then pick above; both take effect together.')}</p></details>`:''}`;
+     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>`;
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
   if(NET.on)decCountdown(60,()=>submitDecision(q.suggest));
   // a pinch-hit answer carries the tactics too when the manager changed them
   box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(q.kind==='ph'&&q.tac&&G.tsel&&tacStr(G.tsel.t)!==q.tac?b.dataset.choose+'~'+tacStr(G.tsel.t):b.dataset.choose));
-  if($('#phtac'))$('#phtac').ontoggle=()=>{G.tsel.open=$('#phtac').open};
   // switching a choice only re-marks the buttons, so the online countdown keeps running
   box.querySelectorAll('[data-tq]').forEach(b=>b.onclick=()=>{const [,side,k]=b.dataset.tq.split(',');G.tsel.t={...G.tsel.t,[side]:k};
     box.querySelectorAll(`[data-tq^="${q.team},${side},"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));
@@ -1772,7 +1771,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ae5b622a6a';
+const BUILD='e20bade480';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1904,7 +1903,7 @@ async function openStats(){
     const row=(label,x,b)=>`<tr style="border-top:1px solid #c9c2a8;${b?'font-weight:900':''}"><td style="padding:4px 6px;white-space:nowrap">${label}</td>${cols.map(([k])=>`<td class="mono" style="padding:4px 6px;text-align:right">${(x[k]||0).toLocaleString()}</td>`).join('')}</tr>`;
     $('#stt').innerHTML=`<table style="border-collapse:collapse;font-size:13px;min-width:560px"><tr><th></th>${cols.map(([,l])=>`<th style="padding:4px 6px;text-align:right;font-size:12px">${l}</th>`).join('')}</tr>
       ${row(TR('累計','All time'),docs[0].exists?docs[0].data():{},true)}${days.map((d,i)=>row(`${d.slice(5,7)}/${d.slice(7)}`,docs[i+1].exists?docs[i+1].data():{})).join('')}</table>
-      <p class="hint" style="color:#4d6a5d;margin-top:8px">${TR('「上線」是當天打開網頁的瀏覽器數；「累計」那列的上線是所有天數加總。同一個人換手機或清除瀏覽器資料會被算成新玩家。','"Online" counts browsers that opened the page that day; in the all-time row it is the sum of all days. Someone on a new phone or with cleared browser data counts as a new player.')}</p>`;
+      <p class="hint" style="color:var(--dim);margin-top:8px">${TR('「上線」是當天打開網頁的瀏覽器數；「累計」那列的上線是所有天數加總。同一個人換手機或清除瀏覽器資料會被算成新玩家。','"Online" counts browsers that opened the page that day; in the all-time row it is the sum of all days. Someone on a new phone or with cleared browser data counts as a new player.')}</p>`;
   }catch(e){$('#stt').textContent=TR('統計載入失敗。','The statistics did not load.')}
 }
 
@@ -2333,9 +2332,9 @@ function openAcct(note){
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
    ${note?`<p style="font-weight:700">${esc(note)}</p>`:''}
    ${a.anon?`<h2>${TR('登入或註冊','Sign in or sign up')}</h2>
-    <p class="hint" style="color:#4d6a5d">${TR('登入後才能打排位賽，積分會記在帳號上，換手機也看得到。','Sign in to play ranked; your rating stays with your account on any device.')}</p>
+    <p class="hint" style="color:var(--dim)">${TR('登入後才能打排位賽，積分會記在帳號上，換手機也看得到。','Sign in to play ranked; your rating stays with your account on any device.')}</p>
     <button id="ggl" style="background:#fff;font-size:16px;padding:12px">🔵 ${TR('用 Google 登入','Continue with Google')}</button>
-    <p class="hint" style="color:#4d6a5d">${TR('在 LINE、FB 的內建瀏覽器裡 Google 登入可能被擋，請改用 Safari 或 Chrome 開啟。','Google sign-in may not work inside the LINE or Facebook app browser; open the page in Safari or Chrome.')}</p>
+    <p class="hint" style="color:var(--dim)">${TR('在 LINE、FB 的內建瀏覽器裡 Google 登入可能被擋，請改用 Safari 或 Chrome 開啟。','Google sign-in may not work inside the LINE or Facebook app browser; open the page in Safari or Chrome.')}</p>
     <div style="border-top:1px solid #c9c2a8;margin:4px 0"></div>
     <label style="color:var(--chalk)">Email<input id="ae" type="email" autocomplete="email" style="width:100%"></label>
     <label style="color:var(--chalk)">${TR('密碼（至少 6 個字元）','Password (6+ characters)')}<input id="ap" type="password" autocomplete="current-password" style="width:100%"></label>
@@ -2366,7 +2365,7 @@ async function openBoard(){
   try{
     const q=await NET.db.collection('players').orderBy('rating','desc').limit(30).get(),me=(acctUser()||{}).uid;
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:#4d6a5d">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
