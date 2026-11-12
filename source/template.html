@@ -2411,14 +2411,14 @@ function openAcct(note){
     <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>`}
    <p id="amsg" role="alert" style="color:#a8441a;font-weight:700"></p></div>`;
   document.body.appendChild(w);
-  const msg=t=>{$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
+  const msg=t=>{$('#amsg').style.color='';$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
   w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   const after=()=>{loadProfile().then(()=>{closeAcct();openAcct(TR('登入成功！取個暱稱就能打排位賽。','Signed in! Pick a nickname to play ranked.'));renderNetBox()})};
   if(a.anon){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
     $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
     $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').innerHTML=TR('重設密碼的信已經寄出（寄件人 noreply@mlbb-e98d2.firebaseapp.com）。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere firebaseapp</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','The reset email is on its way (from noreply@mlbb-e98d2.firebaseapp.com).<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere firebaseapp</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')}));
+    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere 密碼</code>（英文信就搜 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere password</code>），連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere password</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
