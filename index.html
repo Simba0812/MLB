@@ -18,21 +18,23 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: a hand-operated outfield scoreboard — green panels, chalk numerals, two team colors. Single dark look by choice. */
+/* Look: a vintage baseball program — cream paper, navy ink, red accents; tickets and a collectible card on the home page.
+   --chalk is the ink colour (the name is from the earlier dark scoreboard look), --paper the light surface. */
 :root{
-  --board:#0d3326; --panel:#14463a; --panel2:#1b5546; --line:#2c6b5a;
-  --chalk:#f1ede0; --dim:#a9c2b6; --amber:#f2b134; --sky:#7cc7ea; --red:#e0664f; --good:#7fd38a;
+  --board:#e6d9b6; --panel:#f6efdc; --panel2:#ece1c3; --line:#1d3557; --rule:#cbbd97; --paper:#fbf6e8;
+  --chalk:#1d2a3a; --dim:#6b6255; --amber:#b8561c; --sky:#2a6f97; --red:#c8342b; --good:#2f7d4f; --navy:#1d3557;
   --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --serif:"Noto Serif TC","Songti TC","PMingLiU",serif;
   --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  color-scheme:dark;
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 body{background:var(--board);color:var(--chalk);font-family:var(--body);font-size:15px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px;
-  background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 2px,transparent 2px 46px)}
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
 .wrap{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 /* draft screen: everything, bid box included, should fit one screen. render() tags .wrap with the screen
    (s-draft, s-pick, s-game) instead of :has(), which phones re-check on every update */
@@ -41,38 +43,61 @@ body{background:var(--board);color:var(--chalk);font-family:var(--body);font-siz
 .wrap.s-draft h1{font-size:clamp(26px,3vw,34px)}
 .wrap.s-draft h1 small{font-size:13px;margin-top:2px}
 .draft .panel{padding:12px 14px}
-header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--chalk);padding-bottom:10px}
-h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,58px);line-height:.95;margin:0;letter-spacing:.01em;text-transform:uppercase}
-h1 small{display:block;font-family:var(--body);font-size:15px;font-weight:500;color:var(--dim);letter-spacing:0;text-transform:none;margin-top:6px}
-h2{font-family:var(--display);font-weight:800;font-size:28px;margin:0;letter-spacing:.02em;text-transform:uppercase;text-wrap:balance}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:6px double var(--navy);padding-bottom:12px}
+h1{font-family:var(--serif);font-weight:900;font-size:clamp(32px,5.4vw,54px);line-height:1.05;margin:0;letter-spacing:.08em;color:var(--navy)}
+h1 small{display:table;font-family:var(--body);font-size:13px;font-weight:700;color:var(--paper);background:var(--red);letter-spacing:.22em;padding:3px 12px;margin-top:8px}
+h2{font-family:var(--serif);font-weight:900;font-size:26px;margin:0;letter-spacing:.04em;color:var(--navy);text-wrap:balance}
 h3{margin:0;font-size:16px;font-weight:700}
 .src{font-size:12px;color:var(--dim);text-align:right}
 .hdr-r{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .src a{color:var(--dim)}
-.panel{background:var(--panel);border:2px solid var(--line);border-radius:4px;padding:18px;min-width:0}
-.rankpanel{margin-bottom:20px;border-color:var(--tier,var(--amber));background:linear-gradient(135deg,var(--panel) 55%,rgba(240,180,41,.12))}
-.rankgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px 28px;align-items:center;margin-top:10px}
-.tierbadge{display:flex;align-items:center;gap:16px}
-.tierbadge .ico{font-size:clamp(52px,7vw,72px);line-height:1}
-.tierbadge .tn{font-family:var(--display);font-weight:900;font-size:clamp(34px,5vw,54px);line-height:.95;letter-spacing:.02em}
-.tierbadge .rt{font-family:var(--mono);font-size:15px;color:var(--dim);margin-top:6px}
-.tierbar{height:10px;border-radius:5px;background:var(--board);border:1px solid var(--line);overflow:hidden;margin-top:10px}
-.tierbar i{display:block;height:100%;background:var(--amber)}
-.ladder{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
-.ladder span{font-size:12.5px;padding:3px 9px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
-.ladder span.done{color:var(--chalk);border-color:var(--chalk)}
-.ladder span.cur{background:var(--amber);color:#10261d;border-color:var(--amber);font-weight:900}
-.rankgo{font-size:20px;padding:14px 26px}
+.panel{background:var(--panel);border:2.5px solid var(--line);border-radius:2px;padding:18px;min-width:0}
+.slogan{margin:-10px 0 0;font-family:var(--serif);font-weight:700;color:var(--navy);font-size:14px;letter-spacing:.2em}
+/* home: the player's card and the ranked panel */
+.hometop{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:28px;align-items:stretch}
+@media (max-width:760px){.hometop{grid-template-columns:1fr}.pcard{max-width:320px;margin:0 auto}}
+.pcard{background:linear-gradient(160deg,#dfe4e9,#a9b3bd 50%,#eef1f4);border-radius:16px;padding:11px;box-shadow:0 14px 28px rgba(60,40,10,.3);transform:rotate(-2deg);width:100%}
+.pcard .in{background:var(--paper);border-radius:10px;border:3px solid var(--navy);height:100%;padding:16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;gap:2px}
+.pcard .no{position:absolute;top:10px;left:10px;background:var(--navy);color:var(--paper);font-family:var(--display);font-weight:800;padding:1px 9px;border-radius:3px;font-size:15px;letter-spacing:.04em}
+.pcard .em{font-size:76px;line-height:1.25;height:1.25em;margin-top:auto;padding-top:26px;box-sizing:content-box;filter:drop-shadow(0 5px 5px rgba(0,0,0,.2))}
+.pcard .tn{font-family:var(--display);font-weight:900;font-size:58px;line-height:1.1;color:var(--tier,var(--navy));margin-top:10px}
+.pcard .nm{font-family:var(--serif);font-weight:900;font-size:21px;line-height:1.3;color:var(--navy);overflow-wrap:anywhere;margin-top:8px;padding-bottom:14px}
+.pcard .st{display:grid;grid-template-columns:repeat(4,1fr);width:100%;margin-top:auto;border-top:2px solid var(--navy);padding-top:10px;gap:2px}
+.pcard .st b{display:block;font-family:var(--mono);font-size:19px;color:var(--red)}.pcard .st span{font-size:12px;color:var(--dim)}
+.rankpanel{background:var(--panel);border:3px solid var(--navy);box-shadow:8px 8px 0 var(--navy);padding:22px 26px;display:flex;flex-direction:column;min-width:0}
+.rankpath{display:flex;align-items:flex-start;margin:22px 0 6px;overflow-x:auto;padding:6px 2px}
+.rankpath .node{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;width:62px;font-size:12.5px;font-weight:700;color:var(--dim);text-align:center}
+.rankpath .c{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:var(--panel2);border:2.5px solid #b8aa86}
+.rankpath .done{color:var(--navy)}.rankpath .done .c{border-color:var(--navy);background:#fff}
+.rankpath .cur{color:var(--red)}.rankpath .cur .c{width:54px;height:54px;font-size:29px;margin-top:-6px;border:3px solid var(--red);background:#fff;box-shadow:0 0 0 5px rgba(200,52,43,.15)}
+.rankpath .seg{flex:1;min-width:14px;height:4px;background:#c9bb96;margin-top:19px;border:0;border-radius:0}.rankpath .seg.done{background:var(--navy)}
+.tierbar{height:16px;border:2.5px solid var(--navy);background:var(--panel2);margin-top:8px}
+.tierbar i{display:block;height:100%;background:repeating-linear-gradient(45deg,var(--navy) 0 8px,#2c4a75 8px 16px)}
+.rankline{display:flex;justify-content:space-between;gap:6px 16px;flex-wrap:wrap;margin-top:8px;font-family:var(--mono);font-size:14px;color:var(--navy)}
+.rankline b.r{color:var(--red);font-size:19px}
+.rankgo{font-family:var(--serif);font-weight:900;font-size:22px;letter-spacing:.15em;padding:13px 30px;box-shadow:5px 5px 0 var(--navy)}
+/* the three ways to play, as tickets */
+@media (max-width:520px){.rankpath .node{width:38px;font-size:10.5px}.rankpath .c{width:30px;height:30px;font-size:16px}
+  .rankpath .cur .c{width:40px;height:40px;font-size:22px;margin-top:-5px}.rankpath .seg{min-width:4px;margin-top:13px}.rankpanel{padding:18px 16px;box-shadow:5px 5px 0 var(--navy)}}
+.ticket{display:flex;padding:0;overflow:hidden}
+.ticket .stub{flex:none;width:58px;background:var(--navy);color:var(--paper);writing-mode:vertical-rl;text-align:center;font-family:var(--display);font-weight:800;letter-spacing:.25em;font-size:17px;padding:12px 0;border-right:3px dashed var(--paper)}
+.ticket .tbody{padding:18px 20px;flex:1;min-width:0}
+.statline{text-align:center;font-family:var(--mono);color:var(--navy);font-size:14px;margin:0;border-top:2px solid var(--navy);padding-top:12px}
+.statline button{padding:2px 10px;margin-left:6px}
+.disc{display:flex;gap:16px;align-items:center;border:2px dashed var(--navy);padding:14px 18px;background:rgba(255,255,255,.35)}
+.disc .stamp{flex:none;width:80px;height:80px;border-radius:50%;border:3px solid var(--red);color:var(--red);display:grid;place-items:center;text-align:center;font-family:var(--serif);font-weight:900;font-size:14px;line-height:1.2;transform:rotate(-12deg)}
+.disc p{margin:0;font-size:13px;line-height:1.75;color:#3d3a33}.disc b{color:var(--navy)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--dim)}
-input,select{font:inherit;color:var(--chalk);background:var(--board);border:2px solid var(--line);border-radius:3px;padding:8px 10px;min-width:0}
+input,select{font:inherit;color:var(--chalk);background:var(--paper);border:2px solid var(--line);border-radius:2px;padding:8px 10px;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
-button{font:inherit;font-weight:700;cursor:pointer;border:2px solid var(--chalk);background:transparent;color:var(--chalk);padding:9px 16px;border-radius:3px}
-button.solid{background:var(--chalk);color:var(--board)}
-button.a{border-color:var(--amber);color:var(--amber)} button.a.solid{background:var(--amber);color:#1d1606}
-button.b{border-color:var(--sky);color:var(--sky)} button.b.solid{background:var(--sky);color:#06202c}
+button{font:inherit;font-weight:700;cursor:pointer;border:2px solid var(--navy);background:transparent;color:var(--navy);padding:9px 16px;border-radius:2px}
+button.solid{background:var(--red);border-color:var(--red);color:var(--paper);box-shadow:3px 3px 0 var(--navy)}
+button.solid:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--navy)}
+button.a{border-color:var(--amber);color:var(--amber)} button.a.solid{background:var(--amber);border-color:var(--amber);color:var(--paper)}
+button.b{border-color:var(--sky);color:var(--sky)} button.b.solid{background:var(--sky);border-color:var(--sky);color:var(--paper)}
 button:disabled{opacity:.35;cursor:not-allowed}
-button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
+button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;background:rgba(255,255,255,.35)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .ta{color:var(--amber)} .tb{color:var(--sky)}
 .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700}
@@ -88,22 +113,22 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .slotpick select{padding:4px 8px}
 .slots{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;font-size:12.5px;line-height:1.4;margin-top:8px}
 .slots .k{font-family:var(--mono);color:var(--dim)} .slots .v{min-width:0;overflow-wrap:anywhere} .slots .p{font-family:var(--mono);color:var(--dim);text-align:right}
-.slots .empty{color:#6f9686}
+.slots .empty{color:#a3977a}
 .slots .pv{all:unset;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px} .slots .pv:hover,.slots .pv:focus-visible{color:var(--amber)}
-#emobtn{position:fixed;right:14px;bottom:14px;z-index:40;width:52px;height:52px;border-radius:50%;font-size:24px;padding:0;background:var(--amber);color:#10261d;border:0;box-shadow:0 4px 14px rgba(0,0,0,.35)}
-#emopal{position:fixed;right:14px;bottom:76px;z-index:40;background:var(--chalk);color:#10261d;border-radius:8px;padding:10px;width:min(300px,calc(100vw - 28px));box-shadow:0 6px 20px rgba(0,0,0,.4);display:flex;flex-wrap:wrap;gap:6px}
+#emobtn{position:fixed;right:14px;bottom:14px;z-index:40;width:52px;height:52px;border-radius:50%;font-size:24px;padding:0;background:var(--red);color:var(--paper);border:2.5px solid var(--navy);box-shadow:3px 3px 0 var(--navy)}
+#emopal{position:fixed;right:14px;bottom:76px;z-index:40;background:var(--paper);border:2px solid var(--navy);color:var(--chalk);border-radius:8px;padding:10px;width:min(300px,calc(100vw - 28px));box-shadow:0 6px 20px rgba(0,0,0,.4);display:flex;flex-wrap:wrap;gap:6px}
 #emopal button{background:#fff;color:#10261d;border:1.5px solid #c9c2a8;border-radius:16px;padding:4px 10px;font-weight:700}
 #emopal button.e{font-size:22px;padding:2px 8px}
-.emobub{position:fixed;left:50%;transform:translateX(-50%);z-index:45;background:var(--chalk);color:#10261d;border-radius:20px;padding:8px 16px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.4);animation:emoin .25s ease,emoout .4s ease 3.1s forwards;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+.emobub{position:fixed;left:50%;transform:translateX(-50%);z-index:45;background:var(--paper);border:2px solid var(--navy);color:var(--chalk);border-radius:20px;padding:8px 16px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.4);animation:emoin .25s ease,emoout .4s ease 3.1s forwards;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
 .emobub .big{font-size:26px;vertical-align:middle}
 @keyframes emoin{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 @keyframes emoout{to{opacity:0;transform:translate(-50%,-10px)}}
-#pvwrap{position:fixed;inset:0;z-index:50;background:rgba(5,20,14,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+#pvwrap{position:fixed;inset:0;z-index:50;background:rgba(29,42,58,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 #pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto}
-#pvwrap .pvx{align-self:flex-end;background:#10261d;color:var(--chalk);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
+#pvwrap .pvx{align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
-.card{background:var(--chalk);color:#10261d;border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;transform-origin:50% 50%}
+.card{background:var(--paper);color:var(--chalk);border:2.5px solid var(--navy);box-shadow:5px 5px 0 var(--navy);border-radius:4px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;transform-origin:50% 50%}
 .card.flip{animation:flip .6s ease}
 @keyframes flip{from{transform:rotateY(90deg);opacity:.2}to{transform:rotateY(0);opacity:1}}
 @media (prefers-reduced-motion:reduce){.card.flip{animation:none}}
@@ -111,7 +136,7 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .card .name{font-family:var(--display);font-weight:900;font-size:clamp(26px,3vw,38px);line-height:.95;text-transform:uppercase}
 .card .zh{font-size:17px;font-weight:900}
 .card .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px}
-.pos{display:inline-block;background:#10261d;color:var(--chalk);font-family:var(--mono);font-weight:600;padding:2px 8px;border-radius:2px}
+.pos{display:inline-block;background:var(--navy);color:var(--paper);font-family:var(--mono);font-weight:600;padding:2px 8px;border-radius:2px}
 .ovr{margin-left:auto;font-family:var(--display);font-weight:900;font-size:34px;line-height:1;text-align:right}
 .ovr span{display:block;font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.1em;color:#4d6a5d}
 .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:4px}
@@ -128,14 +153,14 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .legend{display:inline-flex;gap:8px;flex-wrap:wrap;margin-left:8px;letter-spacing:0;text-transform:none;font-weight:500}
 .legend span{display:inline-flex;align-items:center;gap:4px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:2px;border:3px solid}
-.spopt{flex-direction:row;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line);cursor:pointer;color:var(--chalk);font-size:14px}
+.spopt{flex-direction:row;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--rule);cursor:pointer;color:var(--chalk);font-size:14px}
 .spopt .spn{flex:1;min-width:8em;font-weight:700}
 .spopt:has(input:disabled){opacity:.45;cursor:not-allowed}
 .statlabel{font-size:10.5px;letter-spacing:.1em;margin-top:2px;font-weight:700;color:#4d6a5d;text-transform:uppercase}
-.facedown{background:repeating-linear-gradient(45deg,#1b5546 0 12px,#174c3e 12px 24px);border:2px dashed var(--line);border-radius:6px;min-height:340px;display:grid;place-items:center;text-align:center;padding:20px}
-.facedown .q{font-family:var(--display);font-size:120px;font-weight:900;line-height:1;color:var(--line)}
+.facedown{background:repeating-linear-gradient(45deg,#1d3557 0 12px,#264573 12px 24px);border:2px dashed var(--paper);color:var(--paper);border-radius:6px;min-height:340px;display:grid;place-items:center;text-align:center;padding:20px}
+.facedown .q{font-family:var(--display);font-size:120px;font-weight:900;line-height:1;color:rgba(251,246,232,.35)}
 /* the bid box stays on screen even when a long card pushes it down */
-.bidbox{display:flex;flex-direction:column;gap:8px;margin-top:8px;position:sticky;bottom:0;z-index:5;box-shadow:0 -6px 16px rgba(0,0,0,.35)}
+.bidbox{display:flex;flex-direction:column;gap:8px;margin-top:8px;position:sticky;bottom:0;z-index:5;box-shadow:0 -6px 16px rgba(29,42,58,.18)}
 .price{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .price .big{font-family:var(--display);font-weight:900;font-size:40px;line-height:1}
 .turn{font-weight:700}
@@ -145,33 +170,33 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 /* game */
 .linescore{overflow-x:auto}
 .linescore table{border-collapse:collapse;font-family:var(--mono);font-variant-numeric:tabular-nums;min-width:100%}
-.linescore th,.linescore td{padding:6px 8px;text-align:center;border:1px solid var(--line);min-width:34px}
+.linescore th,.linescore td{padding:6px 8px;text-align:center;border:1px solid var(--rule);min-width:34px}
 .linescore td.tn{text-align:left;font-family:var(--body);font-weight:700;white-space:nowrap}
 .linescore th{color:var(--dim);font-weight:400;font-size:12px}
 .linescore td.tot{font-weight:600;background:var(--panel2)}
-.pbp{background:var(--board);border:2px solid var(--line);border-radius:4px;padding:14px;max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:15px}
-.pbp .half{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.03em;margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}
+.pbp{background:var(--paper);border:2px solid var(--line);border-radius:4px;padding:14px;max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.pbp .half{font-family:var(--serif);font-weight:900;font-size:20px;color:var(--navy);letter-spacing:.03em;margin-top:12px;padding-top:8px;border-top:1px solid var(--rule)}
 .pbp .half:first-child{margin-top:0;border-top:0}
 .pbp .pa{padding-left:12px;border-left:3px solid transparent}
 .pbp .pa.run{border-left-color:var(--good)}
 .pbp .pa.hr{border-left-color:var(--red);font-weight:700}
 .pbp .note{color:var(--dim);font-size:13px;padding-left:12px}
 .pbp .sc{font-family:var(--mono);font-size:12px;color:var(--good);margin-left:6px}
-.reveal{text-align:center;padding:28px 18px;border:3px solid var(--chalk);border-radius:4px;background:var(--panel2)}
+.reveal{text-align:center;padding:28px 18px;border:3px solid var(--navy);border-radius:2px;background:var(--paper);box-shadow:6px 6px 0 var(--navy)}
 .reveal .w{font-family:var(--display);font-weight:900;font-size:clamp(40px,8vw,84px);line-height:1;text-transform:uppercase}
 .reveal.flash{animation:pop .7s ease}
 @keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){.reveal.flash{animation:none}}
 .box{overflow-x:auto}
 .box table{border-collapse:collapse;width:100%;font-size:13px}
-.box th,.box td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.box th,.box td{padding:4px 6px;border-bottom:1px solid var(--rule);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .box th:first-child,.box td:first-child{text-align:left;font-family:var(--body)}
 .box th{color:var(--dim);font-weight:400}
 .lineup{display:grid;grid-template-columns:auto auto 1fr auto;gap:2px 10px;font-size:14px}
 .lineup .k{font-family:var(--mono);color:var(--dim)}
 .seg{display:inline-flex;border:2px solid var(--line);border-radius:3px;overflow:hidden}
 .seg button{border:0;border-radius:0;padding:6px 12px;font-weight:500;color:var(--dim)}
-.seg button[aria-pressed="true"]{background:var(--chalk);color:var(--board);font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--paper);font-weight:700}
 .panel.soon{border-style:dashed;opacity:.75}
 .lobbybar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .lobbybar #lobbyask{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-weight:700}
@@ -185,16 +210,17 @@ button.ghost{border-color:var(--line);color:var(--dim);font-weight:500}
 .follow{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--panel2);border-top:3px solid var(--amber);
   padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));font-weight:700}
 .waiting{color:var(--dim);font-weight:500}
-.sta{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--board);border:1px solid var(--line);overflow:hidden;vertical-align:middle}
+.sta{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;vertical-align:middle}
 .sta i{display:block;height:100%}
 .stan{font-size:12px;color:var(--dim);min-width:3.2em}
 @media (max-width:520px){.sta{width:80px}}
 .penlist{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;align-items:center;font-size:13px}
 .lued{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.lustat{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin:2px 0 2px 2px}
 .lurow{display:grid;grid-template-columns:2.4em 2.4em minmax(0,1fr) auto;gap:6px;align-items:center;border-radius:3px}
 .lurow.picked{background:var(--panel2);outline:2px solid var(--amber)}
 .lunum{padding:5px 0;border-color:var(--line);font-weight:700}
-.lurow.picked .lunum{background:var(--amber);color:#1d1606;border-color:var(--amber)}
+.lurow.picked .lunum{background:var(--amber);color:var(--paper);border-color:var(--amber)}
 .lurow select{padding:5px 6px;font-size:13px}
 .lupos{color:var(--amber)}
 .warn{font-size:12px;color:var(--red);white-space:nowrap}
@@ -1170,7 +1196,7 @@ function simGame(away,home,ctx){
         }
         // stolen base attempt
         if(bases[0]&&!bases[1]&&outs<2){const r=bases[0];const att=clamp(r.r.sbr*3.2*tf(to,'off','steal')*tf(to,'run','steal'),0,.45);
-          if(rnd()<att){ if(rnd()<.76+((r.spd||27)-27)*.04-(tf(to,'run','steal')>1?.04:0)){bases[1]=r;bases[0]=null;say(TR(`${nm(r)} 起跑盜二壘，成功！`,`${nm(r)} takes off for second: safe!`))} else {bases[0]=null;outs++;s.cur.outs++;pbox(dt).outs++;say(TR(`${nm(r)} 盜壘被捕手 ${nm(s.field.C||{n:''})} 阻殺。${outs}出局。`,`${nm(r)} is thrown out stealing by catcher ${nm(s.field.C||{n:''})}. ${outs} out${outs>1?'s':''}.`)); if(outs>=3)break;}}}
+          if(rnd()<att){ if(rnd()<.76+((r.spd||27)-27)*.04-(tf(to,'run','steal')>1?.04:0)){bases[1]=r;bases[0]=null;say(TR(`🏃 ${nm(r)} 起跑盜二壘，成功！`,`🏃 ${nm(r)} takes off for second: safe!`))} else {bases[0]=null;outs++;s.cur.outs++;pbox(dt).outs++;say(TR(`🚫 ${nm(r)} 盜壘被捕手 ${nm(s.field.C||{n:''})} 阻殺。${outs}出局。`,`🚫 ${nm(r)} is thrown out stealing by catcher ${nm(s.field.C||{n:''})}. ${outs} out${outs>1?'s':''}.`)); if(outs>=3)break;}}}
         const p=s.cur.p, tt=Math.floor(s.cur.bf/9), sta=curSta(s.cur);
         const fat=1+.04*Math.max(0,tt-1)+Math.max(0,40-sta)/100*.6;   // tiring below 40% strength
         const pr=paProbs(h,p,park,fat,defAt(dt,'C'),to,tp);
@@ -1202,7 +1228,7 @@ function simGame(away,home,ctx){
           if(bases[1]){if(rnd()<.58+.12*spd+(outs===2?.2:0)+send){if(send>0&&rnd()<.08){outs++;s.cur.outs++;pb.outs++;cut=true}else score(bases[1],bb)}else bases[2]=bases[1];bases[1]=null}
           if(bases[0]){if(!bases[2]&&rnd()<.27+.1*spd+send*.5)bases[2]=bases[0];else bases[1]=bases[0];bases[0]=null}
           bases[0]=h;
-          if(flip==='boot') say(TR(`${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`));
+          if(flip==='boot') say(TR(`😬 ${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`😬 ${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`));
           else if(DIRZH[fpos]) say(pick(TR([`${B} 擊出${DIRZH[fpos]}方向的平飛球，一壘安打。`,`${B} 輕巧一推，${DIRZH[fpos]}前一壘安打。`],[`${B} lines a single to ${DIRZH[fpos]}.`,`${B} pokes a single into ${DIRZH[fpos]}.`])));
           else say(pick(TR([`${B} 敲出穿越${fielder(dt,fpos)}身邊的滾地安打。`,`${B} 打成${POSZH[fpos]}前的內野高彈跳，跑出內野安打。`],[`${B} rips a grounder past ${fielder(dt,fpos)} for a single.`,`${B} chops a high bouncer in front of the ${POSZH[fpos]} and beats it out.`])));
           if(cut){ev[ev.length-1].t+=TR(` 二壘跑者衝本壘，被傳殺出局！${outs}出局。`,` The runner from second is sent and thrown out at the plate! ${outs} out${outs>1?'s':''}.`);ev[ev.length-1].t3=outs>=3}}
@@ -1226,7 +1252,7 @@ function simGame(away,home,ctx){
           const who=fielder(dt,fpos), rob=flip==='rob';
           if(otype==='g'){
             const d=defAt(dt,fpos);
-            if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`));}
+            if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`❗ ${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`❗ ${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`));}
             else if(bases[0]&&outs<2&&rnd()<.5-.08*spd+(defAt(dt,'SS')+defAt(dt,'2B'))*.003){outs+=2;s.cur.outs+=2;pb.outs+=2;
               if(outs<3){if(bases[2]&&rnd()<.5){score(bases[2],null);bases[2]=null} if(bases[1]&&!bases[2]){bases[2]=bases[1];bases[1]=null}}
               bases[0]=null; say(TR(`${B} 擊出${POSZH[fpos]}方向滾地球，${who} 起手，形成雙殺！${outs>=3?'三出局。':''}`,`${B} grounds to the ${POSZH[fpos]}; ${who} starts the double play!${outs>=3?' Inning over.':''}`));ev[ev.length-1].t3=outs>=3;}
@@ -1342,9 +1368,14 @@ function ensureLued(g){
 }
 function lineupEditor(i){
   const lu=LUED[i],hit=teamHitters(i).map(r=>r.p),byId=new Map(hit.map(p=>[sid(p.id),p]));
+  // season line, and the line so far in this series (games already played against this opponent)
+  const g=S.game?S.game.gnum:0,ser=g>0?new Map(seriesStats(g)[i].bat.map(a=>[sid(a.p.id),a])):null;
+  const f3s=v=>v==null?'—':v.toFixed(3).replace(/^0/,'');
+  const line=p=>{const a=ser&&ser.get(sid(p.id));
+    return `<div class="lustat">${TR('本季','Season')} ${esc(String(p.avg))} / ${esc(String(p.ops))}${ser?` · ${TR('本系列','Series')} ${a&&a.ab?`${f3s(a.avg)} / ${f3s(a.ops)} <span style="opacity:.75">(${a.h}-${a.ab})</span>`:'—'}`:''}</div>`};
   const rows=lu.map((x,r)=>{const p=byId.get(sid(x.id)),alt=x.pos!=='DH'&&p.pos!==x.pos&&(p.alt||[]).includes(x.pos),off=x.pos!=='DH'&&p.pos!==x.pos&&!alt;
     return `<div class="lurow ${LUPICK&&LUPICK[0]===i&&LUPICK[1]===r?'picked':''}"><button class="lunum mono" data-pick="${i},${r}" aria-label="${TR(`第 ${r+1} 棒，點選後再點另一棒互換`,`Batting ${ord(r+1)}: tap, then tap another spot to swap`)}">${r+1}</button><span class="mono lupos">${x.pos}</span>
-      <select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>
+      <div style="min-width:0"><select data-lu="${i},${r}" aria-label="${TR(`第 ${r+1} 棒`,`Batting ${ord(r+1)}`)}" style="width:100%">${hit.map(h=>`<option value="${h.id}" ${sid(h.id)===sid(x.id)?'selected':''}>${esc(nm(h))} (${posTag(h)} · ${ovr(h)})${lu.some(y=>sid(y.id)===sid(h.id))?'':TR(' 替補',' bench')}</option>`).join('')}</select>${line(p)}</div>
       ${off?`<span class="warn">${TR('非本守位','out of position')}</span>`:alt?`<span class="hint">${TR('副守位','secondary')}</span>`:'<span></span>'}</div>`}).join('');
   return `<div class="eyebrow" style="margin-top:14px">${TR('打序與守位','Batting order and positions')}</div><div class="lued">${rows}</div>
     <p class="hint" style="margin-top:6px">${TR('點一個棒次的號碼，再點另一個，兩人就會互換棒次。在下拉選單選板凳球員會換他上場；選打線上的球員，兩人會互換守位。放到副守位（上季在那裡守滿 30 場，中職是 150 局），用他在那個位置的真實守備數據；放到沒守過的位置，守備會差很多。','Tap one batting number, then another, to swap their spots. Picking a bench player in a menu puts him in; picking someone already in the lineup swaps their positions. At a secondary position (30+ games there last season; 150+ innings in the CPBL) he fields as his numbers there say; anywhere else, much worse.')}</p>
@@ -1677,7 +1708,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ab5f3f3004';
+const BUILD='0a5a8f5ec5';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1903,8 +1934,8 @@ const ELO_K=100,ELO_SCALE=1250;   // Elo with bigger steps: an even game is wort
 const eloLoss=(me,opp)=>Math.round(ELO_K/(1+Math.pow(10,(opp-me)/ELO_SCALE)));
 const PROF={doc:null,loaded:false};
 // ranked tiers by rating; everyone starts at 1000, in the rookie league
-const TIERS=[[0,'🌱','新人聯盟','Rookie League','#8fd694'],[1500,'🥉','1A','Single-A','#d99a5b'],[2000,'🥈','2A','Double-A','#c9d1d9'],[2500,'🥇','3A','Triple-A','#f0c040'],
-  [3000,'🏟️','大聯盟','Major League','#7cc4ff'],[3500,'⭐','明星','All-Star','#ffd84d'],[4000,'🏛️','名人堂','Hall of Fame','#d7a8ff']];
+const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1500,'🥉','1A','Single-A','#a8642a'],[2000,'🥈','2A','Double-A','#6b7a89'],[2500,'🥇','3A','Triple-A','#b8860b'],
+  [3000,'🏟️','大聯盟','Major League','#2a6f97'],[3500,'⭐','明星','All-Star','#c99a1e'],[4000,'🏛️','名人堂','Hall of Fame','#7b4fa0']];
 const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
 const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);
@@ -2149,14 +2180,20 @@ async function firebaseBackend(cfg){
 /* ---------- home + room screens ---------- */
 function renderHome(){
   S.rankAI=null;
+  const ticket=(stub,body)=>`<section class="ticket"><div class="stub">${stub}</div><div class="tbody">${body}</div></section>`;
   $('#app').innerHTML=`${header()}
-  ${window.OFFLINE?'':'<section class="panel rankpanel" id="rankbox" hidden></section>'}
-  <div class="grid2">
+  <p class="slogan">${TR('純粹好玩的粉絲作品 · 不賭博 · 不收費 · 不營利','A just-for-fun fan project · no gambling · free · non-profit')}</p>
+  ${window.OFFLINE?'':'<div class="hometop" id="rankbox" hidden></div>'}
+  <div class="grid2 tickets">
    <section class="panel"><h2>${TR('單人對戰','Single player')}</h2><p class="hint" style="margin-top:6px">${TR('你和電腦競標、交易，再模擬對戰。電腦會依球員評價、缺的位置和剩下的預算出價。','Bid and trade against the computer, then play the games. The computer bids by rating, the positions it needs and the budget it has left.')}</p><button class="solid" id="solo" style="margin-top:14px">${TR('開始','Start')}</button></section>
    <section class="panel"><h2>${TR('同一台輪流玩','Same device')}</h2><p class="hint" style="margin-top:6px">${TR('兩個人用同一台電腦或手機，輪流出價、輪流選先發。','Two people share one computer or phone and take turns.')}</p><button class="solid" id="local" style="margin-top:14px">${TR('開始','Start')}</button></section>
    ${window.OFFLINE?`<section class="panel soon"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('和朋友各用自己的裝置連線對戰，敬請期待。','Play a friend from your own devices. Coming soon.')}</p><button disabled style="margin-top:14px">${TR('敬請期待','Coming soon')}</button></section>`:`<section class="panel"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('你和朋友各用自己的裝置，同步看到同一場選秀和比賽，輪到誰誰才能出手。','You and a friend each use your own device and see the same draft and games; only the player whose turn it is can act.')}${window.STANDALONE?TR('把網址和房號傳給朋友就能一起玩，不用註冊。',' Send your friend the link and room code; no sign-up needed.'):TR('朋友需要登入 claude.ai，並被你從 Share 選單加為可以編輯的成員。',' Your friend needs a claude.ai account and Editor access from the Share menu.')}</p><div id="netbox" style="margin-top:14px"></div></section>`}
   </div>
-  <p class="hint" id="statline" style="margin-top:14px"></p>`;
+  <p class="statline" id="statline"></p>
+  <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
+  // the three ways to play are drawn as tickets: a stub on the left, the details on the right
+  document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub">${['SOLO','2 P','ONLINE'][i]}</div>`);
+    const st=p.firstElementChild,rest=[...p.children].slice(1),b=document.createElement('div');b.className='tbody';rest.forEach(x=>b.appendChild(x));p.appendChild(b)});
   statLine();
   $('#local').onclick=()=>{S.ai=null;S.screen='setup';render()};
   $('#solo').onclick=()=>{S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.teams[1].park=Math.floor(Math.random()*PARKS.length);S.screen='setup';render()};
@@ -2184,29 +2221,32 @@ function renderNetBox(){
 function renderRankBox(){
   const box=$('#rankbox');if(!box)return;
   if(NET.status!=='ready'||!NET.acct){box.hidden=true;return}
-  box.hidden=false;box.style.setProperty('--tier',PROF.doc?TIERS[tierIdx(PROF.doc.rating)][4]:'');
-  if(!PROF.loaded){box.innerHTML=`<h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('讀取你的牌位…','Loading your tier…')}</p>`;
+  box.hidden=false;
+  if(!PROF.loaded){box.innerHTML=`<div></div><section class="rankpanel"><h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('讀取你的牌位…','Loading your tier…')}</p></section>`;
     loadProfile().then(()=>{if(S.screen==='home')renderRankBox()},()=>{});return}
-  const a=acctUser(),p=PROF.doc,ti=p?tierIdx(p.rating):0;
-  const ladder=`<div class="ladder" aria-label="${TR('牌位','Tiers')}">${TIERS.map((t,i)=>`<span class="${i<ti?'done':i===ti&&p?'cur':''}">${t[1]} ${TR(t[2],t[3])} <span class="mono" style="border:0;padding:0;color:inherit">${t[0]||1000}</span></span>`).join('')}</div>`;
-  const leagues=`<div class="row" style="gap:6px 14px;margin-top:12px"><span class="eyebrow">${TR('排位聯盟','Leagues')}</span>${['MLB','CPBL'].map(k=>`<label class="slotpick"><input type="checkbox" data-rklg="${k}" ${RK_LG.includes(k)?'checked':''}> ${k==='MLB'?TR('大聯盟','MLB'):TR('中職','CPBL')}</label>`).join('')}</div>`;
+  const a=acctUser(),p=PROF.doc,ti=p?tierIdx(p.rating):-1,T=TIERS[Math.max(0,ti)];
+  box.style.setProperty('--tier',T[4]);
+  // the tier path: done tiers in navy, the current one ringed in red
+  const path=`<div class="rankpath" aria-label="${TR('牌位','Tiers')}">${TIERS.map((t,i)=>`${i?`<div class="seg ${i<=ti?'done':''}"></div>`:''}<div class="node ${i<ti?'done':i===ti?'cur':''}"><div class="c">${t[1]}</div>${i?TR(t[2],t[3]):TR('新人','Rookie')}</div>`).join('')}</div>`;
+  const leagues=`<span class="row" style="gap:6px 12px">${['MLB','CPBL'].map(k=>`<label class="slotpick" style="font-weight:700;color:var(--navy)"><input type="checkbox" data-rklg="${k}" ${RK_LG.includes(k)?'checked':''}> ${k==='MLB'?TR('大聯盟','MLB'):TR('中職','CPBL')}</label>`).join('')}</span>`;
+  const played=p?p.wins+p.losses:0,rate=played?Math.round(p.wins/played*100):0;
+  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}</div>
+      <div class="st"><div><b>${p.wins}</b><span>${TR('勝','W')}</span></div><div><b>${p.losses}</b><span>${TR('敗','L')}</span></div><div><b>${played?rate+'%':'—'}</b><span>${TR('勝率','Win %')}</span></div><div><b>${p.streak>=2?'🔥'+p.streak:p.streak||0}</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`
+    :`<div class="pcard"><div class="in"><span class="no">No. ????</span><div class="em" style="opacity:.35">⚾</div><div class="tn" style="font-size:40px">${TR('你的球員卡','Your card')}</div><div class="nm" style="font-size:15px;font-weight:700;color:var(--dim)">${!a||a.anon?TR('登入後就會發一張給你','Sign in to get yours'):TR('取個暱稱就能拿到','Pick a nickname to get it')}</div>
+      <div class="st"><div><b>—</b><span>${TR('勝','W')}</span></div><div><b>—</b><span>${TR('敗','L')}</span></div><div><b>—</b><span>${TR('勝率','Win %')}</span></div><div><b>—</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`;
+  let body;
   if(!p){
-    box.innerHTML=`<div class="eyebrow">${TR('排位賽','Ranked')}</div>
-     <div class="rankgrid"><div><div class="tierbadge"><span class="ico">🏆</span><div><div class="tn">${TR('排位賽','Ranked')}</div><div class="rt">${TR('從新人聯盟一路打上名人堂','From the rookie league to the Hall of Fame')}</div></div></div>${ladder}</div>
-      <div><p>${TR('和真人對戰贏積分、升牌位；固定規則：單場決勝 · 先發 4・中繼 4・終結者 2・板凳 2。','Win rating points against real players and climb the tiers. Fixed rules: one game · SP 4 · RP 4 · CL 2 · bench 2.')}</p>
-       <div class="row" style="margin-top:12px"><button class="solid rankgo" id="rkgo">${!a||a.anon?TR('登入開始排位','Sign in to play ranked'):TR('取暱稱開始排位','Pick a nickname to start')}</button><button class="ghost" id="lb">📊 ${TR('排行榜','Leaderboard')}</button></div></div></div>`;
+    body=`<h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
+      <div class="row" style="margin-top:auto;padding-top:16px"><button class="solid rankgo" id="rkgo">${!a||a.anon?TR('登入開始排位','Sign in to play'):TR('取暱稱開始排位','Pick a nickname')}</button><button id="lb">📊 ${TR('排行榜','Leaderboard')}</button></div>`;
   }else{
-    const next=TIERS[ti+1],lo=TIERS[ti][0]||1000,pct=next?Math.max(0,Math.min(100,(p.rating-lo)/(next[0]-lo)*100)):100,left=aiLeft(p);
-    box.innerHTML=`<div class="row" style="justify-content:space-between"><div class="eyebrow">${TR('排位賽','Ranked')} · 👤 ${esc(p.name)}</div><div class="row" style="gap:8px"><button class="ghost" id="lb" style="padding:4px 10px">📊 ${TR('排行榜','Leaderboard')}</button><button class="ghost" id="acct" style="padding:4px 10px">${TR('帳號','Account')}</button></div></div>
-     <div class="rankgrid"><div>
-       <div class="tierbadge"><span class="ico">${TIERS[ti][1]}</span><div><div class="tn" style="color:${TIERS[ti][4]}">${TR(TIERS[ti][2],TIERS[ti][3])}</div><div class="rt">${TR('積分','Rating')} <b style="color:var(--chalk);font-size:20px">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</div></div></div>
-       <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%;background:${TIERS[ti][4]}"></i></div>
-       <p class="hint" style="margin-top:6px">${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} points to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier reached!')}</p>
-       ${ladder}</div>
-      <div><button class="solid rankgo" id="rkgo">🏆 ${TR('開始排位','Play ranked')}</button>
-       ${leagues}
-       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50，連勝再加分；配不到人可以打電腦排位（±25','An even win is +50 with a streak bonus on top; if nobody is around, play the computer for rating (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p></div></div>`;
+    const next=TIERS[ti+1],lo=T[0]||1000,pct=next?Math.max(0,Math.min(100,(p.rating-lo)/(next[0]-lo)*100)):100,left=aiLeft(p);
+    body=`<h2>🏆 ${TR('排位賽','Ranked')}</h2><p class="hint" style="margin-top:6px">${TR('和真人單場決勝，贏積分、爬牌位。先發 4・中繼 4・終結者 2・板凳 2。','One game against a real player: win points and climb the tiers. SP 4 · RP 4 · CL 2 · bench 2.')}</p>${path}
+      <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+      <div class="rankline"><span>${TR('積分','Rating')} <b class="r">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)} · ${TR('勝率','win')} ${played?rate+'%':'—'}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</span><span>${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier!')}</span></div>
+      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="acct">${TR('帳號','Account')}</button></div>
+      <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50，連勝再加分；配不到人可以打電腦排位（±25','An even win is +50 plus a streak bonus; if nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
+  box.innerHTML=card+`<section class="rankpanel">${body}</section>`;
   const busy=async(btn,fn)=>{btn.disabled=true;try{await fn()}catch(e){alert(e&&e.message||e)}btn.disabled=false};
   $('#rkgo').onclick=()=>{const a2=acctUser();if(!a2||a2.anon||!PROF.doc)return openAcct(TR('排位賽要先登入並取暱稱，積分才會記在你的帳號。','Sign in and pick a nickname first, so your rating is saved to your account.'));busy($('#rkgo'),()=>quickMatch('ranked'))};
   if($('#lb'))$('#lb').onclick=openBoard;
