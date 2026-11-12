@@ -1577,9 +1577,9 @@ function showDecision(){
     // the other player let the game manage their team: their answer is the suggestion, which this phone
     // computes too, so take it now instead of waiting a round trip for their phone to send it
     if(NET.on&&NET.seat!=null&&((NET.doc.setup||{})[q.team]||{}).auto)return submitDecision(q.suggest);
-    if(NET.on&&NET.seat!=null){const g=S.game.gnum,di=q.di;decCountdown(DEC_SEC+DEC_GRACE,()=>{if(S.game&&S.game.gnum===g&&S.game.res.paused&&decList(g).length===di)submitDecision(q.suggest)},DEC_GRACE)}
+    if(NET.on&&NET.seat!=null){const g=S.game.gnum,di=q.di;decCountdown(DEC_SEC+DEC_GRACE,()=>{if(S.game&&S.game.gnum===g&&S.game.res.paused&&decList(g).length===di){NET.timerAct=true;try{submitDecision(q.suggest)}finally{NET.timerAct=false}}},DEC_GRACE)}
     return}
-  if(AUTO[q.team]) return submitDecision(q.suggest);
+  if(AUTO[q.team]){NET.timerAct=true;try{return submitDecision(q.suggest)}finally{NET.timerAct=false}}
   const sug=q.suggest, tag=v=>v===sug?`<span class="sugg">${TR('建議','Suggested')}</span>`:'';
   let body;
   if(q.kind==='tac'||q.kind==='ph')G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.kind==='tac'?q.cur:q.tac),ph:String(q.suggest)};
@@ -1610,7 +1610,7 @@ function showDecision(){
      <div class="row" style="margin-top:12px"><button class="solid" id="phgo">${TR('確定','Confirm')}</button></div>`;
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
-  if(NET.on)decCountdown(DEC_SEC,()=>submitDecision(q.suggest));
+  if(NET.on)decCountdown(DEC_SEC,()=>{NET.timerAct=true;try{submitDecision(q.suggest)}finally{NET.timerAct=false}strike()});
   box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(b.dataset.choose));
   // pinch-hit: the batter buttons only mark a choice; Confirm sends it, with the tactics when they changed
   box.querySelectorAll('[data-phsel]').forEach(b=>b.onclick=()=>{G.tsel.ph=b.dataset.phsel;box.querySelectorAll('[data-phsel]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
@@ -1623,7 +1623,7 @@ function showDecision(){
   if(box.scrollIntoView) box.scrollIntoView({block:'nearest'});
 }
 function submitDecision(v){
-  clearDecTimers();
+  clearDecTimers();if(!NET.timerAct)unstrike();
   const g=S.game.gnum;v=String(v);
   if(NET.on){
     if(NET.seat==null)return;
@@ -1861,7 +1861,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2340445f4f';
+const BUILD='bb78be4857';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1894,7 +1894,7 @@ function dbWrite(fn){
 }
 // a phone that locks or switches apps pauses the page; on return, fetch the room at once instead of waiting for the reconnect
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&NET.on&&NET.ref)NET.ref.get().then(onRoom).catch(()=>{})});
-function sync(){if(!NET.on||NET.seat==null)return;S.rev=Math.random().toString(36).slice(2);commitRaw()}
+function sync(){if(!NET.on||NET.seat==null)return;if(!NET.timerAct)unstrike();S.rev=Math.random().toString(36).slice(2);commitRaw()}
 function commitRaw(){const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.seat;NET.beatAt=Date.now();
   dbWrite(()=>NET.ref.update({state:st,rev,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}))}
 function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,mode:S.mode,lotMax:S.lotMax,budget:S.budget,
@@ -1915,8 +1915,14 @@ function hydrate(o){
 }
 function onRoom(snap){
   if(!snap.exists){NET.err=TR('這個房間已經不存在。','This room no longer exists.');updateNetBadge();return}
-  const d=snap.data();NET.doc=d;watchOpp(d);watchEmo(d);
-  if(NET.seat===0&&d.cfg&&d.cfg.mm&&(d.seats||{})[1])dbWrite(()=>NET.ref.update({cfg:{mm:''}}));
+  const d=snap.data();NET.doc=d;watchOpp(d);watchEmo(d);oppForfeitSign(d);
+  if(NET.seat===0&&d.cfg&&d.cfg.mm&&(d.seats||{})[1]&&!NET.mmClosing){
+    const g=(d.setup||{})[1]||{};
+    if(!d.cfg.ranked)NET.mmClosing=true,dbWrite(()=>NET.ref.update({cfg:{mm:''}}));
+    // ranked: wait for the joiner's list of leagues (it lands a moment after the seat), then pick one both ticked
+    else if(g.lgs||g.ver){const both=roomLgs(d.cfg).filter(l=>!g.lgs||g.lgs.includes(l)),lg=both.length?both[Math.floor(Math.random()*both.length)]:d.cfg.league;
+      NET.mmClosing=true;dbWrite(()=>NET.ref.update({cfg:{mm:'',league:lg}}))}
+  }
   // a snapshot that arrives while one of our own writes is still in flight carries the other player's move too.
   // Firestore won't send it again once our write lands, so skipping it froze this screen until the next change.
   // Our own unsent state shows up here with our own rev, and the rev check already skips that.
@@ -1931,7 +1937,7 @@ function onRoom(snap){
   // redraw the lineup screen only when something on it changed: a redraw closes a menu the player has open
   if(S.screen==='pick'){maybeFinalizePick();if(S.screen==='pick'){const sig=S.rev+'|'+JSON.stringify((d.picks||{})[pickKey()]||null);if(sig!==NET.pickSig){NET.pickSig=sig;renderPick()}}}
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length&&decList(S.game.gnum).length>S.game.res.paused.di) resumeGame();
-  if(S.screen==='room'&&NET.seat===0&&(d.cfg||{}).rnd&&bothReady(d)&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;closeReady();startOnlineDraft()}
+  if(S.screen==='room'&&NET.seat===0&&(d.cfg||{}).rnd&&!(d.cfg||{}).mm&&bothReady(d)&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;closeReady();startOnlineDraft()}
   if(isRanked()&&NET.seat!=null&&S.screen!=='room')rankStart().then(rankCheck);
   updateNetBadge();
 }
@@ -2035,7 +2041,45 @@ function showEmo(seat,k){
 // runs out the turn passes (or bids the minimum when the spot must be filled). If the other phone has stopped
 // (crashed, locked, app in the background) this phone makes that move for it 10 s after its clock runs out.
 const BID_FIRST=45000,BID_NEXT=30000,BID_REMOTE_GRACE=10000;
-function afkAct(){if(mustBid())bid(S.lot.price+1);else pass();sync()}
+function afkAct(){NET.timerAct=true;try{if(mustBid())bid(S.lot.price+1);else pass();sync()}finally{NET.timerAct=false}}
+/* ---------- three timeouts in a row forfeit a ranked series ---------- */
+// every turn the clock plays for you (a bid or a manager's call) is a strike; anything you do yourself clears them.
+// A phone that is closed or asleep stops its heartbeat instead, and the 3-minute rule covers that.
+const AFK_MAX=3;
+function strike(){
+  if(!isRanked()||NET.seat==null||!NET.on||NET.ffDone)return;
+  NET.strikes=(NET.strikes||0)+1;
+  if(NET.strikes>=AFK_MAX)selfForfeit();else afkSign();
+}
+function unstrike(){if(NET.strikes){NET.strikes=0;closeAfkSign()}}
+function closeAfkSign(){const w=$('#afkwrap');if(w)w.remove()}
+function afkSign(title,body,btn,onBtn){
+  closeAfkSign();const n=NET.strikes||0,w=document.createElement('div');w.id='afkwrap';w.className='acctwrap';
+  w.innerHTML=`<div class="card" role="alertdialog" aria-modal="true" style="gap:10px;border:4px solid var(--red)">
+    <h2 style="color:var(--red)">${title||TR(`⚠ 你已經連續 ${n} 次沒有動作`,`⚠ ${n} turn${n>1?'s':''} in a row with no move`)}</h2>
+    <p>${body||TR(`時間到時系統已經替你自動放棄或選擇建議。<b>再 ${AFK_MAX-n} 次沒有動作，就會判定你放棄這場排位（直接算輸）。</b>`,`The clock played for you. <b>${AFK_MAX-n} more and you forfeit this ranked series (a loss).</b>`)}</p>
+    <div class="row"><button class="solid" id="afkok">${btn||TR('我還在！','I\'m here!')}</button></div></div>`;
+  document.body.appendChild(w);$('#afkok').onclick=onBtn||(()=>unstrike());$('#afkok').focus();
+}
+async function selfForfeit(){
+  NET.ffDone=true;const me=NET.seat,o=1-me,rp=(NET.doc&&NET.doc.rep)||{};
+  if(!rp[me]){
+    NET.rk={...(NET.rk||{}),state:'on'};
+    await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(o),ff:true}},setup:{[me]:{left:true}}}).then(r,r)));
+    NET.doc={...NET.doc,rep:{...(NET.doc.rep||{}),[me]:{w:String(o),ff:true}}};
+  }
+  // the loss was booked when the draft started; clearing the pending series is all that is left
+  try{const code=NET.code,p=await loadProfile();if(p&&p.pend===code)await applyRanked(p,false);await loadProfile()}catch(e){}
+  clearDecTimers();clearTimeout(timer);detachRoom();
+  afkSign(TR('⛔ 已判定放棄比賽','⛔ Series forfeited'),TR(`你連續 ${AFK_MAX} 次沒有動作，這場排位判定你放棄，算輸。`,`${AFK_MAX} turns in a row with no move: this ranked series counts as a loss.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();S.screen='home';render()});
+}
+// the other player forfeited by timeouts: tell this one once
+function oppForfeitSign(d){
+  if(!isRanked()||NET.seat==null||NET.oppFfShown)return;const o=1-NET.seat,r=(d.rep||{})[o];
+  if(!r||!r.ff||r.w!==String(NET.seat))return;
+  NET.oppFfShown=true;clearDecTimers();clearTimeout(timer);
+  afkSign(TR('🏆 對手放棄比賽','🏆 Your opponent forfeited'),TR(`${esc(S.teams[o].name)} 連續 ${AFK_MAX} 次沒有動作，判定放棄，這場排位算你贏。`,`${esc(S.teams[o].name)} made no move ${AFK_MAX} turns in a row and forfeits; this ranked series is yours.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});
+}
 function afkWatch(){
   if(!isRanked()||NET.seat==null||S.screen!=='draft'||!S.lot||!(NET.doc&&(NET.doc.seats||{})[1])){afkStop();return}
   const L=S.lot,key=[S.lotNo,L.turn,L.price,L.passed.join()].join('|');
@@ -2055,7 +2099,7 @@ function afkTick(){
   const a=NET.afk;if(!a||!NET.on||S.screen!=='draft'||!S.lot)return afkStop();
   drawBidClock();
   const t=Date.now()-a.since;if(a.done)return;
-  if(a.turn===NET.seat&&t>=a.limit){a.done=true;afkAct()}
+  if(a.turn===NET.seat&&t>=a.limit){a.done=true;afkAct();strike()}
   else if(a.turn!==NET.seat&&t>=a.limit+BID_REMOTE_GRACE){a.done=true;
     S.log.unshift(TR(`⏱ ${esc(S.teams[a.turn].name)} 沒有連線，時間到自動放棄。`,`⏱ ${esc(S.teams[a.turn].name)} isn't connected; their turn passes.`));afkAct()}
 }
@@ -2215,7 +2259,7 @@ async function rankCheck(){
   if(NET.rk.state==='ffwait'&&Date.now()-(NET.rk.tried||0)<60000)return;   // a forfeit the rules refused: try again in a minute
   NET.rk.tried=Date.now();
   const me=NET.seat,o=1-me,rp=NET.doc.rep||{};
-  if(!rp[me]){const w=rankWinner();if(w==null)return;NET.rk.state='wait';await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w)}}}).then(r,r)));return}
+  if(!rp[me]){let w=rankWinner();if(w==null&&rp[o]&&rp[o].ff&&rp[o].w===String(me))w=me;if(w==null)return;NET.rk.state='wait';await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w)}}}).then(r,r)));return}
   // no report from the opponent: settle as a forfeit once they have left (firestore.rules checks that)
   if(!rp[o]&&!rp[me].ff&&!oppGone())return;
   if(rp[o]&&rp[o].w!==rp[me].w){NET.rk={...NET.rk,state:'disputed'};return showRank()}
@@ -2291,13 +2335,15 @@ async function claimSeat(code){
   const d2=(await ref.get()).data();if(!d2.seats||d2.seats[1])return false;
   await ref.update({seats:{1:NET.uid}});return true;
 }
+// the leagues a ranked room's host is happy with (older rooms only carry the one league)
+const roomLgs=c=>(c&&Array.isArray(c.lgs)&&c.lgs.length?c.lgs:[c&&c.league||'MLB']);
 // why a waiting room can't take this player: 'x' (gone, full, wrong kind), 'ver' (another build of the
 // page), 'lg' (a ranked league this player didn't tick), or '' when it can
 function mmWhy(d,kind,now){
   const st=d.seats||{},h=(d.setup||{})[0]||{},c=d.cfg||{};
   if(!st[0]||st[0]===NET.uid||st[1]||roomExpired(d)||h.left||c.game==='nba'||!!c.ranked!==(kind==='ranked')||(h.hb&&Math.abs(now-h.hb)>=2*60000))return 'x';
   if(h.ver!==BUILD)return 'ver';
-  if(kind==='ranked'&&!RK_LG.includes(c.league))return 'lg';
+  if(kind==='ranked'&&!roomLgs(c).some(l=>RK_LG.includes(l)))return 'lg';
   return '';
 }
 async function mmScan(kind){
@@ -2307,7 +2353,7 @@ async function mmScan(kind){
   for(let i=free.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[free[i],free[j]]=[free[j],free[i]]}
   // someone new first; the last opponent only when nobody else is waiting
   free.sort((x,y)=>(x.d.seats[0]===LAST_OPP)-(y.d.seats[0]===LAST_OPP));
-  return {free,ver:all.filter(r=>r.why==='ver').length,lg:[...new Set(all.filter(r=>r.why==='lg').map(r=>r.d.cfg.league))]};
+  return {free,ver:all.filter(r=>r.why==='ver').length,lg:[...new Set(all.filter(r=>r.why==='lg').flatMap(r=>roomLgs(r.d.cfg)))]};
 }
 // the page on the server may be newer than this one (phones keep old copies): returns true if it is
 let NEWER=null;
@@ -2326,7 +2372,7 @@ async function quickMatch(kind){
   for(const {id} of r.free.slice(0,5)){
     try{if(await claimSeat(id)){enterRoom(id,1,kind);return}}catch(e){}
   }
-  await createRoom(kind);NET.mmMiss=r;
+  NET.mmMiss=r;await createRoom(kind);
 }
 // while waiting in our own room, look again every few seconds: two players who pressed at the same moment
 // each opened a room, so the newer room's host moves into the older one
@@ -2347,7 +2393,7 @@ function genCode(){const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let s='';for(let i=
 async function createRoom(mm){
   if(mm==='ranked'){setLeague(pickLg());S.mode=RANKED.mode;S.slots={...RANKED.slots}}
   let code;for(let k=0;k<6;k++){code=genCode();const s=await NET.db.doc('rooms/'+code).get();if(!s.exists)break}
-  await roomDoc(code).set({v:1,seats:{0:NET.uid},setup:{0:{name:'',park:0},1:{name:'',park:1}},cfg:{budget:200,lotMax:50,league:S.league,mode:S.mode,slots:S.slots,...(mm?{mm,rnd:true}:{}),...(mm==='ranked'?{ranked:true}:{})},picks:{},state:'',rev:'',created:Date.now()});
+  await roomDoc(code).set({v:1,seats:{0:NET.uid},setup:{0:{name:'',park:0},1:{name:'',park:1}},cfg:{budget:200,lotMax:50,league:S.league,mode:S.mode,slots:S.slots,...(mm?{mm,rnd:true}:{}),...(mm==='ranked'?{ranked:true,lgs:RK_LG.slice()}:{})},picks:{},state:'',rev:'',created:Date.now()});
   enterRoom(code,0,mm);
 }
 async function joinRoom(raw){
@@ -2377,13 +2423,13 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,oppFfShown:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
   NET.unsub=NET.ref.onSnapshot(onRoom,()=>{NET.err=TR('連線中斷，請重新整理頁面。','Connection lost. Reload the page.');updateNetBadge()});
   NET.verSince=0;NET.opp=null;NET.mm=mm||null;NET.mmStart=Date.now();
-  const nick=mm==='ranked'&&PROF.doc?{name:PROF.doc.name,elo:PROF.doc.rating}:mm?{name:randomName()}:{};
+  const nick=mm==='ranked'&&PROF.doc?{name:PROF.doc.name,elo:PROF.doc.rating,lgs:RK_LG.slice()}:mm?{name:randomName()}:{};
   NET.rk=null;
   if(seat!=null)dbWrite(()=>NET.ref.update({setup:{[seat]:{ver:BUILD,auto:!!AUTO[seat],...nick,...(mm?{park:Math.floor(Math.random()*PARKS.length)}:{})}}}));
   startBeat();
@@ -2617,7 +2663,7 @@ function renderRoom(){
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>`}
   <div class="grid2">${seat(0)}${seat(1)}</div>
-  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 3 分鐘會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes counts as a forfeit.')}</p>`
+  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')}</p>`
     :me===0?`<div><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end;margin-top:12px"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR(`總籤數（最少 ${lotsNeeded()}）`,`Total lots (min ${lotsNeeded()})`)}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
@@ -2655,7 +2701,7 @@ function mmWait(d){
   el.hidden=!on;if(on&&$('#mmsec'))return;   // already showing
   clearInterval(NET.waitTick);if(!on)return;
   const rk=!!d.cfg.ranked;
-  el.innerHTML=`<h2>${rk?'🏆':'🎲'} ${rk?TR('正在找排位對手…','Looking for a ranked opponent…'):TR('正在找隨機對手…','Looking for an opponent…')}</h2><p class="hint" style="margin-top:6px">${rk?TR(`已等 <span id="mmsec">0</span> 秒。下一位按「開始排位」的玩家會和你配對（${S.league==='CPBL'?'中職':'MLB'}）。`,`Waiting <span id="mmsec">0</span>s. The next player who presses "Play ranked" is paired with you (${S.league}).`):TR('已等 <span id="mmsec">0</span> 秒。下一位按「隨機配對」的玩家會和你配對。','Waiting <span id="mmsec">0</span>s. The next player who presses "Random match" is paired with you.')}</p>
+  el.innerHTML=`<h2>${rk?'🏆':'🎲'} ${rk?TR('正在找排位對手…','Looking for a ranked opponent…'):TR('正在找隨機對手…','Looking for an opponent…')}</h2><p class="hint" style="margin-top:6px">${rk?TR(`已等 <span id="mmsec">0</span> 秒。下一位按「開始排位」的玩家會和你配對（${roomLgs(d.cfg).map(l=>l==='CPBL'?'中職':'MLB').join(' 或 ')}）。`,`Waiting <span id="mmsec">0</span>s. The next player who presses "Play ranked" is paired with you (${roomLgs(d.cfg).join(' or ')}).`):TR('已等 <span id="mmsec">0</span> 秒。下一位按「隨機配對」的玩家會和你配對。','Waiting <span id="mmsec">0</span>s. The next player who presses "Random match" is paired with you.')}</p>
    <p class="hint" id="mmmiss" role="status" style="margin-top:6px;color:var(--red);font-weight:700"></p>
    <div id="mmlate" hidden><p style="margin-top:8px">${TR('目前好像沒有其他玩家在線上。','Nobody else seems to be online right now.')}</p></div>
    <div class="row" style="margin-top:10px">${d.cfg.ranked&&PROF.doc&&PROF.doc.rating<AI_RK.cap&&aiLeft(PROF.doc)>0?`<button class="solid" id="mmrk" hidden>🤖 ${TR(`打電腦排位（算積分，今天還剩 ${aiLeft(PROF.doc)} 場）`,`Ranked vs the computer (counts; ${aiLeft(PROF.doc)} left today)`)}</button>`:''}<button class="${d.cfg.ranked?'ghost':'solid'}" id="mmai" hidden>🤖 ${d.cfg.ranked?TR('打電腦練習（不算分）','Practice vs the computer (no rating)'):TR('先和電腦打','Play the computer instead')}</button><button class="ghost" id="mmstop">${TR('取消配對','Stop looking')}</button></div>
@@ -2672,7 +2718,7 @@ function mmWait(d){
     if(box.dataset.t!==t){box.dataset.t=t;box.innerHTML=t;if($('#mmrl'))$('#mmrl').onclick=reloadFresh}};
   newerBuild().then(v=>{NET.newer=v;miss()});
   const draw=()=>{if(!$('#mmsec')||S.screen!=='room')return clearInterval(NET.waitTick);
-    const sec=Math.floor((Date.now()-NET.mmStart)/1000);$('#mmsec').textContent=sec;if(sec%6===3)mmRescan().then(miss);miss();$('#mmlate').hidden=$('#mmai').hidden=sec<60;if($('#mmrk'))$('#mmrk').hidden=sec<60};
+    const sec=Math.floor((Date.now()-NET.mmStart)/1000);$('#mmsec').textContent=sec;if(Date.now()-(NET.mmScanAt||0)>=6000){NET.mmScanAt=Date.now();mmRescan().then(miss)}miss();$('#mmlate').hidden=$('#mmai').hidden=sec<60;if($('#mmrk'))$('#mmrk').hidden=sec<60};
   draw();NET.waitTick=setInterval(draw,1000);
 }
 /* ---------- ready check for matched strangers ---------- */
@@ -2688,7 +2734,7 @@ function readyPanel(d){
   if(!NET.rdySince)NET.rdySince=Date.now();
   const me=NET.seat,su=d.setup||{},st=i=>(su[i]||{}).ready?'✅ '+TR('已準備','Ready'):'⌛ '+TR('還沒準備','Not ready');
   if(!$('#rdybtn'))el.innerHTML=`<h2>🤝 ${TR('找到對手了！','Opponent found!')}</h2>
-    <p class="hint" style="margin-top:6px">${(d.cfg||{}).ranked?TR('⚠ 排位賽是七戰四勝，進行中離開超過 3 分鐘會被判棄賽。','⚠ Ranked is best of seven; leaving for over 3 minutes during it counts as a forfeit.')+'<br>':''}${TR(`${(d.cfg||{}).ranked?'排位賽':'隨機配對'}：兩邊都按「準備開始」就開始選秀。<b id="rdyleft">60</b> 秒內沒按的人會回到大廳。`,`${(d.cfg||{}).ranked?'Ranked':'Random match'}: the draft starts once both press "Ready". Whoever hasn't within <b id="rdyleft">60</b> s goes back to the lobby.`)}</p>
+    <p class="hint" style="margin-top:6px">${(d.cfg||{}).ranked?TR('⚠ 排位賽是七戰四勝。進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','⚠ Ranked is best of seven. Leaving for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')+'<br>':''}${TR(`${(d.cfg||{}).ranked?'排位賽':'隨機配對'}：兩邊都按「準備開始」就開始選秀。<b id="rdyleft">60</b> 秒內沒按的人會回到大廳。`,`${(d.cfg||{}).ranked?'Ranked':'Random match'}: the draft starts once both press "Ready". Whoever hasn't within <b id="rdyleft">60</b> s goes back to the lobby.`)}</p>
     <div class="row" style="margin-top:10px;gap:8px 24px;font-weight:700"><span id="rdy0"></span><span id="rdy1"></span></div>
     <div class="row" style="margin-top:12px"><button class="solid rankgo" id="rdybtn">${TR('準備開始','Ready')}</button></div>`;
   [0,1].forEach(i=>{const x=$('#rdy'+i);if(x)x.textContent=`${i===me?TR('你','You'):TR('對手','Opponent')}（${(su[i]||{}).name||'—'}）：${st(i)}`});
