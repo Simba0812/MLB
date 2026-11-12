@@ -232,6 +232,7 @@ button.mini{padding:3px 8px;font-size:13px}
 .gp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .decide{border-color:var(--amber)}
 .optlist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.opt[aria-pressed="true"]{background:var(--navy);color:var(--paper);border-color:var(--navy)}.opt[aria-pressed="true"] .hint{color:#dfe6ef}
 .opt{display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;text-align:left;border-color:var(--line);font-weight:700}
 .opt:hover{border-color:var(--amber)}
 .opt .hint{font-weight:400}
@@ -372,7 +373,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 let rnd=Math.random;
 const pick=a=>a[Math.floor(rnd()*a.length)];
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-const nm=p=>LANG==='en'?p.n:(p.zh||p.n);
+const nm=p=>p.n;   // one name everywhere: English for MLB players, Chinese for CPBL players
 const f3=x=>x==null?'—':x.toFixed(3).replace(/^0/,'');
 const pct=x=>(x*100).toFixed(1)+'%';
 
@@ -762,7 +763,7 @@ function lotCard(p){
    <div class="row" style="align-items:flex-start">
     <div style="min-width:0;display:flex;flex-direction:column;gap:4px">
      <div class="lotno">${S.lotNo>S.lotMax?TR(`補位籤（第 ${S.lotNo} 支）`,`Fill-in lot (#${S.lotNo})`):TR(`第 ${S.lotNo} / ${S.lotMax} 支籤`,`Lot ${S.lotNo} / ${S.lotMax}`)}</div>
-     <div class="name">${esc(p.n)}</div>${p.zh?`<div class="zh">${esc(p.zh)}</div>`:''}
+     <div class="name">${esc(p.n)}</div>
     </div>
     <div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div>
    </div>
@@ -777,7 +778,7 @@ function briefCard(i,id){
   const p=r.p,pit=q=>{const g=q.pos==='SP'?'SP':'RP';return `<div class="stats">${statBox(q.era,TR('防禦率','ERA'),0,T(g,'era',q,1))}${statBox(q.ip,TR('局數','IP'),0,T(g,'ip',q))}${statBox(q.w+'-'+q.l,TR('勝-敗','W-L'),0,T(g,'w',q))}${statBox(q.so,TR('三振','SO'),0,T(g,'so',q))}${statBox(q.whip,'WHIP',0,T(g,'whip',q,1))}${statBox(pct(q.r.k),'K%',0,T(g,'kr',q))}</div>`};
   return `<div class="card" role="dialog" aria-modal="true" aria-label="${esc(nm(p))}">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
-   <div class="row" style="align-items:flex-start"><div style="min-width:0;display:flex;flex-direction:column;gap:4px"><div class="name">${esc(p.n)}</div>${p.zh?`<div class="zh">${esc(p.zh)}</div>`:''}</div><div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div></div>
+   <div class="row" style="align-items:flex-start"><div style="min-width:0;display:flex;flex-direction:column;gap:4px"><div class="name">${esc(p.n)}</div></div><div class="ovr">${ovr(p)}<span>${TR('綜合評價','Rating')}</span></div></div>
    <div class="meta"><span class="pos">${p.twp?'DH ＋ SP':p.pos}</span>${(p.alt||[]).map(k=>`<span class="pos">${k}</span>`).join('')}<span>${p.twp?TR('二刀流','Two-way'):POSZH[p.pos]}</span>${p.t?`<span>· ${esc(TR(TEAMZH[p.t]||p.t,TEAM_EN[p.t]||p.t))}</span>`:''}${p.age?`<span>· ${TR(`${p.age} 歲`,`age ${p.age}`)}</span>`:''}<span>· ${TR(`得標價 $${r.price}`,`paid $${r.price}`)}</span></div>
    ${p.type==='H'?`<div class="stats">${statBox(p.avg,TR('打擊率','AVG'),0,T('H','avg',p))}${statBox(p.obp,TR('上壘率','OBP'),0,T('H','obp',p))}${statBox(p.slg,TR('長打率','SLG'),0,T('H','slg',p))}${statBox(p.ops,'OPS',0,T('H','ops',p))}${statBox(p.hr,TR('全壘打','HR'),0,T('H','hr',p))}${statBox(p.sb,TR('盜壘','SB'),0,T('H','sb',p))}${statBox((p.def>0?'+':'')+(p.def||0).toFixed(1),TR('守備指數','Defense'),1)}</div>`:pit(p)}
    ${p.twp?`<div class="statlabel">${TR('投手成績','Pitching')}</div>`+pit({...p.twp}):''}
@@ -1544,7 +1545,7 @@ function showDecision(){
   if(AUTO[q.team]) return submitDecision(q.suggest);
   const sug=q.suggest, tag=v=>v===sug?`<span class="sugg">${TR('建議','Suggested')}</span>`:'';
   let body;
-  if(q.kind==='tac'||(q.kind==='ph'&&q.tac))G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.kind==='tac'?q.cur:q.tac)};
+  if(q.kind==='tac'||q.kind==='ph')G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.kind==='tac'?q.cur:q.tac),ph:String(q.suggest)};
   if(q.kind==='tac'){
     // a tactics checkpoint: three rows of choices, then confirm
     const sg=tacOf(sug);
@@ -1564,15 +1565,19 @@ function showDecision(){
     const c=q.cur;
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換代打嗎？',': pinch-hit?')}</h2>
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
-     ${q.tac?`<div style="margin-top:12px;padding:10px 12px;border:1.5px solid var(--rule);background:var(--panel2)"><div class="eyebrow">${TR('戰術（可以順便調整，選好再按下面的打者）','Tactics (change them if you like, then pick a batter below)')}</div>${tacticsPicker(G.tsel.t,'tq',q.team)}</div>`:''}
-     <div class="optlist"><button class="opt" data-choose="keep">${TR(`讓 ${esc(c.name)} 打`,`Let ${esc(c.name)} hit`)} ${tag('keep')}<span class="hint">${c.pos} · ${TR('打擊率','AVG')} ${c.avg} · OPS ${c.ops} · ${TR('評價','Rating')} ${c.ovr} · ${TR('今天','today')} ${c.today}</span></button>
-     ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('代打','Pinch-hit with')} ${esc(o.name)} ${tag(o.id)}<span class="hint">${o.pos} · ${TR('打擊率','AVG')} ${o.avg} · OPS ${o.ops} · ${TR('評價','Rating')} ${o.ovr}</span></button>`).join('')}</div>
-     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>`;
+     <div class="eyebrow" style="margin-top:12px">${TR('① 選打者','① Pick the batter')}</div>
+     <div class="optlist" style="margin-top:6px"><button class="opt" data-phsel="keep" aria-pressed="${G.tsel.ph==='keep'}">${TR(`讓 ${esc(c.name)} 打`,`Let ${esc(c.name)} hit`)} ${tag('keep')}<span class="hint">${c.pos} · ${TR('打擊率','AVG')} ${c.avg} · OPS ${c.ops} · ${TR('評價','Rating')} ${c.ovr} · ${TR('今天','today')} ${c.today}</span></button>
+     ${q.opts.map(o=>`<button class="opt" data-phsel="${esc(o.id)}" aria-pressed="${G.tsel.ph===o.id}">${TR('代打','Pinch-hit with')} ${esc(o.name)} ${tag(o.id)}<span class="hint">${o.pos} · ${TR('打擊率','AVG')} ${o.avg} · OPS ${o.ops} · ${TR('評價','Rating')} ${o.ovr}</span></button>`).join('')}</div>
+     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>
+     ${q.tac?`<div class="eyebrow" style="margin-top:14px">${TR('② 戰術（不改也可以）','② Tactics (optional)')}</div><div style="margin-top:4px;padding:10px 12px;border:1.5px solid var(--rule);background:var(--panel2)">${tacticsPicker(G.tsel.t,'tq',q.team)}</div>`:''}
+     <div class="row" style="margin-top:12px"><button class="solid" id="phgo">${TR('確定','Confirm')}</button></div>`;
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
   if(NET.on)decCountdown(60,()=>submitDecision(q.suggest));
-  // a pinch-hit answer carries the tactics too when the manager changed them
-  box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(q.kind==='ph'&&q.tac&&G.tsel&&tacStr(G.tsel.t)!==q.tac?b.dataset.choose+'~'+tacStr(G.tsel.t):b.dataset.choose));
+  box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(b.dataset.choose));
+  // pinch-hit: the batter buttons only mark a choice; Confirm sends it, with the tactics when they changed
+  box.querySelectorAll('[data-phsel]').forEach(b=>b.onclick=()=>{G.tsel.ph=b.dataset.phsel;box.querySelectorAll('[data-phsel]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  if($('#phgo'))$('#phgo').onclick=()=>submitDecision(q.tac&&tacStr(G.tsel.t)!==q.tac?G.tsel.ph+'~'+tacStr(G.tsel.t):G.tsel.ph);
   // switching a choice only re-marks the buttons, so the online countdown keeps running
   box.querySelectorAll('[data-tq]').forEach(b=>b.onclick=()=>{const [,side,k]=b.dataset.tq.split(',');G.tsel.t={...G.tsel.t,[side]:k};
     box.querySelectorAll(`[data-tq^="${q.team},${side},"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));
