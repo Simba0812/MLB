@@ -1529,7 +1529,8 @@ function renderGameShell(){
   <div class="pbp" id="pbp" aria-live="polite"></div>
   <div id="after"></div>`;
   document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
-  document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
+  document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;
+    if(NET.on&&NET.seat===+c.dataset.auto){const seat=NET.seat,on=c.checked;dbWrite(()=>NET.ref.update({setup:{[seat]:{auto:on}}}))}if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
   $('#skip').onclick=()=>{clearTimeout(timer);S.game.skip=true;play()};
 }
 function emit(){
@@ -1556,13 +1557,15 @@ function play(){
   const e=G.res.ev[G.pos-1];
   timer=setTimeout(play,e.k==='half'?S.speed*1.8:S.speed);
 }
-// online: a decision left unanswered for a minute takes the suggestion; the waiting player's screen
-// fills it in after 75 seconds in case the other phone is asleep. Both write the same value.
+// online: a decision left unanswered for 50 seconds takes the suggestion; the waiting player's screen
+// shows the same 50 s but fills it in itself 10 s later, in case the other phone is asleep. Both write the same value.
+const DEC_SEC=50,DEC_GRACE=10;
 let decTimer=null,decTick=null;
 function clearDecTimers(){clearTimeout(decTimer);clearInterval(decTick);decTimer=decTick=null}
-function decCountdown(sec,onExpire){
+function decCountdown(sec,onExpire,grace=0){
   clearDecTimers();const end=Date.now()+sec*1000;
-  const upd=()=>{const el=$('#deccd');if(el)el.textContent=TR(`${Math.max(0,Math.ceil((end-Date.now())/1000))} 秒後自動選擇建議`,`Auto-picks the suggestion in ${Math.max(0,Math.ceil((end-Date.now())/1000))}s`)};
+  const upd=()=>{const el=$('#deccd');if(!el)return;const left=Math.ceil((end-Date.now())/1000)-grace;
+    el.textContent=left>0?TR(`${left} 秒後自動選擇建議`,`Auto-picks the suggestion in ${left}s`):TR('時間到，自動選擇建議…','Time is up; taking the suggestion…')};
   upd();decTick=setInterval(upd,1000);decTimer=setTimeout(()=>{clearDecTimers();onExpire()},sec*1000);
 }
 function showDecision(){
@@ -1571,7 +1574,10 @@ function showDecision(){
   if(S.ai&&q.team===S.ai.seat&&!NET.on) return submitDecision(q.suggest);
   if(!isMine(q.team)||(NET.on&&NET.seat==null)){
     box.innerHTML=`<section class="panel decide"><div class="eyebrow">${halfTxt}</div><p style="margin-top:6px">${TR(`等待 ${tname(q.team)} 調度中…`,`Waiting for ${tname(q.team)} to decide…`)}</p><p class="hint" id="deccd"></p></section>`;
-    if(NET.on&&NET.seat!=null){const g=S.game.gnum,di=q.di;decCountdown(75,()=>{if(S.game&&S.game.gnum===g&&S.game.res.paused&&decList(g).length===di)submitDecision(q.suggest)})}
+    // the other player let the game manage their team: their answer is the suggestion, which this phone
+    // computes too, so take it now instead of waiting a round trip for their phone to send it
+    if(NET.on&&NET.seat!=null&&((NET.doc.setup||{})[q.team]||{}).auto)return submitDecision(q.suggest);
+    if(NET.on&&NET.seat!=null){const g=S.game.gnum,di=q.di;decCountdown(DEC_SEC+DEC_GRACE,()=>{if(S.game&&S.game.gnum===g&&S.game.res.paused&&decList(g).length===di)submitDecision(q.suggest)},DEC_GRACE)}
     return}
   if(AUTO[q.team]) return submitDecision(q.suggest);
   const sug=q.suggest, tag=v=>v===sug?`<span class="sugg">${TR('建議','Suggested')}</span>`:'';
@@ -1604,7 +1610,7 @@ function showDecision(){
      <div class="row" style="margin-top:12px"><button class="solid" id="phgo">${TR('確定','Confirm')}</button></div>`;
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
-  if(NET.on)decCountdown(60,()=>submitDecision(q.suggest));
+  if(NET.on)decCountdown(DEC_SEC,()=>submitDecision(q.suggest));
   box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(b.dataset.choose));
   // pinch-hit: the batter buttons only mark a choice; Confirm sends it, with the tactics when they changed
   box.querySelectorAll('[data-phsel]').forEach(b=>b.onclick=()=>{G.tsel.ph=b.dataset.phsel;box.querySelectorAll('[data-phsel]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
@@ -1855,7 +1861,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2db97a9074';
+const BUILD='2340445f4f';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2379,7 +2385,7 @@ function enterRoom(code,seat,mm){
   NET.verSince=0;NET.opp=null;NET.mm=mm||null;NET.mmStart=Date.now();
   const nick=mm==='ranked'&&PROF.doc?{name:PROF.doc.name,elo:PROF.doc.rating}:mm?{name:randomName()}:{};
   NET.rk=null;
-  if(seat!=null)dbWrite(()=>NET.ref.update({setup:{[seat]:{ver:BUILD,...nick,...(mm?{park:Math.floor(Math.random()*PARKS.length)}:{})}}}));
+  if(seat!=null)dbWrite(()=>NET.ref.update({setup:{[seat]:{ver:BUILD,auto:!!AUTO[seat],...nick,...(mm?{park:Math.floor(Math.random()*PARKS.length)}:{})}}}));
   startBeat();
 }
 (async()=>{
