@@ -1647,7 +1647,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='066d6b52f9';
+const BUILD='2bbb933a70';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1782,6 +1782,11 @@ const ELO_K=32;
 // So leaving a lost game early saves nothing, and firestore.rules can check every step.
 const eloLoss=(me,opp)=>Math.round(ELO_K/(1+Math.pow(10,(opp-me)/400)));
 const PROF={doc:null,loaded:false};
+// ranked tiers by rating; everyone starts at 1000, in the rookie league
+const TIERS=[[0,'🌱','新人聯盟','Rookie League'],[1050,'⚾','1A','Single-A'],[1125,'⚾','2A','Double-A'],[1200,'⚾','3A','Triple-A'],
+  [1300,'🏟️','大聯盟','Major League'],[1450,'⭐','明星','All-Star'],[1600,'🏛️','名人堂','Hall of Fame']];
+const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
+const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);
 const acctUser=()=>NET.acct&&NET.acct.user();
 const profRef=()=>NET.db.doc('players/'+acctUser().uid);
@@ -1846,7 +1851,9 @@ async function claimForfeit(){
 function rankText(){
   const k=NET.rk;if(!k)return '';
   const sg=v=>(v>0?'+':'')+v;
-  if(k.state==='done')return k.won?TR(`🏆 排位積分 ${k.before} → ${k.after}（${sg(k.after-k.before)}）`,`🏆 Rating ${k.before} → ${k.after} (${sg(k.after-k.before)})`):TR(`排位積分 ${k.before} → ${k.before-k.d}（${sg(-k.d)}）`,`Rating ${k.before} → ${k.before-k.d} (${sg(-k.d)})`);
+  if(k.state==='done'){const to=k.won?k.after:k.before-k.d,mv=tierIdx(to)-tierIdx(k.before);
+    const line=k.won?TR(`🏆 排位積分 ${k.before} → ${to}（${sg(to-k.before)}）`,`🏆 Rating ${k.before} → ${to} (${sg(to-k.before)})`):TR(`排位積分 ${k.before} → ${to}（${sg(to-k.before)}）`,`Rating ${k.before} → ${to} (${sg(to-k.before)})`);
+    return line+(mv>0?TR(` · 🎉 升上 ${tierName(to)}！`,` · 🎉 Promoted to ${tierName(to)}!`):mv<0?TR(` · 降到 ${tierName(to)}`,` · Down to ${tierName(to)}`):` · ${tierName(to)}`)}
   if(k.state==='wait')return TR('等待對手確認比賽結果…','Waiting for your opponent to confirm the result…');
   if(k.state==='disputed')return TR('雙方回報的結果不一致，這場不計勝場（已扣的積分不退）。','The two reports disagree, so this game does not count as a win.');
   if(k.state==='ffwait')return TR('對手還沒離線夠久（10 分鐘），稍後再按一次「判對手棄賽」。','Your opponent has not been gone long enough (10 min). Try again later.');
@@ -2023,7 +2030,7 @@ function renderNetBox(){
 function acctLine(){
   if(!NET.acct)return '';
   const a=acctUser(),p=PROF.doc;
-  const who=!a||a.anon?TR('目前是訪客','Playing as a guest'):p?`👤 <b>${esc(p.name)}</b> · ${TR('積分','Rating')} <b class="mono">${p.rating}</b> <span class="hint">（${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)}）</span>`:`👤 ${esc(a.email||'Google')} · ${TR('還沒取暱稱','no nickname yet')}`;
+  const who=!a||a.anon?TR('目前是訪客','Playing as a guest'):p?`👤 <b>${esc(p.name)}</b> · ${tierName(p.rating)} · ${TR('積分','Rating')} <b class="mono">${p.rating}</b> <span class="hint">（${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)}）</span>`:`👤 ${esc(a.email||'Google')} · ${TR('還沒取暱稱','no nickname yet')}`;
   return `<div class="row" style="margin-bottom:12px;gap:8px 12px"><span>${who}</span><button class="ghost" id="acct" style="padding:4px 10px">${!a||a.anon?TR('登入／註冊','Sign in / sign up'):TR('帳號','Account')}</button><button class="ghost" id="lb" style="padding:4px 10px">📊 ${TR('排行榜','Leaderboard')}</button></div>`;
 }
 const AUTHERR={'auth/email-already-in-use':['這個 Email 已經註冊過，請改按「登入」。','That email is already registered. Sign in instead.'],
@@ -2072,7 +2079,7 @@ async function openBoard(){
   try{
     const q=await NET.db.collection('players').orderBy('rating','desc').limit(30).get(),me=(acctUser()||{}).uid;
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:#4d6a5d">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:#4d6a5d">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
