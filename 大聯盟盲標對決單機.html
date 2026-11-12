@@ -1788,7 +1788,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='6e9923d6bc';
+const BUILD='2a2949f045';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2389,7 +2389,7 @@ function openAcct(note){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
     $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
     $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>msg(TR('如果這個 Email 有註冊過，重設密碼的信已經寄出（找不到的話看一下垃圾郵件匣）。','If that email has an account, a reset link is on its way (check your spam folder too).')));
+    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>msg(TR('如果這個 Email 是用「Email＋密碼」註冊的，重設密碼的信已經寄出，找不到請看垃圾郵件匣。用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','If that email signed up with a password, a reset link is on its way (check spam too). Accounts made with Google have no password: just use "Continue with Google".')));
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
