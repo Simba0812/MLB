@@ -2418,7 +2418,7 @@ function openAcct(note){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
     $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
     $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>msg(TR('如果這個 Email 是用「Email＋密碼」註冊的，重設密碼的信已經寄出，找不到請看垃圾郵件匣。用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','If that email signed up with a password, a reset link is on its way (check spam too). Accounts made with Google have no password: just use "Continue with Google".')));
+    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').innerHTML=TR('重設密碼的信已經寄出（寄件人 noreply@mlbb-e98d2.firebaseapp.com）。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere firebaseapp</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','The reset email is on its way (from noreply@mlbb-e98d2.firebaseapp.com).<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere firebaseapp</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')}));
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
