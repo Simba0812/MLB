@@ -1573,16 +1573,15 @@ function showDecision(){
     const c=q.cur;
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換代打嗎？',': pinch-hit?')}</h2>
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
+     ${q.tac?`<div style="margin-top:12px;padding:10px 12px;border:1.5px solid var(--rule);background:var(--panel2)"><div class="eyebrow">${TR('戰術（可以順便調整，選好再按下面的打者）','Tactics (change them if you like, then pick a batter below)')}</div>${tacticsPicker(G.tsel.t,'tq',q.team)}</div>`:''}
      <div class="optlist"><button class="opt" data-choose="keep">${TR(`讓 ${esc(c.name)} 打`,`Let ${esc(c.name)} hit`)} ${tag('keep')}<span class="hint">${c.pos} · ${TR('打擊率','AVG')} ${c.avg} · OPS ${c.ops} · ${TR('評價','Rating')} ${c.ovr} · ${TR('今天','today')} ${c.today}</span></button>
      ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('代打','Pinch-hit with')} ${esc(o.name)} ${tag(o.id)}<span class="hint">${o.pos} · ${TR('打擊率','AVG')} ${o.avg} · OPS ${o.ops} · ${TR('評價','Rating')} ${o.ovr}</span></button>`).join('')}</div>
-     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>
-     ${q.tac?`<details style="margin-top:10px" ${G.tsel.open?'open':''} id="phtac"><summary style="cursor:pointer;font-weight:700">${TR('同時調整戰術（選填）','Change tactics too (optional)')}</summary>${tacticsPicker(G.tsel.t,'tq',q.team)}<p class="hint" style="margin-top:6px">${TR('先調好戰術，再按上面的代打或不換人，會一起生效。','Set the tactics first, then pick above; both take effect together.')}</p></details>`:''}`;
+     <p class="hint" style="margin-top:6px">${TR('被換下的球員不能再上場；代打者會接手他的守位。','The replaced player is out of the game; the pinch-hitter takes over his position.')}</p>`;
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
   if(NET.on)decCountdown(60,()=>submitDecision(q.suggest));
   // a pinch-hit answer carries the tactics too when the manager changed them
   box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(q.kind==='ph'&&q.tac&&G.tsel&&tacStr(G.tsel.t)!==q.tac?b.dataset.choose+'~'+tacStr(G.tsel.t):b.dataset.choose));
-  if($('#phtac'))$('#phtac').ontoggle=()=>{G.tsel.open=$('#phtac').open};
   // switching a choice only re-marks the buttons, so the online countdown keeps running
   box.querySelectorAll('[data-tq]').forEach(b=>b.onclick=()=>{const [,side,k]=b.dataset.tq.split(',');G.tsel.t={...G.tsel.t,[side]:k};
     box.querySelectorAll(`[data-tq^="${q.team},${side},"]`).forEach(x=>x.setAttribute('aria-pressed',x===b));
@@ -1781,7 +1780,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='231a08daff';
+const BUILD='e20bade480';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
