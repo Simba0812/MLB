@@ -183,6 +183,12 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .pbp .pa{padding-left:12px;border-left:3px solid transparent}
 .pbp .pa.run{border-left-color:var(--good)}
 .pbp .pa.hr{border-left-color:var(--red);font-weight:700}
+.pbp .pa.sb,.pbp .pa.cs,.pbp .pa.err{border-left-width:5px;font-weight:700;padding-top:3px;padding-bottom:3px;border-radius:0 3px 3px 0}
+.pbp .pa.sb{border-left-color:var(--sky);background:rgba(42,111,151,.1)}
+.pbp .pa.cs{border-left-color:var(--dim);background:rgba(107,98,85,.1)}
+.pbp .pa.err{border-left-color:var(--amber);background:rgba(184,86,28,.1)}
+.pbtag{display:inline-block;font-size:11.5px;font-weight:900;letter-spacing:.06em;color:var(--paper);border-radius:3px;padding:1px 7px;margin-right:8px;vertical-align:1px}
+.pa.sb .pbtag{background:var(--sky)}.pa.cs .pbtag{background:var(--dim)}.pa.err .pbtag{background:var(--amber)}
 .pbp .note{color:var(--dim);font-size:13px;padding-left:12px}
 .pbp .sc{font-family:var(--mono);font-size:12px;color:var(--good);margin-left:6px}
 .reveal{text-align:center;padding:28px 18px;border:3px solid var(--navy);border-radius:2px;background:var(--paper);box-shadow:6px 6px 0 var(--navy)}
@@ -1198,7 +1204,7 @@ function simGame(away,home,ctx){
         }
         // stolen base attempt
         if(bases[0]&&!bases[1]&&outs<2){const r=bases[0];const att=clamp(r.r.sbr*3.2*tf(to,'off','steal')*tf(to,'run','steal'),0,.45);
-          if(rnd()<att){ if(rnd()<.76+((r.spd||27)-27)*.04-(tf(to,'run','steal')>1?.04:0)){bases[1]=r;bases[0]=null;say(TR(`🏃 ${nm(r)} 起跑盜二壘，成功！`,`🏃 ${nm(r)} takes off for second: safe!`))} else {bases[0]=null;outs++;s.cur.outs++;pbox(dt).outs++;say(TR(`🚫 ${nm(r)} 盜壘被捕手 ${nm(s.field.C||{n:''})} 阻殺。${outs}出局。`,`🚫 ${nm(r)} is thrown out stealing by catcher ${nm(s.field.C||{n:''})}. ${outs} out${outs>1?'s':''}.`)); if(outs>=3)break;}}}
+          if(rnd()<att){ if(rnd()<.76+((r.spd||27)-27)*.04-(tf(to,'run','steal')>1?.04:0)){bases[1]=r;bases[0]=null;say(TR(`🏃 ${nm(r)} 起跑盜二壘，成功！`,`🏃 ${nm(r)} takes off for second: safe!`),'sb')} else {bases[0]=null;outs++;s.cur.outs++;pbox(dt).outs++;say(TR(`🚫 ${nm(r)} 盜壘被捕手 ${nm(s.field.C||{n:''})} 阻殺。${outs}出局。`,`🚫 ${nm(r)} is thrown out stealing by catcher ${nm(s.field.C||{n:''})}. ${outs} out${outs>1?'s':''}.`),'cs'); if(outs>=3)break;}}}
         const p=s.cur.p, tt=Math.floor(s.cur.bf/9), sta=curSta(s.cur);
         const fat=1+.04*Math.max(0,tt-1)+Math.max(0,40-sta)/100*.6;   // tiring below 40% strength
         const pr=paProbs(h,p,park,fat,defAt(dt,'C'),to,tp);
@@ -1230,7 +1236,7 @@ function simGame(away,home,ctx){
           if(bases[1]){if(rnd()<.58+.12*spd+(outs===2?.2:0)+send){if(send>0&&rnd()<.08){outs++;s.cur.outs++;pb.outs++;cut=true}else score(bases[1],bb)}else bases[2]=bases[1];bases[1]=null}
           if(bases[0]){if(!bases[2]&&rnd()<.27+.1*spd+send*.5)bases[2]=bases[0];else bases[1]=bases[0];bases[0]=null}
           bases[0]=h;
-          if(flip==='boot') say(TR(`😬 ${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`😬 ${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`));
+          if(flip==='boot') say(TR(`😬 ${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`😬 ${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`),'err');
           else if(DIRZH[fpos]) say(pick(TR([`${B} 擊出${DIRZH[fpos]}方向的平飛球，一壘安打。`,`${B} 輕巧一推，${DIRZH[fpos]}前一壘安打。`],[`${B} lines a single to ${DIRZH[fpos]}.`,`${B} pokes a single into ${DIRZH[fpos]}.`])));
           else say(pick(TR([`${B} 敲出穿越${fielder(dt,fpos)}身邊的滾地安打。`,`${B} 打成${POSZH[fpos]}前的內野高彈跳，跑出內野安打。`],[`${B} rips a grounder past ${fielder(dt,fpos)} for a single.`,`${B} chops a high bouncer in front of the ${POSZH[fpos]} and beats it out.`])));
           if(cut){ev[ev.length-1].t+=TR(` 二壘跑者衝本壘，被傳殺出局！${outs}出局。`,` The runner from second is sent and thrown out at the plate! ${outs} out${outs>1?'s':''}.`);ev[ev.length-1].t3=outs>=3}}
@@ -1254,7 +1260,7 @@ function simGame(away,home,ctx){
           const who=fielder(dt,fpos), rob=flip==='rob';
           if(otype==='g'){
             const d=defAt(dt,fpos);
-            if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`❗ ${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`❗ ${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`));}
+            if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`❗ ${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`❗ ${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`),'err');}
             else if(bases[0]&&outs<2&&rnd()<.5-.08*spd+(defAt(dt,'SS')+defAt(dt,'2B'))*.003){outs+=2;s.cur.outs+=2;pb.outs+=2;
               if(outs<3){if(bases[2]&&rnd()<.5){score(bases[2],null);bases[2]=null} if(bases[1]&&!bases[2]){bases[2]=bases[1];bases[1]=null}}
               bases[0]=null; say(TR(`${B} 擊出${POSZH[fpos]}方向滾地球，${who} 起手，形成雙殺！${outs>=3?'三出局。':''}`,`${B} grounds to the ${POSZH[fpos]}; ${who} starts the double play!${outs>=3?' Inning over.':''}`));ev[ev.length-1].t3=outs>=3;}
@@ -1510,6 +1516,8 @@ function emit(){
   else if(e.k==='note'){d.className='note';d.textContent=e.t}
   else if(e.k==='end'){d.className='note';d.textContent=e.t;$('#ls').innerHTML=lineTable(G.res,e)}
   else {d.className='pa'+(e.c?' '+e.c:'');d.textContent=e.t;
+    const tag={sb:TR('盜壘成功','STOLEN BASE'),cs:TR('盜壘失敗','CAUGHT STEALING'),err:TR('失誤','ERROR')}[e.c];
+    if(tag)d.insertAdjacentHTML('afterbegin',`<span class="pbtag">${tag}</span>`);
     if(e.sc){const s=document.createElement('span');s.className='sc';s.textContent=`${G.res.away.name} ${e.sc[0]} : ${e.sc[1]} ${G.res.home.name}`;d.appendChild(s)}}
   if(e.ps){$('#gstat').innerHTML=[0,1].map(t=>`<div class="gp"><span class="${(t?G.homeIdx:1-G.homeIdx)?'tb':'ta'}">${esc(t?G.res.home.name:G.res.away.name)}</span><span>${esc(e.ps[t][0])}</span><span class="mono">${e.ps[t][1]} ${TR('球','pitches')}</span>${staBar(e.ps[t][2])}</div>`).join('')}
   box.appendChild(d);box.scrollTop=box.scrollHeight;
@@ -1712,7 +1720,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='9e2b0ac541';
+const BUILD='66950487ac';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
