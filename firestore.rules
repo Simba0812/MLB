@@ -176,8 +176,8 @@ service cloud.firestore {
         let mine = rep.get(s, {}).get('w', '');
         let theirs = rep.get(o, {}).get('w', '');
         let them = r.setup.get(o, {});
-        // a forfeit counts when the opponent left, or has sent no heartbeat for 10 minutes
-        let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 600000;
+        // a forfeit counts when the opponent left, or has sent no heartbeat for 3 minutes
+        let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 180000;
         return inRoom(r) && r.created == od().pendAt
           && mine == s && (theirs == s || (theirs == '' && gone))
           && nd().rating == od().rating + 100 + (od().get('streak', 0) >= 3 ? 30 : od().get('streak', 0) * 10)
