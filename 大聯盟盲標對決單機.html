@@ -1540,7 +1540,7 @@ function submitDecision(v){
     if(NET.seat==null)return;
     const key=decKey(g),n=decList(g).length,cur=(NET.doc.dec||{})[key]||{};
     NET.doc={...NET.doc,dec:{...(NET.doc.dec||{}),[key]:{...cur,[n]:v}}};
-    dbWrite(()=>NET.ref.update({dec:{[key]:{[n]:v}}}));
+    NET.beatAt=Date.now();const seat=NET.seat;dbWrite(()=>NET.ref.update({dec:{[key]:{[n]:v}},setup:{[seat]:{hb:Date.now(),left:false}}}));
   }else{const gm=S.series.games[g];(gm.dec=gm.dec||[]).push(v)}
   resumeGame();
 }
@@ -1663,7 +1663,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='e594ffc8e0';
+const BUILD='84e319a9fe';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -1697,7 +1697,8 @@ function dbWrite(fn){
 // a phone that locks or switches apps pauses the page; on return, fetch the room at once instead of waiting for the reconnect
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&NET.on&&NET.ref)NET.ref.get().then(onRoom).catch(()=>{})});
 function sync(){if(!NET.on||NET.seat==null)return;S.rev=Math.random().toString(36).slice(2);commitRaw()}
-function commitRaw(){const st=JSON.stringify(dehydrate()),rev=S.rev;dbWrite(()=>NET.ref.update({state:st,rev}))}
+function commitRaw(){const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.seat;NET.beatAt=Date.now();
+  dbWrite(()=>NET.ref.update({state:st,rev,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}))}
 function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,mode:S.mode,lotMax:S.lotMax,budget:S.budget,
   teams:S.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:!!t.done,roster:t.roster.map(e=>({id:e.p.id,price:e.price,slot:e.slot,slot2:e.slot2||null,traded:!!e.traded}))})),
   ...deckDiff(),lotNo:S.lotNo,lot:S.lot?{p:S.lot.p.id,price:S.lot.price,high:S.lot.high,turn:S.lot.turn,passed:S.lot.passed}:null,
@@ -1771,10 +1772,13 @@ function countGame(){
   if(!S.series||!S.game||(NET.on&&NET.seat!==0))return;
   const k=(S.series.id||'')+'/'+S.game.gnum;if(COUNTED.has(k))return;COUNTED.add(k);bump('games',gameKind());
 }
+let STAT_CACHE=null;
 async function statLine(){
   const el=$('#statline');if(!el||!NET.bump)return;
-  try{const [a,t]=await Promise.all([NET.db.doc('stats/all').get(),NET.db.doc('stats/'+dayKey()).get()]);
-    const A=a.exists?a.data():{},T=t.exists?t.data():{},n=v=>(v||0).toLocaleString();
+  try{if(!STAT_CACHE||Date.now()-STAT_CACHE.at>300000){const [a,t]=await Promise.all([NET.db.doc('stats/all').get(),NET.db.doc('stats/'+dayKey()).get()]);
+      STAT_CACHE={at:Date.now(),A:a.exists?a.data():{},T:t.exists?t.data():{}}}
+    if(!$('#statline'))return;
+    const {A,T}=STAT_CACHE,n=v=>(v||0).toLocaleString();
     el.innerHTML=`📈 ${TR(`累計 <b>${n(A.players)}</b> 位玩家 · <b>${n(A.games)}</b> 場比賽 · 今天 <b>${n(T.active)}</b> 人上線、打了 <b>${n(T.games)}</b> 場`,`<b>${n(A.players)}</b> players · <b>${n(A.games)}</b> games played · today <b>${n(T.active)}</b> online, <b>${n(T.games)}</b> games`)} <button class="ghost" id="statbtn" style="padding:2px 10px;margin-left:6px">${TR('詳細','Details')}</button>`;
     $('#statbtn').onclick=openStats;
   }catch(e){}
@@ -1830,8 +1834,9 @@ function showEmo(seat,k){
 // how long ago this device last saw the stamp change, not by the stamp itself.
 function startBeat(){
   clearInterval(NET.beat);if(NET.seat==null)return;
-  const seat=NET.seat,beat=()=>{if(NET.on&&NET.seat===seat)dbWrite(()=>NET.ref.update({setup:{[seat]:{hb:Date.now(),left:false}}}))};
-  beat();NET.beat=setInterval(()=>{beat();updateNetBadge()},30000);
+  const seat=NET.seat,beat=()=>{if(NET.on&&NET.seat===seat){NET.beatAt=Date.now();dbWrite(()=>NET.ref.update({setup:{[seat]:{hb:Date.now(),left:false}}}))}};
+  // moves already carry a fresh stamp (commitRaw), so only a quiet stretch needs a write of its own
+  beat();NET.beat=setInterval(()=>{if(Date.now()-(NET.beatAt||0)>=29000)beat();updateNetBadge()},10000);
 }
 function watchOpp(d){
   if(NET.seat==null)return;const o=1-NET.seat,su=(d.setup||{})[o]||{},here=!!(d.seats||{})[o];
