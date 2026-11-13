@@ -1265,10 +1265,19 @@ function simGame(away,home,ctx){
           if(bases[0]&&bases[1])bases[2]=bases[1]; if(bases[0])bases[1]=bases[0]; bases[0]=h;
           say(hbp?TR(`${P} 失投觸身，${B} 保送上一壘。`,`${P} hits ${B} with a pitch; he takes first.`):pick(TR([`${B} 選到四壞球保送。`,`${P} 控球不穩，保送 ${B}。`],[`${B} draws a walk.`,`${P} loses the zone and walks ${B}.`])));}
         else if(res==='s1'){bb.ab++;bb.hits++;pb.h++;H[bt]++;
-          if(bases[2]){score(bases[2],bb);bases[2]=null}
           const send=ta(to,'run','send');let cut=false;
+          if(!DIRZH[fpos]&&flip!=='boot'){
+            // an infield single: everyone forced moves up one base; a runner on third who isn't forced
+            // scores only sometimes (two outs, running on contact), a runner on second stops at third
+            const f1=!!bases[0],f2=f1&&!!bases[1],f3=f2&&!!bases[2];
+            if(bases[2]&&(f3||rnd()<(outs===2?.45:.2))){score(bases[2],bb);bases[2]=null}
+            if(bases[1]&&(f2||!bases[2])){if(!bases[2]){bases[2]=bases[1];bases[1]=null}}
+            if(bases[0]){bases[1]=bases[0];bases[0]=null}
+          }else{
+          if(bases[2]){score(bases[2],bb);bases[2]=null}
           if(bases[1]){if(rnd()<.58+.12*spd+(outs===2?.2:0)+send){if(send>0&&rnd()<.08){outs++;s.cur.outs++;pb.outs++;cut=true}else score(bases[1],bb)}else bases[2]=bases[1];bases[1]=null}
           if(bases[0]){if(!bases[2]&&rnd()<.27+.1*spd+send*.5)bases[2]=bases[0];else bases[1]=bases[0];bases[0]=null}
+          }
           bases[0]=h;
           if(flip==='boot') say(TR(`😬 ${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`😬 ${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`),'err');
           else if(DIRZH[fpos]) say(pick(TR([`${B} 擊出${DIRZH[fpos]}方向的平飛球，一壘安打。`,`${B} 輕巧一推，${DIRZH[fpos]}前一壘安打。`],[`${B} lines a single to ${DIRZH[fpos]}.`,`${B} pokes a single into ${DIRZH[fpos]}.`])));
@@ -1296,12 +1305,27 @@ function simGame(away,home,ctx){
             const d=defAt(dt,fpos);
             if(!rob&&rnd()<clamp(.012-d*.0004,.004,.025)){E[dt]++;[2,1,0].forEach(j=>{if(bases[j]){if(j===2)score(bases[j],null);else bases[j+1]=bases[j];bases[j]=null}});bases[0]=h;say(TR(`❗ ${B} 打出${POSZH[fpos]}前滾地球，${who} 失誤！打者上壘。`,`❗ ${B} grounds to the ${POSZH[fpos]}: error by ${who}! The batter is safe.`),'err');}
             else if(bases[0]&&outs<2&&rnd()<.5-.08*spd+(defAt(dt,'SS')+defAt(dt,'2B'))*.003){outs+=2;s.cur.outs+=2;pb.outs+=2;
-              if(outs<3){if(bases[2]&&rnd()<.5){score(bases[2],null);bases[2]=null} if(bases[1]&&!bases[2]){bases[2]=bases[1];bases[1]=null}}
+              // the runner from first and the batter are out; runners forced by them still had to run
+              if(outs<3){const f2=!!bases[1],f3=f2&&!!bases[2];
+                if(bases[2]&&(f3||rnd()<.5)){score(bases[2],null);bases[2]=null} if(bases[1]&&!bases[2]){bases[2]=bases[1];bases[1]=null}}
               bases[0]=null; say(TR(`${B} 擊出${POSZH[fpos]}方向滾地球，${who} 起手，形成雙殺！${outs>=3?'三出局。':''}`,`${B} grounds to the ${POSZH[fpos]}; ${who} starts the double play!${outs>=3?' Inning over.':''}`));ev[ev.length-1].t3=outs>=3;}
+            else if(!rob&&outs<2&&bases[0]&&bases[1]&&bases[2]&&rnd()<.55){
+              // bases loaded, fewer than two out: the infield throws home for the force
+              outs++;s.cur.outs++;pb.outs++;bases[2]=bases[1];bases[1]=bases[0];bases[0]=h;
+              say(TR(`${B} 擊出${POSZH[fpos]}方向滾地球，${who} 傳本壘封殺三壘跑者，打者上一壘。${outs}出局。`,`${B} grounds to ${who}, who throws home to force the runner from third; the batter reaches. ${outs} out${outs>1?'s':''}.`));ev[ev.length-1].t3=true;}
+            else if(!rob&&outs<2&&bases[0]&&!bases[2]&&rnd()<.3){
+              // a force at the lead base instead of the out at first (fielder's choice)
+              outs++;s.cur.outs++;pb.outs++;const lead=bases[1]?1:0;
+              if(lead===1){bases[2]=null;bases[1]=bases[0]}bases[0]=h;
+              say(TR(`${B} 擊出${POSZH[fpos]}方向滾地球，${who} 選擇封殺${lead?'三':'二'}壘的前導跑者，打者上一壘。${outs}出局。`,`${B} grounds to ${who}, who forces the lead runner at ${lead?'third':'second'}; the batter reaches. ${outs} out${outs>1?'s':''}.`));ev[ev.length-1].t3=true;}
             else{outs++;s.cur.outs++;pb.outs++;
-              if(outs<3){ if(bases[2]&&rnd()<.45){score(bases[2],bb);bases[2]=null}
-                if(bases[1]&&!bases[2]){bases[2]=bases[1];bases[1]=null}
-                if(bases[0]&&!bases[1]){bases[1]=bases[0];bases[0]=null} }
+              if(outs<3){
+                // out at first: every forced runner moves up; a runner on third who isn't forced scores
+                // on contact some of the time, a runner on second who isn't forced moves to third about half
+                const f1=!!bases[0],f2=f1&&!!bases[1],f3=f2&&!!bases[2];
+                if(bases[2]&&(f3||rnd()<.45)){score(bases[2],bb);bases[2]=null}
+                if(bases[1]&&!bases[2]&&(f2||rnd()<.5)){bases[2]=bases[1];bases[1]=null}
+                if(bases[0]){bases[1]=bases[0];bases[0]=null} }
               say((rob?TR(`${who} 美技！撲住 ${B} 的強勁滾地球，傳一壘出局。`,`${who} makes a diving stop on ${B}'s hard grounder and throws him out!`):TR(`${B} 打成${who}方向滾地球出局。`,`${B} grounds out to ${who}.`))+(R[bt]>before?TR(' 三壘跑者回來得分。',' The runner from third scores.'):''));}
           } else if(otype==='f'||otype==='l'){
             const liner=otype==='l'; outs++;s.cur.outs++;pb.outs++;
