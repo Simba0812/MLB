@@ -1905,7 +1905,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='b8f997e4d3';
+const BUILD='487a3f16ed';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2688,8 +2688,14 @@ async function openBoard(){
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${TR('排位排行榜','Ranked leaderboard')}</span></h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   try{
-    const q=await NET.db.collection('players').orderBy('rating','desc').limit(30).get(),me=(acctUser()||{}).uid;
-    const SN=curSeason(),rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN);
+    const me=(acctUser()||{}).uid,SN=curSeason(),P=NET.db.collection('players');
+    // a player's record moves to the new season only when they next sign in, so a plain "highest ratings"
+    // list fills up with last season's players. From S1 on, ask for this season's players only (that
+    // needs the season+rating index in Firestore); until the index exists, fall back to a longer plain list.
+    let q;
+    if(SN>=1){try{q=await P.where('season','==',SN).orderBy('rating','desc').limit(100).get()}catch(e){console.warn('leaderboard index',e&&e.message);q=null}}
+    if(!q)q=await P.orderBy('rating','desc').limit(100).get();
+    const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN).slice(0,50);
     $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
     $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
