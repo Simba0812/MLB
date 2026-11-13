@@ -95,6 +95,8 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .bidclock .bar{flex:1;height:10px;border:2px solid var(--navy);background:var(--panel2)}
 .bidclock .bar i{display:block;height:100%;background:var(--navy);transition:width .25s linear}
 .bidclock.low{color:var(--red)}.bidclock.low .bar{border-color:var(--red)}.bidclock.low .bar i{background:var(--red)}
+.linebtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #06c755;background:#06c755;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
+.linebtn:hover{filter:brightness(1.06)}
 .fbrow{display:flex;justify-content:center;align-items:center;gap:8px 14px;flex-wrap:wrap;font-weight:700;color:var(--navy)}
 button.fbstar{font-size:24px;padding:0 6px;border:0;color:var(--amber);background:transparent}
 [data-fbt][aria-pressed="true"]{background:var(--navy);color:var(--paper);border-color:var(--navy)}
@@ -1720,7 +1722,7 @@ function finish(){
     ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${rankText()}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
-     ${rankedGame()||isRnd()?(seriesOver||S.rankAI?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>${isRnd()?`<button id="newmatch">🎲 ${TR('找新對手','Find a new opponent')}</button>`:''}`:''):`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}</div>
+     ${rankedGame()||isRnd()?(seriesOver||S.rankAI?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>${isRnd()?`<button id="newmatch">🎲 ${TR('找新對手','Find a new opponent')}</button>`:''}`:''):`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}${lineBtn()}</div>
    </div>
    ${S.mode!=='single'?seriesPanel(G.gnum+1,seriesOver):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
@@ -1740,6 +1742,9 @@ function finish(){
 /* ---------- feedback ---------- */
 // written to Firestore feedback/{id}; nobody can read it back from the page, the owner reads it in the Firebase console
 const FB_TAGS=()=>[['fun',TR('好玩','Fun')],['bug',TR('有 bug','Bug')],['idea',TR('建議','Idea')],['balance',TR('平衡','Balance')],['ui',TR('介面','Looks')]];
+// the players' LINE OpenChat
+const LINE_CHAT='https://line.me/ti/g2/ugXZG7mEZAP526k_C4FL11eLszg2B7tqd7L-IQ';
+const lineBtn=()=>window.OFFLINE?'':`<a class="linebtn" href="${LINE_CHAT}" target="_blank" rel="noopener">💬 ${TR('加入 LINE 社群','Join the LINE group')}</a>`;
 function feedbackBtn(page){return NET.bump?`<button class="ghost" data-fb="${page}">💬 ${TR('意見回饋','Feedback')}</button>`:''}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-fb]');if(b)openFeedback(b.dataset.fb)});
 function openFeedback(page){
@@ -1900,7 +1905,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='e94e13f3cf';
+const BUILD='b8f997e4d3';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2561,7 +2566,7 @@ function renderHome(){
    ${window.OFFLINE?`<section class="panel soon"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('和朋友各用自己的裝置連線對戰，敬請期待。','Play a friend from your own devices. Coming soon.')}</p><button disabled style="margin-top:14px">${TR('敬請期待','Coming soon')}</button></section>`:`<section class="panel"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('你和朋友各用自己的裝置，同步看到同一場選秀和比賽，輪到誰誰才能出手。','You and a friend each use your own device and see the same draft and games; only the player whose turn it is can act.')}${window.STANDALONE?TR('把網址和房號傳給朋友就能一起玩，不用註冊。',' Send your friend the link and room code; no sign-up needed.'):TR('朋友需要登入 claude.ai，並被你從 Share 選單加為可以編輯的成員。',' Your friend needs a claude.ai account and Editor access from the Share menu.')}</p><div id="netbox" style="margin-top:14px"></div></section>`}
   </div>
   <p class="statline" id="statline"></p>
-  ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我。','How was it? Tell me about bugs or features you want.')}</span><span id="fbhome"></span></div>`}
+  ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我，也歡迎到 LINE 社群找人對戰、聊天。','How was it? Tell me about bugs or features you want, or find opponents in the LINE group.')}</span><span id="fbhome"></span>${lineBtn()}</div>`}
   <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
   // the three ways to play are drawn as tickets: a stub on the left, the details on the right
   document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub"><span class="si">${['🤖','👥','🌐'][i]}</span><span class="sl">${[TR('單人','SOLO'),TR('雙人','2P'),TR('線上','ONLINE')][i]}</span></div>`);
@@ -2750,7 +2755,7 @@ function mmWait(d){
   const rk=!!d.cfg.ranked;
   el.innerHTML=`<h2>${rk?'🏆':'🎲'} ${rk?TR('正在找排位對手…','Looking for a ranked opponent…'):TR('正在找隨機對手…','Looking for an opponent…')}</h2><p class="hint" style="margin-top:6px">${rk?TR(`已等 <span id="mmsec">0</span> 秒。下一位按「開始排位」的玩家會和你配對（${roomLgs(d.cfg).map(l=>l==='CPBL'?'中職':'MLB').join(' 或 ')}）。`,`Waiting <span id="mmsec">0</span>s. The next player who presses "Play ranked" is paired with you (${roomLgs(d.cfg).join(' or ')}).`):TR('已等 <span id="mmsec">0</span> 秒。下一位按「隨機配對」的玩家會和你配對。','Waiting <span id="mmsec">0</span>s. The next player who presses "Random match" is paired with you.')}</p>
    <p class="hint" id="mmmiss" role="status" style="margin-top:6px;color:var(--red);font-weight:700"></p>
-   <div id="mmlate" hidden><p style="margin-top:8px">${TR('目前好像沒有其他玩家在線上。','Nobody else seems to be online right now.')}</p></div>
+   <div id="mmlate" hidden><p style="margin-top:8px">${TR('目前好像沒有其他玩家在線上。','Nobody else seems to be online right now.')}${window.OFFLINE?'':` <a href="${LINE_CHAT}" target="_blank" rel="noopener" style="color:#06a347;font-weight:900">${TR('到 LINE 社群約人對戰 →','Find an opponent in the LINE group →')}</a>`}</p></div>
    <div class="row" style="margin-top:10px">${d.cfg.ranked&&PROF.doc&&PROF.doc.rating<AI_RK.cap&&aiLeft(PROF.doc)>0?`<button class="solid" id="mmrk" hidden>🤖 ${TR(`打電腦排位（算積分，今天還剩 ${aiLeft(PROF.doc)} 場）`,`Ranked vs the computer (counts; ${aiLeft(PROF.doc)} left today)`)}</button>`:''}<button class="${d.cfg.ranked?'ghost':'solid'}" id="mmai" hidden>🤖 ${d.cfg.ranked?TR('打電腦練習（不算分）','Practice vs the computer (no rating)'):TR('先和電腦打','Play the computer instead')}</button><button class="ghost" id="mmstop">${TR('取消配對','Stop looking')}</button></div>
    <p class="hint" id="mmerr" role="alert" style="margin-top:6px"></p>`;
   if($('#mmrk'))$('#mmrk').onclick=async()=>{$('#mmrk').disabled=true;try{detachRoom();await startAIRanked()}catch(e){S.screen='home';render();const el=$('#neterr');if(el)el.textContent=e.message||String(e)}};
