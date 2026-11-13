@@ -402,8 +402,22 @@ const f3=x=>x==null?'—':x.toFixed(3).replace(/^0/,'');
 const pct=x=>(x*100).toFixed(1)+'%';
 
 /* ---------- ratings ---------- */
-function hitBlend(p){ if(p.woba&&p.xwoba) return .5*p.woba+.5*p.xwoba; if(p.woba) return p.woba; return (parseFloat(p.obp)*1.8+parseFloat(p.slg))/3.1; }
-function pitBlend(p){ const e=parseFloat(p.era); return p.xera!=null? .5*e+.5*p.xera : p.fip!=null? .5*e+.5*p.fip : e; }
+function hitBlendRaw(p){ if(p.woba&&p.xwoba) return .5*p.woba+.5*p.xwoba; if(p.woba) return p.woba; return (parseFloat(p.obp)*1.8+parseFloat(p.slg))/3.1; }
+function pitBlendRaw(p){ const e=parseFloat(p.era); return p.xera!=null? .5*e+.5*p.xera : p.fip!=null? .5*e+.5*p.fip : e; }
+// small samples: a hitter under 250 PA or a pitcher under 150 batters faced is pulled toward the league
+// average in proportion to how little he played (72 PA keeps about half of his edge). Every MLB player in
+// the pool is above both lines, so this only touches the CPBL's part-timers. Shown stats stay as they are.
+const pBF=p=>(p.bfg||4)*(p.g||1);
+const sampleF=p=>p.type==='H'?(p.pa>=250?1:(p.pa+100)/350):(pBF(p)>=150?1:(pBF(p)+60)/210);
+const shrink=(v,lg,f)=>lg+(v-lg)*f;
+function blendLg(){
+  if(POOL.blendLg)return POOL.blendLg;
+  let hw=0,hs=0,pw=0,ps=0;
+  POOL.forEach(p=>{if(p.type==='H'){hw+=p.pa;hs+=hitBlendRaw(p)*p.pa}else{const b=pBF(p),v=pitBlendRaw(p);if(isFinite(v)){pw+=b;ps+=v*b}}});
+  return POOL.blendLg={h:hs/hw,p:ps/pw};
+}
+function hitBlend(p){ const f=sampleF(p),v=hitBlendRaw(p);return f>=1?v:shrink(v,blendLg().h,f); }
+function pitBlend(p){ const f=p.type==='P'?sampleF(p):1,v=pitBlendRaw(p);return f>=1?v:shrink(v,blendLg().p,f); }
 // hitter rating ≈ 70% bat, 20% glove and position, 10% legs
 const POSADJ={C:5,SS:4,CF:3,'2B':2,'3B':2,LF:0,RF:0,'1B':-3,DH:-5};
 // fielding value on one scale for both leagues: OAA runs (MLB) or UZR (CPBL); catchers use framing runs
@@ -434,7 +448,7 @@ function ovr(p){
   if(p.type==='H'){let o=curveOvr(rankPct(OVR_SORT.H,rawBat(p)));if(p.twp)o=Math.max(o,curveOvr(rankPct(OVR_SORT.SP,pitOvr(p.twp))))+4;return Math.round(clamp(o,40,99))}
   return Math.round(clamp(curveOvr(rankPct(p.pos==='SP'?OVR_SORT.SP:OVR_SORT.RP,pitOvr(p))),40,99));
 }
-function pitOvr(p){ return 96-(pitBlend(p)-2.2)*13+(p.r.k-.22)*70; }
+function pitOvr(p){ const f=p.type==='P'?sampleF(p):1,k=f>=1?p.r.k:shrink(p.r.k,LGP?LGP.k:p.r.k,f);return 96-(pitBlend(p)-2.2)*13+(k-.22)*70; }
 
 /* ---------- league baselines ---------- */
 let LG;
@@ -1069,8 +1083,10 @@ function tacHint(t){
 }
 
 /* ---------- simulation engine ---------- */
-function adjH(h){const m=(h.woba&&h.xwoba)?(.5*h.woba+.5*h.xwoba)/h.woba:1;const r={...h.r};['s1','s2','s3','hr'].forEach(k=>r[k]*=m);return r}
-function adjP(p){const m=p.m!=null?p.m:(p.woba&&p.xwoba)?(.5*p.woba+.5*p.xwoba)/p.woba:1;const r={...p.r};['s1','s2','s3','hr'].forEach(k=>r[k]*=m);return r}
+function adjH(h){const m=(h.woba&&h.xwoba)?(.5*h.woba+.5*h.xwoba)/h.woba:1;const r={...h.r};['s1','s2','s3','hr'].forEach(k=>r[k]*=m);
+  const f=sampleF(h);if(f<1)['k','bb','s1','s2','s3','hr'].forEach(k=>r[k]=shrink(r[k],LG[k],f));return r}
+function adjP(p){const m=p.m!=null?p.m:(p.woba&&p.xwoba)?(.5*p.woba+.5*p.xwoba)/p.woba:1;const r={...p.r};['s1','s2','s3','hr'].forEach(k=>r[k]*=m);
+  const f=p.type==='P'?sampleF(p):1;if(f<1)['k','bb','s1','s2','s3','hr'].forEach(k=>r[k]=shrink(r[k],LGP[k],f));return r}
 function log5(b,p,l){const x=b*p/l, y=(1-b)*(1-p)/(1-l);return x/(x+y)}
 function paProbs(h,p,park,fat,cdef,to,tp){
   const hr=adjH(h),pr=adjP(p),o={};
@@ -1904,7 +1920,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='487a3f16ed';
+const BUILD='fc8171cb79';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
