@@ -935,7 +935,7 @@ function renderDraft(){
   document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{declareDone(+b.dataset.done);sync()});
   scheduleAI();afkWatch();
 }
-function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[null,null],pending:null,log:[]};render()}
+function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[null,null],pending:null,log:[],t0:Date.now()};render()}
 
 /* ---------- trades ---------- */
 function tradeResult(pi,ai,oi,bi){
@@ -978,10 +978,11 @@ function renderTrade(){
    ${online?`<button id="tdone" ${myDone||NET.seat==null?'disabled':''}>${myDone?TR('你已經交易完了','You\'re done trading'):TR('我交易完了','I\'m done trading')}</button>
      <span class="hint">${TR('對手：','Opponent: ')}${oppDone?TR('✅ 交易完了','✅ done'):TR('⏳ 還在看','⏳ still looking')}${myDone?TR('。交易完了還是可以接受或拒絕對手的提案；雙方都完成後進入賽前準備。','. You can still accept or decline their proposals; pregame starts once both of you are done.'):''}</span>`
     :`<button id="tdone" ${T.pending?'disabled':''}>${TR('交易結束，進入賽前準備','Done trading, go to pregame')}</button>`}</div>
+   ${online?'<p class="hint" id="trcd" style="margin-top:8px"></p>':''}
    <div class="log" style="margin-top:12px">${T.log.map(l=>`<div>${l}</div>`).join('')}</div></section>`;
   document.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{T.prop=+b.dataset.tp;T.sel=[null,null];render()});
   [0,1].forEach(i=>document.querySelectorAll(`input[name="tr${i}"]`).forEach(r=>r.onchange=()=>{T.sel[i]=+r.value;render()}));
-  $('#tprop').onclick=()=>{T.left[pi]--;T.pending={pi,a:T.sel[pi],b:T.sel[oi]};sync();render()};
+  $('#tprop').onclick=()=>{T.left[pi]--;T.pending={pi,a:T.sel[pi],b:T.sel[oi],at:Date.now()};sync();render()};
   $('#tdone').onclick=online?()=>{T.done[pi]=true;T.log.unshift(TR(`🤝 ${esc(P.name)} 交易完了`,`🤝 ${esc(P.name)} is done trading`));sync();render()}
     :()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   if(T.pending&&$('#tacc')){
@@ -990,6 +991,28 @@ function renderTrade(){
     $('#trej').onclick=()=>{T.log.unshift(TR(`❌ ${esc(B.name)} 拒絕了 ${esc(an)} ⇄ ${esc(bn)}`,`❌ ${esc(B.name)} declines ${esc(an)} ⇄ ${esc(bn)}`));T.pending=null;sync();render()};
   }
   if(S.ai&&T.pending&&T.pending.pi!==S.ai.seat){clearTimeout(aiTimer);aiTimer=setTimeout(aiTradeReply,S.aiFast?0:1100)}
+  if(online)tradeWatch();
+}
+// online trades can't stall on a player who stopped answering: the trade window is 3 minutes, a proposal
+// waits 45 s for its answer (then it is declined). Each side's own phone acts when its time is up; the other
+// phone steps in 10 s later in case that one is asleep. Running out of time here is not a strike.
+const TRADE_MS=180000,TRADE_ANS_MS=45000;
+function tradeWatch(){if(!NET.trTick)NET.trTick=setInterval(tradeTick,1000);tradeTick()}
+function tradeTick(){
+  const T=S.trade,me=NET.seat;
+  if(!NET.on||S.ai||S.screen!=='trade'||!T){clearInterval(NET.trTick);NET.trTick=null;return}
+  if(me==null||!T.t0)return;
+  const now=Date.now(),mm=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
+  const act=fn=>{NET.timerAct=true;try{fn();sync()}finally{NET.timerAct=false}render()};
+  if(T.pending&&T.pending.at){
+    const resp=1-T.pending.pi,left=T.pending.at+TRADE_ANS_MS-now;
+    if(left<=(resp===me?0:-BID_REMOTE_GRACE))return act(()=>{T.log.unshift(TR(`⌛ ${esc(S.teams[resp].name)} 沒有在時間內回覆，提案取消`,`⌛ ${esc(S.teams[resp].name)} did not answer in time; the proposal is off`));T.pending=null});
+    const el=$('#trcd');if(el)el.textContent=resp===me?TR(`⏱ 你還有 ${Math.ceil(left/1000)} 秒回覆這筆提案`,`⏱ ${Math.ceil(left/1000)}s to answer`):TR(`⏱ 對手還有 ${Math.max(0,Math.ceil(left/1000))} 秒回覆`,`⏱ ${Math.max(0,Math.ceil(left/1000))}s for them to answer`);
+    return;
+  }
+  const left=T.t0+TRADE_MS-now,late=[0,1].filter(i=>!T.done[i]&&left<=(i===me?0:-BID_REMOTE_GRACE));
+  if(late.length)return act(()=>late.forEach(i=>{T.done[i]=true;T.log.unshift(TR(`⌛ ${esc(S.teams[i].name)} 交易時間到，自動結束交易`,`⌛ ${esc(S.teams[i].name)} ran out of trade time`))}));
+  const el=$('#trcd');if(el)el.textContent=T.done[me]&&T.done[1-me]?'':TR(`⏱ 交易時間還剩 ${mm(left)}，時間到會自動結束交易`,`⏱ ${mm(left)} left to trade; then trading ends on its own`);
 }
 
 /* ---------- lineup building ---------- */
@@ -2016,7 +2039,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='4fd18cc97e';
+const BUILD='f6d202b035';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2055,7 +2078,7 @@ function commitRaw(){const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.sea
 function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,mode:S.mode,lotMax:S.lotMax,budget:S.budget,
   teams:S.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:!!t.done,roster:t.roster.map(e=>({id:e.p.id,price:e.price,slot:e.slot,slot2:e.slot2||null,traded:!!e.traded}))})),
   ...deckDiff(),lotNo:S.lotNo,lot:S.lot?{p:S.lot.p.id,price:S.lot.price,high:S.lot.high,turn:S.lot.turn,passed:S.lot.passed}:null,
-  log:S.log.slice(0,20),trade:S.trade?{left:S.trade.left,prop:S.trade.prop,pending:S.trade.pending,log:S.trade.log.slice(0,15),done:S.trade.done||[false,false]}:null,
+  log:S.log.slice(0,20),trade:S.trade?{left:S.trade.left,prop:S.trade.prop,pending:S.trade.pending,t0:S.trade.t0||0,log:S.trade.log.slice(0,15),done:S.trade.done||[false,false]}:null,
   series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev,ts:Date.now()}}
 function hydrate(o){
   const prevSel=S.trade&&S.trade.sel;
