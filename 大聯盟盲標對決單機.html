@@ -1291,12 +1291,14 @@ function simGame(away,home,ctx){
     }
     if(choice!=='keep'){const np=avail(s).find(p=>sid(p.id)===choice);if(np)doChange(dt,np,lead)}
   }
-  // before the 4th and the 7th: each side may change its tactics (the away side is asked first)
+  // a person is asked once, before the 5th (the away side first); the computer adjusts before the 4th and the 7th
   function manageTactics(inning){
     for(const s of st){
+      const human=ctx.human[s.tm.i];
+      if(human?inning!==5:inning===5)continue;
       const lead=R[s.ti]-R[1-s.ti],sug=tacStr(aiTactic(inning,lead,s.tac));
       let v=sug;
-      if(ctx.human[s.tm.i])v=decide({kind:'tac',team:s.tm.i,inning,half:0,outs:0,bases:baseTxt([null,null,null]),lead,suggest:sug,cur:tacStr(s.tac)});
+      if(human)v=decide({kind:'tac',team:s.tm.i,inning,half:0,outs:0,bases:baseTxt([null,null,null]),lead,suggest:sug,cur:tacStr(s.tac)});
       const t=tacOf(v);
       if(tacStr(t)!==tacStr(s.tac)){s.tac=t;ev.push({k:'note',t:TR(`📋 ${s.tm.name} 調整戰術：打擊「${TACTL().off[t.off]}」、跑壘「${TACTL().run[t.run]}」、投球「${TACTL().pit[t.pit]}」。`,`📋 ${s.tm.name} change tactics: batting "${TACTL().off[t.off]}", running "${TACTL().run[t.run]}", pitching "${TACTL().pit[t.pit]}".`)})}
     }
@@ -1329,7 +1331,7 @@ function simGame(away,home,ctx){
 
   let inning=1, done=false, last=null;
   while(!done){
-    if(inning===4||inning===7)manageTactics(inning);
+    if(inning===4||inning===5||inning===7)manageTactics(inning);
     for(let half=0;half<2;half++){
       const bt=half, dt=1-half;
       if(inning>=9 && half===1 && R[1]>R[0]){ line[1].push('X'); done=true; break;}
@@ -1623,7 +1625,7 @@ function renderPick(){
      <div class="eyebrow" style="margin-top:14px">${TR('牛棚分組與體力','Bullpen roles and stamina')}</div>
      <div class="penlist" style="grid-template-columns:minmax(0,1fr) auto auto">${pen.map(p=>`<span>${p.pos==='CL'||p.pos==='SP'?`<span class="mono">${p.pos}</span> `:''}${esc(nm(p))} <span class="mono" style="color:var(--dim)">ERA ${p.era}</span></span>${p.pos==='CL'||sent?`<span class="hint">${p.pos==='CL'?TR('終結者','Closer'):ROLEL()[ROLESEL[i][sid(p.id)]]||TR('不上場','Not used')}</span>`:`<select data-role="${i},${esc(p.id)}" aria-label="${esc(nm(p))}" style="padding:3px 6px;font-size:13px" ${p.pos==='SP'&&p.id===cur?'disabled':''}>${p.pos==='SP'?`<option value="">${p.id===cur?TR('今天先發','Starting today'):TR('不上場','Not used')}</option>`:''}${ROLES.map(r=>`<option value="${r}" ${p.id!==cur&&ROLESEL[i][sid(p.id)]===r?'selected':''}>${ROLEL()[r]}</option>`).join('')}</select>`}<span style="white-space:nowrap">${staBar(sv(p))}</span>`).join('')}</div>
      ${sent?'':`<p class="hint" style="margin-top:6px">${ROLES.map(r=>`${ROLEL()[r]}：${ROLEHINT()[r]}`).join('；')}${TR('。其他先發投手預設不上場，要用的話自己編進牛棚（會吃掉他的體力）。','. Other starters stay out unless you put them in the bullpen yourself (it costs them stamina).')}</p>`}
-     ${sent?`<p class="hint" style="margin-top:8px">${TR('已送出，等待對手準備好。','Sent. Waiting for your opponent.')}</p>`:lineupEditor(i)+`<div class="eyebrow" style="margin-top:14px">${TR('戰術（4 局、7 局開始前可以再調整）','Tactics (you can change them before the 4th and the 7th)')}</div>`+tacticsPicker(TACSEL[i],'tpk',i)}</section>`};
+     ${sent?`<p class="hint" style="margin-top:8px">${TR('已送出，等待對手準備好。','Sent. Waiting for your opponent.')}</p>`:lineupEditor(i)+`<div class="eyebrow" style="margin-top:14px">${TR('戰術（5 局開始前可以再調整一次）','Tactics (you can change them once more before the 5th)')}</div>`+tacticsPicker(TACSEL[i],'tpk',i)}</section>`};
   const mySent=NET.on&&NET.seat!=null&&picks[NET.seat]!=null;
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${S.mode==='single'?TR('決勝戰','Winner-take-all'):TR('第 '+(g+1)+' 戰','Game '+(g+1))} · ${esc(parkOf(S.teams[homeIdx].park).n)}</div>
@@ -2110,7 +2112,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2ac9247f1f';
+const BUILD='096918be8f';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
