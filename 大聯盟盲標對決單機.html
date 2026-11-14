@@ -235,6 +235,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .netbar .warn{color:var(--amber)}
 .netbar .sync{color:var(--amber);font-family:var(--mono);font-size:12px}
 .netbar .sync.ok{color:var(--dim)}
+.netbar .sync.slow{color:var(--red);font-weight:700}
 .follow{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--panel2);border-top:3px solid var(--amber);
   padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));font-weight:700}
 .waiting{color:var(--dim);font-weight:500}
@@ -2015,7 +2016,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='3fff1f1d6d';
+const BUILD='4fd18cc97e';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2055,7 +2056,7 @@ function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,m
   teams:S.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:!!t.done,roster:t.roster.map(e=>({id:e.p.id,price:e.price,slot:e.slot,slot2:e.slot2||null,traded:!!e.traded}))})),
   ...deckDiff(),lotNo:S.lotNo,lot:S.lot?{p:S.lot.p.id,price:S.lot.price,high:S.lot.high,turn:S.lot.turn,passed:S.lot.passed}:null,
   log:S.log.slice(0,20),trade:S.trade?{left:S.trade.left,prop:S.trade.prop,pending:S.trade.pending,log:S.trade.log.slice(0,15),done:S.trade.done||[false,false]}:null,
-  series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev}}
+  series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev,ts:Date.now()}}
 function hydrate(o){
   const prevSel=S.trade&&S.trade.sel;
   // rebuilding the league tables takes a phone tens of milliseconds, so only when the league actually changes
@@ -2082,6 +2083,9 @@ function onRoom(snap){
   // Our own unsent state shows up here with our own rev, and the rev check already skips that.
   if(d.state&&d.rev!==S.rev){
     const st=JSON.parse(d.state);
+    // how long the other player's move took to reach this screen (their clock to ours, so roughly).
+    // Skip the first snapshot after joining or a reload, and any that waited while this page was hidden.
+    if(NET.rxReady&&st.ts&&!document.hidden&&Date.now()-(NET.shownAt||0)>3000){const ms=Date.now()-st.ts;if(ms>-2000&&ms<30000)NET.rx=Math.max(0,ms)}
     const watching=S.screen==='game'&&S.game&&S.game.res;
     if(watching&&st.screen==='game'&&st.gnum===S.game.gnum){const keep=S.game;hydrate(st);S.game=keep;S.screen='game'}
     else if(watching){NET.pending=d;showFollow()}
@@ -2093,14 +2097,15 @@ function onRoom(snap){
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length&&decList(S.game.gnum).length>S.game.res.paused.di) resumeGame();
   if(S.screen==='room'&&NET.seat===0&&(d.cfg||{}).rnd&&!(d.cfg||{}).mm&&bothReady(d)&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;closeReady();startOnlineDraft()}
   if(isRanked()&&NET.seat!=null&&S.screen!=='room')rankStart().then(rankCheck);
-  updateNetBadge();
+  NET.rxReady=true;updateNetBadge();
 }
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)NET.shownAt=Date.now()});
 function showFollow(){const f=$('#follow');f.hidden=false;document.querySelectorAll('#endbtns button').forEach(b=>b.disabled=true)}
 $('#followbtn').onclick=()=>{const d=NET.pending;NET.pending=null;$('#follow').hidden=true;if(!d)return;hydrate(JSON.parse(d.state));render();window.scrollTo(0,0)};
 function netBadge(){
   if(!NET.on) return '';
   const me=NET.seat==null?TR('你正在觀戰','You are watching'):`${TR('你是 玩家 ','You are Player ')}${NET.seat?'B':'A'}${S.teams[NET.seat]&&S.teams[NET.seat].name&&S.screen!=='room'?' ('+esc(S.teams[NET.seat].name)+')':''}`;
-  return `<span class="dot" aria-hidden="true"></span><span>${TR('線上房間','Room')} <b class="mono">${NET.code}</b></span><span>${me}</span>${NET.pend?`<span class="sync">${TR('傳送中…','Sending…')}</span>`:NET.lag!=null?`<span class="sync ok">${TR(`已同步 · ${(NET.lag/1000).toFixed(1)} 秒`,`Synced · ${(NET.lag/1000).toFixed(1)}s`)}</span>`:''}${NET.err?`<span class="warn">⚠ ${esc(NET.err)}</span>`:''}${verWarn()}${oppWarn()}${isRanked()&&NET.rk&&rankText()&&!(S.screen==='game'&&S.game&&S.game.res&&S.game.pos<S.game.res.ev.length)?`<span class="sync">${rankText()}</span>`:''}<button class="ghost" id="leave" style="margin-left:auto;padding:4px 10px">${TR('離開房間','Leave room')}</button>`;
+  return `<span class="dot" aria-hidden="true"></span><span>${TR('線上房間','Room')} <b class="mono">${NET.code}</b></span><span>${me}</span>${NET.pend?`<span class="sync">${TR('傳送中…','Sending…')}</span>`:NET.lag!=null?`<span class="sync ok">${TR(`已同步 · 送出 ${(NET.lag/1000).toFixed(1)} 秒`,`Synced · sent in ${(NET.lag/1000).toFixed(1)}s`)}</span>`:''}${NET.rx!=null?`<span class="sync ${NET.rx>=1500?'slow':'ok'}" title="${TR('對手出手到你看到的時間（兩台裝置的時鐘可能有些微誤差）','From the other player\'s move to your screen (the two clocks may differ slightly)')}">${TR(`收到對手動作 ${(NET.rx/1000).toFixed(1)} 秒`,`Their move arrived in ${(NET.rx/1000).toFixed(1)}s`)}</span>`:''}${NET.err?`<span class="warn">⚠ ${esc(NET.err)}</span>`:''}${verWarn()}${oppWarn()}${isRanked()&&NET.rk&&rankText()&&!(S.screen==='game'&&S.game&&S.game.res&&S.game.pos<S.game.res.ev.length)?`<span class="sync">${rankText()}</span>`:''}<button class="ghost" id="leave" style="margin-left:auto;padding:4px 10px">${TR('離開房間','Leave room')}</button>`;
 }
 function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=leaveRoom;const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()}}
 // let go of the room without touching the game on screen; the other player sees that this seat left
@@ -2109,7 +2114,7 @@ function detachRoom(){
   if(NET.on&&NET.seat!=null&&NET.ref){const ref=NET.ref,seat=NET.seat,mm=NET.seat===0&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.mm;
     ref.update({setup:{[seat]:{left:true}},...(mm?{cfg:{mm:''}}:{})}).catch(()=>{})}
   if(NET.unsub)NET.unsub();clearInterval(NET.beat);clearInterval(NET.waitTick);
-  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,err:'',unsub:null,beat:null,waitTick:null,opp:null,mm:null,rk:null,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0});clearInterval(NET.afkTick);NET.afkTick=null;emoUI();
+  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,err:'',unsub:null,beat:null,waitTick:null,opp:null,mm:null,rk:null,emoSeen:undefined,rx:null,rxReady:false,afk:null,myAfk:0,oppAfk:0});clearInterval(NET.afkTick);NET.afkTick=null;emoUI();
   $('#follow').hidden=true;S.rev=null;
 }
 function leaveRoom(){detachRoom();clearTimeout(timer);S.screen='home';render()}
@@ -2126,9 +2131,6 @@ const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=
 async function countVisit(){
   if(!lsGet('mlbSeen')&&await bump('players'))lsSet('mlbSeen','1');
   const d=dayKey();if(lsGet('mlbDay')!==d&&await bump('active'))lsSet('mlbDay',d);
-  // a visit is one browser tab session: reloading the page or moving between screens doesn't add another
-  let seen=null;try{seen=sessionStorage.getItem('mlbVisit')}catch(e){}
-  if(!seen&&await bump('visits'))try{sessionStorage.setItem('mlbVisit','1')}catch(e){}
 }
 const gameKind=()=>S.rankAI?'rankedAI':isRanked()?'ranked':NET.on?'online':S.ai?'solo':'local';
 /* ---------- recent matches: the last five finished series, kept on this device ---------- */
@@ -2200,7 +2202,7 @@ async function openStats(){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('遊玩統計','Play statistics')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📈 ${TR('遊玩統計','Play statistics')}</h2><div id="stt" style="color:#10261d;overflow-x:auto">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
-  const cols=[['visits',TR('造訪','Visits')],['active',TR('上線','Online')],['players',TR('新玩家','New')],['drafts',TR('選秀（次）','Drafts')],['games',TR('比賽（場）','Games')],['solo',TR('單人','Solo')],['local',TR('同機','Same device')],['online',TR('線上','Online')],['ranked',TR('排位','Ranked')],['rankedAI',TR('電腦排位','Ranked vs CPU')]];
+  const cols=[['active',TR('上線','Online')],['players',TR('新玩家','New')],['drafts',TR('選秀（次）','Drafts')],['games',TR('比賽（場）','Games')],['solo',TR('單人','Solo')],['local',TR('同機','Same device')],['online',TR('線上','Online')],['ranked',TR('排位','Ranked')],['rankedAI',TR('電腦排位','Ranked vs CPU')]];
   try{
     const days=[...Array(14)].map((_,i)=>dayKey(Date.now()-i*86400000));
     const docs=await Promise.all(['all',...days].map(k=>NET.db.doc('stats/'+k).get()));
