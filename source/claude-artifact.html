@@ -1754,9 +1754,9 @@ function play(){
   const e=G.res.ev[G.pos-1];
   timer=setTimeout(play,e.k==='half'?S.speed*1.8:S.speed);
 }
-// online: a decision left unanswered for 50 seconds takes the suggestion; the waiting player's screen
-// shows the same 50 s but fills it in itself 10 s later, in case the other phone is asleep. Both write the same value.
-const DEC_SEC=50,DEC_GRACE=10;
+// online: a decision left unanswered for 45 seconds takes the suggestion; the waiting player's screen
+// shows the same 45 s but fills it in itself 10 s later, in case the other phone is asleep. Both write the same value.
+const DEC_SEC=45,DEC_GRACE=10;
 let decTimer=null,decTick=null;
 function clearDecTimers(){clearTimeout(decTimer);clearInterval(decTick);decTimer=decTick=null}
 function decCountdown(sec,onExpire,grace=0){
@@ -2103,7 +2103,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='493992d9d9';
+const BUILD='6fbea6ba54';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
