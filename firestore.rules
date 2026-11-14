@@ -97,6 +97,15 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // a player's last five matches (shown on the home page): one small document, only its owner reads or writes it
+    match /players/{uid}/hist/{doc} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid && doc == 'recent'
+        && request.resource.data.keys().hasOnly(['list', 'at'])
+        && request.resource.data.list is list && request.resource.data.list.size() <= 5
+        && request.resource.data.at is number;
+    }
+
     // One record per account for ranked play. Only its owner writes it, and only in these steps:
     // pick or change a nickname; start a ranked game (book the loss: K x expected score, Elo);
     // a confirmed win (add K back); or drop a pending game (the booked loss stays).
