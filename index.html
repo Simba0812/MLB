@@ -551,7 +551,7 @@ function prOf(g,k,v,lowGood){const a=PRS[g][k];if(v==null||!a||!a.length)return 
 const S={screen:'home',teams:[
   {name:'',park:0,budget:200,roster:[],done:false},
   {name:'',park:1,budget:200,roster:[],done:false}],
-  budget:200,lotMax:50,league:'MLB',slots:{SP:4,RP:5,CL:2,BN:2},deck:[],lotNo:0,lot:null,log:[],speed:(()=>{try{const v=+localStorage.getItem('mlbSpeed');if([1800,700,250].includes(v))return v}catch(e){}return 700})(),mode:'single'};
+  budget:200,lotMax:50,league:'MLB',slots:{SP:4,RP:5,CL:2,BN:2},deck:[],lotNo:0,lot:null,log:[],speed:380,mode:'single'};
 
 // best-of-7 needs a fourth starter for the rotation
 // starters, relievers and closers: the exact number set before the draft
@@ -1277,7 +1277,10 @@ function simGame(away,home,ctx){
     let choice=sug?sid(sug.id):'keep';
     const kept=c.keep&&c.keep.runs===c.runs&&c.keep.sta-sta<15;
     // blowouts are managed automatically; ask when the game is within reach or the starter is in trouble
-    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||sta<40));
+    // a person is asked about the starter, a reliever who is getting hit mid-inning, and the bullpen in the
+    // 8th or later of a game within two runs; the reliever-per-inning routine otherwise runs by the roles set before the game
+    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=8&&Math.abs(lead)<=2));
+    if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead)||avail(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
       choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,
@@ -1292,7 +1295,8 @@ function simGame(away,home,ctx){
     for(const s of st){
       const lead=R[s.ti]-R[1-s.ti],sug=tacStr(aiTactic(inning,lead,s.tac));
       let v=sug;
-      if(ctx.human[s.tm.i])v=decide({kind:'tac',team:s.tm.i,inning,half:0,outs:0,bases:baseTxt([null,null,null]),lead,suggest:sug,cur:tacStr(s.tac)});
+      // a person is asked once, before the 7th; before the 4th their tactics just carry on
+      if(ctx.human[s.tm.i])v=inning<7?tacStr(s.tac):decide({kind:'tac',team:s.tm.i,inning,half:0,outs:0,bases:baseTxt([null,null,null]),lead,suggest:sug,cur:tacStr(s.tac)});
       const t=tacOf(v);
       if(tacStr(t)!==tacStr(s.tac)){s.tac=t;ev.push({k:'note',t:TR(`📋 ${s.tm.name} 調整戰術：打擊「${TACTL().off[t.off]}」、跑壘「${TACTL().run[t.run]}」、投球「${TACTL().pit[t.pit]}」。`,`📋 ${s.tm.name} change tactics: batting "${TACTL().off[t.off]}", running "${TACTL().run[t.run]}", pitching "${TACTL().pit[t.pit]}".`)})}
     }
@@ -1303,7 +1307,8 @@ function simGame(away,home,ctx){
     const best=bench.slice().sort((a,b)=>hitBlend(b)-hitBlend(a))[0];
     let choice=inning>=7&&Math.abs(diff)<=2&&hitBlend(best)>hitBlend(h)+.03?sid(best.id):'keep';
     if(ctx.human[s.tm.i]){
-      if(hitBlend(best)<=hitBlend(h)-.005) return;
+      // asked only when a pinch-hitter is the suggestion (the "keep him in" prompts were most of them)
+      if(choice==='keep') return;
       choice=decide({kind:'ph',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead:diff,suggest:choice,
         cur:{id:sid(h.id),name:nm(h),pos:h.fpos,avg:h.avg,ops:h.ops,ovr:ovr(h),today:TR(`${row.ab} 打數 ${row.hits} 安打`,`${row.hits}-for-${row.ab}`)},
         opts:bench.map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,avg:p.avg,ops:p.ops,ovr:ovr(p)})),tac:tacStr(s.tac)});
@@ -1692,7 +1697,7 @@ function renderGameShell(){
    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${title} · ${esc(res.park.n)}</div>
     <h2 style="margin-top:4px"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span> @ <span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span></h2>
     <p class="hint">${coinText(G.gnum)}${S.mode!=='single'?` <span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></div>
-    <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1800],[TR('中','Normal'),700],[TR('快','Fast'),250]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
+    <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1400],[TR('中','Normal'),380],[TR('快','Fast'),90]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
    </div>
    <div class="linescore" id="ls" style="margin-top:14px">${lineTable(res,null)}</div>
    <div class="gstat" id="gstat"></div>
@@ -1707,7 +1712,7 @@ function renderGameShell(){
    box.addEventListener('scroll',()=>{const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<40;
      if(atEnd!==!G.hold){G.hold=!atEnd;nb.hidden=atEnd}},{passive:true});
    nb.onclick=()=>{G.hold=false;nb.hidden=true;box.scrollTop=box.scrollHeight}}
-  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;try{localStorage.setItem('mlbSpeed',S.speed)}catch(e){}document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;
     if(NET.on&&NET.seat===+c.dataset.auto){const seat=NET.seat,on=c.checked;dbWrite(()=>NET.ref.update({setup:{[seat]:{auto:on}}}))}if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
   $('#skip').onclick=()=>{clearTimeout(timer);S.game.skip=true;play()};
@@ -2102,7 +2107,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='3c2ea99e86';
+const BUILD='084b930baa';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
