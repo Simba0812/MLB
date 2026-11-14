@@ -1153,10 +1153,10 @@ function simGame(away,home,ctx){
     const order=Math.abs(lead)>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
     const best=a=>a.slice().sort((x,y)=>(pitBlend(x)-sta(x)/40)-(pitBlend(y)-sta(y)/40))[0];
     for(const min of [45,30])for(const r of order){const g=pen.filter(p=>p.pos!=='CL'&&s.roles[sid(p.id)]===r&&sta(p)>=min);if(g.length)return best(g)}
-    // nobody fresh: whoever is left, the closer included from the 7th on. Before the 7th the computer never
-    // brings in a closer, even with the rest of the pen used up: the pitcher on the mound stays in.
-    // (A manager picking by hand can still call on the closer at any time.)
-    const rest=pen.filter(p=>p.pos!=='CL'||inning>=7);
+    // nobody fresh: whoever is left. The computer calls on a closer only from the 7th on, and only when tied or
+    // ahead by 1 to 3; behind, in a blowout, or before the 7th, the pitcher on the mound stays in rather than
+    // spend the closer's arm. (A manager picking by hand can still call on the closer at any time.)
+    const rest=pen.filter(p=>p.pos!=='CL'||(inning>=7&&lead>=0&&lead<=3));
     return rest.length?best(rest):null;
   }
   function doChange(dt,np,lead){
@@ -1946,7 +1946,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='cfd36b909b';
+const BUILD='ea7f58a541';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
