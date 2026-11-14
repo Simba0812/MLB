@@ -1143,10 +1143,10 @@ function simGame(away,home,ctx){
     const order=Math.abs(lead)>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
     const best=a=>a.slice().sort((x,y)=>(pitBlend(x)-sta(x)/40)-(pitBlend(y)-sta(y)/40))[0];
     for(const min of [45,30])for(const r of order){const g=pen.filter(p=>p.pos!=='CL'&&s.roles[sid(p.id)]===r&&sta(p)>=min);if(g.length)return best(g)}
-    // nobody fresh: whoever is left. The computer calls on a closer only from the 7th on, and only when tied or
-    // ahead by 1 to 3; behind, in a blowout, or before the 7th, the pitcher on the mound stays in rather than
-    // spend the closer's arm. (A manager picking by hand can still call on the closer at any time.)
-    const rest=pen.filter(p=>p.pos!=='CL'||(inning>=7&&lead>=0&&lead<=3));
+    // nobody fresh: whoever is left. The computer calls on a closer only from the 7th on, and only from one run
+    // behind to three ahead; further behind, in a blowout, or before the 7th, the pitcher on the mound stays in
+    // rather than spend the closer's arm. (A manager picking by hand can still call on the closer at any time.)
+    const rest=pen.filter(p=>p.pos!=='CL'||(inning>=7&&lead>=-1&&lead<=3));
     return rest.length?best(rest):null;
   }
   function doChange(dt,np,lead){
