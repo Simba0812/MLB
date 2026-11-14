@@ -247,6 +247,10 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .lupos{color:var(--amber)}
 .warn{font-size:12px;color:var(--red);white-space:nowrap}
 button.mini{padding:3px 8px;font-size:13px}
+.luwrap{margin-top:10px}.luwrap summary{cursor:pointer;font-weight:900;color:var(--navy);font-size:14px}
+.lugrid{gap:10px 18px;margin-top:6px}.lutab{width:100%;border-collapse:collapse;font-size:13px}
+.lutab td{padding:2px 4px;border-top:1px solid #d9cfb2;white-space:nowrap}.lutab td.n{width:100%;overflow:hidden;text-overflow:ellipsis;max-width:0}
+.lutab td.p{color:var(--dim)}.lutab td.l{text-align:right}.lutab tr.up td{background:#fff3c4;font-weight:900}
 .gstat{display:flex;gap:10px 22px;flex-wrap:wrap;margin-top:10px;font-size:13px}
 .gp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .decide{border-color:var(--amber)}
@@ -1138,6 +1142,8 @@ function simGame(away,home,ctx){
   const defAt=(ti,pos)=>st[ti].field[pos]?defOf(st[ti].field[pos],pos):0;
   const fielder=(ti,pos)=>`${POSZH[pos]} ${nm(st[ti].field[pos]||{n:''})}`;
   const pstat=s=>[nm(s.cur.p),s.cur.pc,Math.round(curSta(s.cur))];
+  // both batting orders as they stand after a plate appearance: who is due up, and each man's line so far
+  const luSnap=()=>[0,1].map(t=>({bi:st[t].bi,r:st[t].lu.map(x=>[nm(x.h),x.h.fpos,x.ab,x.hits,x.hr,x.bb])}));
   const avail=s=>s.pen.filter(p=>!s.used.has(p));
   const baseTxt=b=>{const on=TR(['一','二','三'],['1st','2nd','3rd']).filter((_,j)=>b[j]);return on.length?TR(on.join('、')+'壘有人','runner'+(on.length>1?'s':'')+' on '+on.join(' & ')):TR('壘上無人','bases empty')};
 
@@ -1248,7 +1254,7 @@ function simGame(away,home,ctx){
             say(TR(`${B} 觸擊失敗，前導跑者被封殺。${outs}出局。`,`${B}'s bunt is too hard; the lead runner is forced out. ${outs} out.`))}
           else{bb.hits++;pb.h++;H[bt]++;if(bases[1])bases[2]=bases[1];bases[1]=bases[0];bases[0]=h;
             say(TR(`${B} 觸擊後全力衝刺，內野安打！`,`${B} bunts and beats it out for a hit!`))}
-          last=ev[ev.length-1];last.ps=[pstat(st[0]),pstat(st[1])];st[bt].bi=(st[bt].bi+1)%9;continue;
+          last=ev[ev.length-1];last.ps=[pstat(st[0]),pstat(st[1])];st[bt].bi=(st[bt].bi+1)%9;last.lu=luSnap();continue;
         }
         // stolen base attempt
         if(bases[0]&&!bases[1]&&outs<2){const r=bases[0];const att=clamp(r.r.sbr*3.2*tf(to,'off','steal')*tf(to,'run','steal'),0,.45);
@@ -1352,7 +1358,7 @@ function simGame(away,home,ctx){
         if(R[bt]>before){last.c=(last.c||'run');last.sc=[...R]}
         st[bt].bi=(st[bt].bi+1)%9;
         if(outs>0 && (res==='k'||res==='out') && !last.t3) last.t+=outs>=3?TR(' 三出局。',' Three outs.'):TR(` ${outs}出局。`,` ${outs} out${outs>1?'s':''}.`);
-        last.ps=[pstat(st[0]),pstat(st[1])];
+        last.ps=[pstat(st[0]),pstat(st[1])];last.lu=luSnap();
       }
       if(inning>=9&&half===1&&R[1]>R[0]&&outs<3){line[1].push(runs);ev.push({k:'note',t:TR(`🎉 再見分！${st[1].tm.name} 在主場終結比賽。`,`🎉 Walk-off! ${st[1].tm.name} win it at home.`)});done=true;break;}
       line[bt].push(runs);
@@ -1572,15 +1578,27 @@ function renderGameShell(){
    </div>
    <div class="linescore" id="ls" style="margin-top:14px">${lineTable(res,null)}</div>
    <div class="gstat" id="gstat"></div>
+   <details class="luwrap" id="luwrap" ${(lsGet('mlbLuOff')??(innerWidth<700?'1':''))?'':'open'}><summary>${TR('打序','Batting orders')}</summary><div class="grid2 lugrid" id="lugame"></div></details>
    ${auto?`<div class="row" style="margin-top:8px">${auto}</div>`:''}
   </section>
   <div id="decide"></div>
   <div class="pbp" id="pbp" aria-live="polite"></div>
   <div id="after"></div>`;
+  {const lw=$('#luwrap');if(lw)lw.ontoggle=()=>lw.open?lsSet('mlbLuOff',''):lsSet('mlbLuOff','1');
+   const shown=G.res.ev.slice(0,G.pos).reverse().find(e=>e.lu);
+   drawLineups(shown?shown.lu:[res.away,res.home].map(tm=>({bi:0,r:((tm&&tm.order)||[]).map(h=>[nm(h),h.fpos,0,0,0,0])})))}
   document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;
     if(NET.on&&NET.seat===+c.dataset.auto){const seat=NET.seat,on=c.checked;dbWrite(()=>NET.ref.update({setup:{[seat]:{auto:on}}}))}if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
   $('#skip').onclick=()=>{clearTimeout(timer);S.game.skip=true;play()};
+}
+// the batting orders under the line score: ▶ marks who is due up, with each batter's line so far today
+function drawLineups(lu){
+  const G=S.game,el=$('#lugame');if(!el)return;
+  el.innerHTML=[0,1].map(t=>{const cls=(t?G.homeIdx:1-G.homeIdx)?'tb':'ta',x=lu[t];
+    return `<div><div class="eyebrow ${cls}">${esc(t?G.res.home.name:G.res.away.name)}</div><table class="lutab">${x.r.map((r,k)=>{const [n,pos,ab,hi,hr,bb]=r,up=k===x.bi;
+      const line=ab||bb?`${hi}-${ab}${hr?` <b>HR${hr>1?'×'+hr:''}</b>`:''}${bb?` BB${bb>1?'×'+bb:''}`:''}`:'';
+      return `<tr class="${up?'up':''}"><td class="mono">${up?'▶':k+1}</td><td class="n">${esc(n)}</td><td class="mono p">${pos}</td><td class="mono l">${line}</td></tr>`}).join('')}</table></div>`}).join('');
 }
 function emit(){
   const G=S.game,e=G.res.ev[G.pos++],box=$('#pbp');
@@ -1592,6 +1610,7 @@ function emit(){
     const tag={sb:TR('盜壘成功','STOLEN BASE'),cs:TR('盜壘失敗','CAUGHT STEALING'),err:TR('失誤','ERROR')}[e.c];
     if(tag)d.insertAdjacentHTML('afterbegin',`<span class="pbtag">${tag}</span>`);
     if(e.sc){const s=document.createElement('span');s.className='sc';s.textContent=`${G.res.away.name} ${e.sc[0]} : ${e.sc[1]} ${G.res.home.name}`;d.appendChild(s)}}
+  if(e.lu)drawLineups(e.lu);
   if(e.ps){$('#gstat').innerHTML=[0,1].map(t=>`<div class="gp"><span class="${(t?G.homeIdx:1-G.homeIdx)?'tb':'ta'}">${esc(t?G.res.home.name:G.res.away.name)}</span><span>${esc(e.ps[t][0])}</span><span class="mono">${e.ps[t][1]} ${TR('球','pitches')}</span>${staBar(e.ps[t][2])}</div>`).join('')}
   box.appendChild(d);box.scrollTop=box.scrollHeight;
 }
@@ -1949,7 +1968,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='d3cfb71ee1';
+const BUILD='312df39af7';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
