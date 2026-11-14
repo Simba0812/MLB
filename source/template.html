@@ -91,6 +91,11 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .bidclock.low{color:var(--red)}.bidclock.low .bar{border-color:var(--red)}.bidclock.low .bar i{background:var(--red)}
 .linebtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #06c755;background:#06c755;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
 .linebtn:hover{filter:brightness(1.06)}
+.hist .hrow{border-top:1px solid #d9cfb2;padding:6px 0}.hist .hrow:first-of-type{margin-top:8px}
+.hist summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;cursor:pointer;list-style:none}.hist summary::-webkit-details-marker{display:none}
+.hist .hmeta{font-size:13px;color:var(--dim)}.hist .hsc{font-weight:900;margin-left:auto}
+.hist .hw,.hist .hl{display:inline-block;width:26px;text-align:center;font-weight:900;color:#fff;border-radius:3px;font-size:13px}
+.hist .hw{background:var(--good)}.hist .hl{background:var(--red)}.hist .hdet{font-size:13px;margin:6px 0 2px;display:grid;gap:4px}
 .fbrow{display:flex;justify-content:center;align-items:center;gap:8px 14px;flex-wrap:wrap;font-weight:700;color:var(--navy)}
 button.fbstar{font-size:24px;padding:0 6px;border:0;color:var(--amber);background:transparent}
 [data-fbt][aria-pressed="true"]{background:var(--navy);color:var(--paper);border-color:var(--navy)}
@@ -1749,6 +1754,7 @@ function finish(){
   const need={single:1,bo3:2,bo7:4}[S.mode];
   const seriesOver=w[0]>=need||w[1]>=need;
   const champ=seriesOver?(w[0]>=need?0:1):null;
+  if(seriesOver)saveHistory(champ,w);
   const nmw=res.wp.W?nm(res.wp.W):'—', nml=res.wp.L?nm(res.wp.L):'—';
   const watch=NET.on&&NET.seat==null;
   $('#after').innerHTML=`
@@ -2061,6 +2067,29 @@ async function countVisit(){
   if(!seen&&await bump('visits'))try{sessionStorage.setItem('mlbVisit','1')}catch(e){}
 }
 const gameKind=()=>S.rankAI?'rankedAI':isRanked()?'ranked':NET.on?'online':S.ai?'solo':'local';
+/* ---------- recent matches: the last five finished series, kept on this device ---------- */
+const HIST_KEY='mlbHist',HIST_MAX=5;
+const histGet=()=>{try{const v=JSON.parse(localStorage.getItem(HIST_KEY)||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
+function saveHistory(champ,w){
+  if(!S.series||(NET.on&&NET.seat==null))return;
+  const id=String(S.series.id||''),h=histGet();if(!id||h.some(x=>x.id===id))return;
+  const n=S.series.games.length;
+  const games=[...Array(n)].map((_,g)=>{const r=gameResult(g);return r.away.i===0?[r.R[0],r.R[1]]:[r.R[1],r.R[0]]});
+  let mvpTxt='';try{mvpTxt=seriesMvp(seriesStats(n),champ)}catch(e){}
+  const me=S.ai?1-S.ai.seat:NET.on?NET.seat:null;
+  h.unshift({id,t:Date.now(),kind:gameKind(),lg:S.league,mode:S.mode,names:S.teams.map(t=>t.name),w:[...w],champ,me,games,mvp:mvpTxt});
+  try{localStorage.setItem(HIST_KEY,JSON.stringify(h.slice(0,HIST_MAX)))}catch(e){}
+}
+function histPanel(){
+  const h=histGet();if(!h.length)return '';
+  const KIND={solo:TR('單人','Solo'),local:TR('同機','Same device'),online:TR('線上','Online'),ranked:TR('排位','Ranked'),rankedAI:TR('電腦排位','Ranked vs CPU')};
+  const when=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+  return `<section class="panel hist"><h2>📜 ${TR('最近對戰','Recent matches')}</h2><p class="hint" style="margin-top:4px">${TR(`最近 ${HIST_MAX} 場對戰（單場或系列賽），存在這台裝置上。點一下看細節。`,`Your last ${HIST_MAX} matches on this device. Tap one for details.`)}</p>
+   ${h.map(x=>{const one=x.mode==='single'&&x.games.length===1,res=x.me==null?'':x.champ===x.me?`<span class="hw">${TR('勝','W')}</span>`:`<span class="hl">${TR('敗','L')}</span>`;
+     const nm2=i=>`<span class="${i?'tb':'ta'}">${esc(x.names[i]||'')}</span>`;
+     return `<details class="hrow"><summary>${res}<span class="hmeta">${when(x.t)} · ${KIND[x.kind]||''} · ${x.lg==='CPBL'?TR('中職','CPBL'):'MLB'} · ${MODEZH[x.mode]||''}</span><span class="hsc">${nm2(0)} <b class="mono">${one?x.games[0][0]:x.w[0]}：${one?x.games[0][1]:x.w[1]}</b> ${nm2(1)}</span></summary>
+       <div class="hdet">${one?'':`<span class="mono">${x.games.map((g,i)=>`G${i+1} ${g[0]}:${g[1]}`).join('　')}</span>`}${x.mvp?`<div>🏅 ${one?'MVP':TR('系列賽 MVP','Series MVP')}　${esc(x.mvp)}</div>`:''}</div></details>`}).join('')}</section>`;
+}
 const COUNTED=new Set();
 // a game counts once, on one device (the host's when online)
 function countGame(){
@@ -2608,6 +2637,7 @@ function renderHome(){
    <section class="panel"><h2>${TR('同一台輪流玩','Same device')}</h2><p class="hint" style="margin-top:6px">${TR('兩個人用同一台電腦或手機，輪流出價、輪流選先發。','Two people share one computer or phone and take turns.')}</p><button class="solid" id="local" style="margin-top:14px">${TR('開始','Start')}</button></section>
    ${window.OFFLINE?`<section class="panel soon"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('和朋友各用自己的裝置連線對戰，敬請期待。','Play a friend from your own devices. Coming soon.')}</p><button disabled style="margin-top:14px">${TR('敬請期待','Coming soon')}</button></section>`:`<section class="panel"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('你和朋友各用自己的裝置，同步看到同一場選秀和比賽，輪到誰誰才能出手。','You and a friend each use your own device and see the same draft and games; only the player whose turn it is can act.')}${window.STANDALONE?TR('把網址和房號傳給朋友就能一起玩，不用註冊。',' Send your friend the link and room code; no sign-up needed.'):TR('朋友需要登入 claude.ai，並被你從 Share 選單加為可以編輯的成員。',' Your friend needs a claude.ai account and Editor access from the Share menu.')}</p><div id="netbox" style="margin-top:14px"></div></section>`}
   </div>
+  ${histPanel()}
   <p class="statline" id="statline"></p>
   ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我，也歡迎到 LINE 社群找人對戰、聊天。','How was it? Tell me about bugs or features you want, or find opponents in the LINE group.')}</span><span id="fbhome"></span>${lineBtn()}</div>`}
   <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
