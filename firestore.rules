@@ -113,17 +113,19 @@ service cloud.firestore {
     // 10 / 20 / 30 from the 2nd win in a row. Ranked games against the computer can't be checked here,
     // so they are worth half (-25 booked, +50 for a win), five a day, below 2100 (the major-league
     // tier), and leave the streak alone.
+    // A loss costs 3/4 of the Elo amount (an even game: -38) and never takes a rating below 1000; the booked
+    // loss is pendD and the win on top of it is pendW, so a win adds pendD + pendW back.
     match /players/{uid} {
       function nd() { return request.resource.data; }
       function od() { return resource.data; }
       function pchanged() { return nd().diff(od()).affectedKeys(); }
       function shape() {
-        return nd().keys().hasOnly(['name', 'rating', 'games', 'wins', 'losses', 'pend', 'pendAt', 'pendD', 'created', 'aiDay', 'aiN', 'streak', 'season', 'hist'])
+        return nd().keys().hasOnly(['name', 'rating', 'games', 'wins', 'losses', 'pend', 'pendAt', 'pendD', 'created', 'aiDay', 'aiN', 'streak', 'season', 'hist', 'pendW'])
           && nd().name is string && nd().name.size() >= 2 && nd().name.size() <= 16
           && nd().rating is int && nd().games is int && nd().wins is int && nd().losses is int
           && nd().pend is string && nd().pendAt is int && nd().pendD is int
           && nd().get('aiDay', 0) is int && nd().get('aiN', 0) is int && nd().get('streak', 0) is int
-          && nd().get('season', 1) is int && nd().get('hist', {}) is map;
+          && nd().get('season', 1) is int && nd().get('hist', {}) is map && nd().get('pendW', 0) is int;
       }
       function room(c) { return get(/databases/$(database)/documents/rooms/$(c)).data; }
       function seatOf(r) { return r.seats['0'] == uid ? '0' : '1'; }
@@ -132,6 +134,8 @@ service cloud.firestore {
       // the opponent's rating before this game (their record may already have booked its loss)
       function preRating(p, r) { return p.pend == nd().pend && p.pendAt == r.created ? p.rating + p.pendD : p.rating; }
       function lossFor(mine, theirs) { return math.round(100.0 / (1.0 + math.pow(10.0, (theirs - mine) / 1250.0))); }
+      // what a loss may book: d, but never below 1000
+      function floored(r, d) { return r - 1000 <= 0 ? 0 : (d < r - 1000 ? d : r - 1000); }
 
       // seasons: a test season (0) until S1 opens on Mon 16 Nov 2026 (Taiwan time); S1 runs to the end of
       // Jan 2027, then three months each (Feb–Apr, May–Jul, ...)
@@ -159,21 +163,23 @@ service cloud.firestore {
       function aiStartOK() {
         let day = nd().aiDay;
         let n = od().get('aiDay', 0) == day ? od().get('aiN', 0) + 1 : 1;
-        return od().rating < 2100 && nd().pendAt == 0 && nd().pendD == 25 && nd().rating == od().rating - 25
+        let d = floored(od().rating, 25);
+        return od().rating < 2100 && nd().pendAt == 0 && nd().pendD == d && nd().rating == od().rating - d && nd().get('pendW', 0) == 25
           && nd().games == od().games + 1 && nd().losses == od().losses + 1
           && day is int && day >= od().get('aiDay', 0) && day >= today() - 1 && day <= today() + 1
           && nd().aiN == n && n <= 5;
       }
       function aiWinOK() {
-        return nd().rating == od().rating + 50 && nd().wins == od().wins + 1 && nd().losses == od().losses - 1
+        return nd().rating == od().rating + od().pendD + od().get('pendW', 25) && nd().get('pendW', 0) == 0 && nd().wins == od().wins + 1 && nd().losses == od().losses - 1
           && nd().games == od().games && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0;
       }
       function startOK() {
         let r = room(nd().pend);
         let opp = get(/databases/$(database)/documents/players/$(r.seats[other(seatOf(r))])).data;
-        let d = lossFor(od().rating, preRating(opp, r));
+        let full = lossFor(od().rating, preRating(opp, r));
+        let d = floored(od().rating, math.round(full * 0.75));
         return r.cfg.get('ranked', false) == true && inRoom(r) && ('1' in r.seats)
-          && nd().pendAt == r.created && nd().pendD == d
+          && nd().pendAt == r.created && nd().pendD == d && nd().get('pendW', 0) == 100 - full
           && nd().rating == od().rating - d
           && nd().games == od().games + 1 && nd().losses == od().losses + 1;
       }
@@ -189,7 +195,8 @@ service cloud.firestore {
         let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 180000;
         return inRoom(r) && r.created == od().pendAt
           && mine == s && (theirs == s || (theirs == '' && gone))
-          && nd().rating == od().rating + 100 + (od().get('streak', 0) >= 3 ? 30 : od().get('streak', 0) * 10)
+          && nd().rating == od().rating + od().pendD + od().get('pendW', 100 - od().pendD) + (od().get('streak', 0) >= 3 ? 30 : od().get('streak', 0) * 10)
+          && nd().get('pendW', 0) == 0
           && nd().streak == od().get('streak', 0) + 1
           && nd().wins == od().wins + 1 && nd().losses == od().losses - 1
           && nd().games == od().games && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0;
@@ -203,13 +210,13 @@ service cloud.firestore {
 
       allow update: if permanent() && request.auth.uid == uid && shape() && (
         pchanged().hasOnly(['name'])
-        || (od().pend == '' && nd().pend != '' && nd().pend != 'ai' && inSeason() && pchanged().hasOnly(['rating', 'games', 'losses', 'pend', 'pendAt', 'pendD']) && startOK())
-        || (od().pend != '' && od().pend != 'ai' && pchanged().hasOnly(['rating', 'wins', 'losses', 'pend', 'pendAt', 'pendD', 'streak']) && winOK())
-        || (od().pend == '' && nd().pend == 'ai' && inSeason() && pchanged().hasOnly(['rating', 'games', 'losses', 'pend', 'pendAt', 'pendD', 'aiDay', 'aiN']) && aiStartOK())
+        || (od().pend == '' && nd().pend != '' && nd().pend != 'ai' && inSeason() && pchanged().hasOnly(['rating', 'games', 'losses', 'pend', 'pendAt', 'pendD', 'pendW']) && startOK())
+        || (od().pend != '' && od().pend != 'ai' && pchanged().hasOnly(['rating', 'wins', 'losses', 'pend', 'pendAt', 'pendD', 'pendW', 'streak']) && winOK())
+        || (od().pend == '' && nd().pend == 'ai' && inSeason() && pchanged().hasOnly(['rating', 'games', 'losses', 'pend', 'pendAt', 'pendD', 'pendW', 'aiDay', 'aiN']) && aiStartOK())
         || (pchanged().hasOnly(['rating', 'games', 'wins', 'losses', 'streak', 'season', 'hist']) && rollOK())
-        || (od().pend == 'ai' && pchanged().hasOnly(['rating', 'wins', 'losses', 'pend', 'pendAt', 'pendD']) && aiWinOK())
+        || (od().pend == 'ai' && pchanged().hasOnly(['rating', 'wins', 'losses', 'pend', 'pendAt', 'pendD', 'pendW']) && aiWinOK())
         // dropping a pending game: one against a person was lost, so the streak ends (the computer's leaves it)
-        || (pchanged().hasOnly(['pend', 'pendAt', 'pendD', 'streak']) && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0
+        || (pchanged().hasOnly(['pend', 'pendAt', 'pendD', 'pendW', 'streak']) && nd().pend == '' && nd().pendAt == 0 && nd().pendD == 0 && nd().get('pendW', 0) == 0
             && (od().pend == 'ai' ? nd().get('streak', 0) == od().get('streak', 0) : nd().get('streak', 0) == 0))
       );
     }
