@@ -374,7 +374,7 @@ button.mini{padding:3px 8px;font-size:13px}
 const POOLS = {MLB:/*POOL*/[], CPBL:/*POOL_CPBL*/[]};
 let POOL = POOLS.MLB;
 /* ---------- language: 中文 / English, remembered on this device ---------- */
-let LANG=(()=>{try{const v=localStorage.getItem('mlbLang');if(v==='en'||v==='zh')return v}catch(e){}return /^zh/i.test(navigator.language||'')?'zh':'en'})();
+let LANG=(()=>{try{const v=localStorage.getItem('mlbLang');if(v==='en'||v==='zh')return v}catch(e){}return 'zh'})();   // Chinese unless the player picked English
 document.documentElement.lang=LANG==='en'?'en':'zh-Hant';
 const TR=(zh,en)=>LANG==='en'?en:zh;   // pick the text for the current language
 const ord=n=>{const t=['th','st','nd','rd'],v=n%100;return n+(t[(v-20)%10]||t[v]||t[0])};
