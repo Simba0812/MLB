@@ -1472,7 +1472,7 @@ function ensureLued(g){
   LUED_KEY=k;LUPICK=null;LUED=[0,1].map(i=>(lastLineup(i,g)||defaultLineup(i)).map(x=>({...x})));PICKSEL[0]=PICKSEL[1]=null;
   // tactics start where this team left them last game
   TACSEL=[0,1].map(i=>{for(let k2=g-1;k2>=0;k2--){const t=S.series.games[k2].tac;if(t&&tacOK(t[i]))return {...t[i]}}return {...TACT0}});
-  HOOKSEL=[0,1].map(i=>{const h=g>0&&S.series.games[g-1].hook;return h&&h[i]==='early'?'early':''});
+  HOOKSEL=['',''];   // every game starts on the normal hook
   // bullpen roles also carry over from the last game
   ROLESEL=[0,1].map(i=>{const rps=buildTeam(i).rps;for(let k2=g-1;k2>=0;k2--){const r=S.series.games[k2].roles;if(r&&rolesOK(rps,r[i]))return {...r[i]}}return defaultRoles(rps)});
 }
@@ -2006,7 +2006,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='5fc6470c9e';
+const BUILD='2738ab35c4';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
