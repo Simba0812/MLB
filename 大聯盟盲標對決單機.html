@@ -666,6 +666,20 @@ const AI_LV={
   r6:{rank:1,get label(){return TR('名人堂電腦','Hall of Fame computer')},scale:1.14,noise:.03,accept:3}};
 let aiTimer=null;
 function scheduleAI(){clearTimeout(aiTimer);if(S.ai&&S.screen==='draft'&&S.lot&&S.lot.turn===S.ai.seat)aiTimer=setTimeout(aiAct,S.aiFast?0:300+Math.random()*300)}
+// how willing the computer is to settle for this player at a spot it must fill. It knows who is still undrawn
+// (the pool minus everyone already drawn), not the order: from that it expects how many better players for the
+// spot will still come up in the lots left. Plenty of better ones on the way: hold out; few or none: take him.
+function waitFactor(t,p,slots){
+  const k=slots.find(x=>slotCount(t,x)<slotMin(SLOTS.find(s=>s.k===x)));if(!k)return 1;
+  const fits=x=>k==='DH'||k==='BN'?x.type==='H':x.type==='H'?(x.pos===k||(x.alt||[]).includes(k)):x.pos===k&&!x.twp;
+  const rest=S.deck.filter(x=>x!==p),pool=rest.filter(fits);if(!rest.length||!pool.length)return 1;
+  const left=Math.max(0,S.lotMax-S.lotNo-1),o=ovr(p);
+  const better=pool.filter(x=>ovr(x)>o+2).length/rest.length*left;     // better ones expected in the lots left
+  const open=slotMin(SLOTS.find(s=>s.k===k))-slotCount(t,k);
+  if(better>=open*3+1)return .3;
+  if(better>=open*1.5+.5)return .6;
+  return 1;
+}
 // what the computer is willing to pay for this player right now
 function aiValue(t,p){
   const lv=AI_LV[S.ai.level],slots=openSlotsFor(t,p);if(!slots.length)return 0;
@@ -673,6 +687,7 @@ function aiValue(t,p){
   let v=1+S.budget*.24*q*q;                                   // a 99 is worth about a quarter of the starting budget
   v=Math.min(v,(t.budget/Math.max(1,req))*(need?3:1.2));     // keep enough money for the spots still empty
   if(!need)v*=.45;                                           // depth beyond the minimum roster matters less
+  else v*=waitFactor(t,p,slots);                              // an ordinary player while better ones are still to come: let him go
   if(need&&S.lotMax-S.lotNo<req*2)v*=1.4;                     // few lots left: pay up for a spot it must fill
   const pace=t.budget/Math.max(1,S.budget*Math.max(0,S.lotMax-S.lotNo)/S.lotMax);
   if(pace>1.2)v*=Math.min(2.2,pace*.8);                        // more money left than the remaining lots need: spend it
@@ -1960,7 +1975,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ea33db9906';
+const BUILD='d5f3047ad5';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
