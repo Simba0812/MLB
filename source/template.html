@@ -675,15 +675,15 @@ function waitFactor(t,p,slots){
 function aiValue(t,p){
   const lv=AI_LV[S.ai.level],slots=openSlotsFor(t,p);if(!slots.length)return 0;
   const need=needsCovered(t,p,slots)>0,q=clamp((ovr(p)-50)/49,0,1),req=minRemaining(t);
-  let v=1+S.budget*.24*q*q;                                   // a 99 is worth about a quarter of the starting budget
+  let v=1+S.budget*.32*Math.pow(q,2.4);                       // a 99 is worth about a third of the starting budget, a star far more than a regular
   v=Math.min(v,(t.budget/Math.max(1,req))*(need?3:1.2));     // keep enough money for the spots still empty
   if(!need)v*=.45;                                           // depth beyond the minimum roster matters less
-  else v*=waitFactor(t,p,slots);                              // an ordinary player while better ones are still to come: let him go
+  const wf=need?waitFactor(t,p,slots):1;v*=wf;              // an ordinary player while better ones are still to come: let him go
   if(need&&S.lotMax-S.lotNo<req*2)v*=1.4;                     // few lots left: pay up for a spot it must fill
   const pace=t.budget/Math.max(1,S.budget*Math.max(0,S.lotMax-S.lotNo)/S.lotMax);
   if(pace>1.2)v*=Math.min(2.2,pace*.8);                        // more money left than the remaining lots need: spend it
   v*=lv.scale*(1+(Math.random()*2-1)*lv.noise);
-  return Math.max(need?1:0,Math.floor(v));
+  return Math.max(need&&wf>=1?1:0,Math.floor(v));
 }
 function aiAct(){
   const L=S.lot;if(!S.ai||S.screen!=='draft'||!L||L.turn!==S.ai.seat)return;
