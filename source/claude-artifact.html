@@ -1922,7 +1922,7 @@ function finish(){
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
    <div class="grid2" style="margin-top:10px">${safe(()=>boxScore(res,0),'')}${safe(()=>boxScore(res,1),'')}</div>`;
   // the result sits under a long play-by-play: bring it into view (unless the player is reading back)
-  if(!G.hold)setTimeout(()=>{const el=$('#after');if(el&&S.game===G)el.scrollIntoView({behavior:'smooth',block:'start'})},250);
+  if(!G.hold)setTimeout(()=>{const el=$('#after');if(el&&el.scrollIntoView&&S.game===G)el.scrollIntoView({behavior:'smooth',block:'start'})},250);
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
   countGame();
   if($('#rkhome')){$('#rkhome').onclick=()=>{S.rankAI=null;S.ai=null;leaveRoom()};if(S.rankAI)finishAIRanked();else rankCheck()}
@@ -2101,7 +2101,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='6bab4cb587';
+const BUILD='2ac9247f1f';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
