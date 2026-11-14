@@ -1763,9 +1763,11 @@ function play(){
   const e=G.res.ev[G.pos-1];
   timer=setTimeout(play,e.k==='half'?S.speed*1.8:S.speed);
 }
-// online: a decision left unanswered for 45 seconds takes the suggestion; the waiting player's screen
-// shows the same 45 s but fills it in itself 10 s later, in case the other phone is asleep. Both write the same value.
-const DEC_SEC=45,DEC_GRACE=10;
+// online: a decision left unanswered for 45 seconds takes the suggestion, picked on the deciding player's own
+// phone (their clock starts when their play-by-play reaches it). The waiting phone shows the same 45 s and steps in
+// only if the other phone looks asleep (no heartbeat for 45 s; one goes out every 30 s), or 30 s after its own clock as a last resort.
+// Both write the same value, so it doesn't matter who gets there first.
+const DEC_SEC=45,DEC_BACKSTOP=30000;
 let decTimer=null,decTick=null;
 function clearDecTimers(){clearTimeout(decTimer);clearInterval(decTick);decTimer=decTick=null}
 function decCountdown(sec,onExpire,grace=0){
@@ -1783,7 +1785,12 @@ function showDecision(){
     // the other player let the game manage their team: their answer is the suggestion, which this phone
     // computes too, so take it now instead of waiting a round trip for their phone to send it
     if(NET.on&&NET.seat!=null&&((NET.doc.setup||{})[q.team]||{}).auto)return submitDecision(q.suggest);
-    if(NET.on&&NET.seat!=null){const g=S.game.gnum,di=q.di;decCountdown(DEC_SEC+DEC_GRACE,()=>{if(S.game&&S.game.gnum===g&&S.game.res.paused&&decList(g).length===di){NET.timerAct=true;try{submitDecision(q.suggest)}finally{NET.timerAct=false}}},DEC_GRACE)}
+    if(NET.on&&NET.seat!=null){const g=S.game.gnum,di=q.di,t0=Date.now();
+      const open=()=>S.game&&S.game.gnum===g&&S.game.res.paused&&decList(g).length===di;
+      const fill=()=>{if(!open())return;NET.timerAct=true;try{submitDecision(q.suggest)}finally{NET.timerAct=false}};
+      const asleep=()=>!NET.opp||NET.opp.left||Date.now()-NET.opp.seen>45000;
+      const wait=()=>{if(!open())return;if(asleep()||Date.now()-t0>=DEC_SEC*1000+DEC_BACKSTOP)return fill();decTimer=setTimeout(wait,2000)};
+      decCountdown(DEC_SEC,wait)}
     return}
   if(AUTO[q.team]&&!q.req){NET.timerAct=true;try{return submitDecision(q.suggest)}finally{NET.timerAct=false}}
   const sug=q.suggest, tag=v=>v===sug?`<span class="sugg">${TR('建議','Suggested')}</span>`:'';
@@ -2112,7 +2119,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='6fbea6ba54';
+const BUILD='fc4b3c7a4a';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
