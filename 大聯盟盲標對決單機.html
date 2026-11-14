@@ -338,44 +338,11 @@ button.mini{padding:3px 8px;font-size:13px}
   .opt{padding:8px 10px}
   .reveal{padding:18px 12px}
 }
-.about{line-height:1.75;font-size:15px}
-.about h3{font-family:var(--serif);font-size:18px;margin:18px 0 6px;color:var(--navy)}
-.about p,.about ol,.about ul,.about dl{margin:6px 0}
-.about dt{font-weight:700;margin-top:10px}
-.about dd{margin:2px 0 0;color:var(--dim)}
-#about{margin-top:20px}
 </style>
 </head>
 <body>
 
 <div class="wrap" id="app"></div>
-<div class="wrap" id="about">
-<section class="panel about">
-<h2>關於大聯盟盲標對決</h2>
-<p>大聯盟盲標對決是一款免費的線上棒球選秀遊戲，也是 MLB／中職 Fantasy 競標對戰。你可以選大聯盟（MLB）或中華職棒（CPBL）的真實球員，和朋友或電腦用預算競標，組成自己的球隊，再模擬比賽分出勝負。打開網頁就能玩，不用下載也不用註冊。</p>
-<h3>怎麼玩</h3>
-<ol>
-<li><b>盲標選秀：</b>球員一個一個隨機抽出，事先不知道下一個是誰。兩邊用各自的預算出價，不加價的一方就放棄這位球員。</li>
-<li><b>交易：</b>選秀結束後，雙方可以交換球員 3 次，補強缺的位置。</li>
-<li><b>排兵佈陣：</b>排打序、選先發投手、分配牛棚、調整戰術。</li>
-<li><b>模擬對戰：</b>系統依球員數據模擬比賽，有文字轉播，最後才公布勝負。可以打單場或系列賽。</li>
-</ol>
-<h3>三種玩法</h3>
-<ul>
-<li><b>單人對戰：</b>和電腦競標、交易再對戰，電腦會依球員評價、缺的位置和剩餘預算出價。</li>
-<li><b>同一台輪流玩：</b>兩個人用同一台電腦或手機輪流出價。</li>
-<li><b>線上對戰：</b>你和朋友各用自己的手機或電腦，把網址和房號傳給朋友就能一起玩。</li>
-</ul>
-<h3>常見問題</h3>
-<dl>
-<dt>要錢嗎？要註冊嗎？</dt><dd>完全免費，不用註冊。這是粉絲做的作品，不賭博、不收費、不營利。</dd>
-<dt>球員數據從哪裡來？</dt><dd>MLB 使用 MLB.com 例行賽統計和 Baseball Savant 進階數據（xwOBA、xERA、擊球初速、衝刺速度），中職參考野球革命的數據。</dd>
-<dt>可以用手機玩嗎？</dt><dd>可以，手機、平板、電腦的瀏覽器都能玩。</dd>
-<dt>哪裡可以找人對戰？</dt><dd>歡迎加入 LINE 社群找人對戰、回報 bug 或提出想要的功能。</dd>
-</dl>
-<p lang="en"><b>MLB Blind Auction</b> is a free browser-based fantasy baseball draft game. Bid on real MLB or CPBL players with a budget, build your team, set your lineup and rotation, and simulate games against a friend or the computer. No download or sign-up.</p>
-</section>
-</div>
 <div id="follow" class="follow" hidden role="status"><span>對手已經前往下一步。</span><button id="followbtn" class="solid">跟上</button></div>
 
 <script>window.STANDALONE=true;window.OFFLINE=true</script>
@@ -1697,7 +1664,7 @@ function renderGameShell(){
   {const box=$('#pbp'),nb=$('#pbpnew');G.hold=false;
    // scrolling up holds the play-by-play where it is; coming back down (or the button) carries on
    box.addEventListener('scroll',()=>{const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<40;
-     if(atEnd!==!G.hold){G.hold=!atEnd;nb.hidden=atEnd||G.finished}},{passive:true});
+     if(atEnd!==!G.hold){G.hold=!atEnd;nb.hidden=atEnd}},{passive:true});
    nb.onclick=()=>{G.hold=false;nb.hidden=true;box.scrollTop=box.scrollHeight}}
   document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;
@@ -1736,7 +1703,9 @@ function emit(){
 function play(){
   const G=S.game;
   if(G.skip){G.hold=false;const nb=$('#pbpnew');if(nb)nb.hidden=true;while(G.pos<G.res.ev.length)emit()}
-  else if(G.hold&&G.pos<G.res.ev.length){timer=setTimeout(play,300);return}   // reading back: wait
+  // reading back (scrolled up) no longer stops the game: new plays keep coming in below without pulling the
+  // view down, and the result still shows at the end. (Pausing left a desktop page, whose mouse wheel had
+  // scrolled the play-by-play by accident, stuck short of the final screen.)
   if(G.pos>=G.res.ev.length){
     if(G.res.paused){if(decList(G.gnum).length>G.res.paused.di)return resumeGame();return showDecision()}   // the answer may have come in while we were still playing back
     return finish();
@@ -1886,6 +1855,8 @@ function seriesPanel(n,over){
    <p class="hint">${TR('防禦率用失分計算（比賽沒有區分自責分），會比官方防禦率略高。','ERA here counts all runs allowed (the games don\'t separate earned runs), so it runs a little high.')}</p>
    <div class="grid2" style="margin-top:10px">${team(0)}${team(1)}</div>`;
 }
+// a stat line that fails to compute must not keep the result from showing
+const safe=(f,d='—')=>{try{return f()}catch(e){console.error(e);return d}};
 function finish(){
   const G=S.game; if(G.finished) return; G.finished=true;
   const res=G.res, winTm=res.win?res.home:res.away, w=winsThrough(G.gnum+1);
@@ -1900,26 +1871,26 @@ function finish(){
    <div class="reveal flash"><div class="eyebrow">${S.mode==='single'?TR('比賽結束','Final'):TR('第 '+(G.gnum+1)+' 戰結束','Game '+(G.gnum+1)+' final')}</div>
     <div class="w ${winTm.i?'tb':'ta'}">${esc(winTm.name)} ${TR('獲勝','win')}</div>
     <p class="mono" style="font-size:22px;margin:8px 0">${esc(res.away.name)} ${res.R[0]} : ${res.R[1]} ${esc(res.home.name)}${res.line[0].length>9?TR(`（延長 ${res.line[0].length} 局）`,` (${res.line[0].length} innings)`):''}</p>
-    <p class="hint">${TR('勝投','W')} ${esc(nmw)} · ${TR('敗投','L')} ${esc(nml)}${res.wp.S?` · ${TR('救援','S')} ${esc(nm(res.wp.S))}`:''}<br>${TR('單場 MVP','Game MVP')}　${esc(mvp(res))}</p>
+    <p class="hint">${TR('勝投','W')} ${esc(nmw)} · ${TR('敗投','L')} ${esc(nml)}${res.wp.S?` · ${TR('救援','S')} ${esc(nm(res.wp.S))}`:''}<br>${TR('單場 MVP','Game MVP')}　${esc(safe(()=>mvp(res)))}</p>
     ${S.mode!=='single'?`<p class="series" style="margin-top:10px">${TR('系列賽','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</p>`:''}
     ${champ!=null&&S.mode!=='single'?`<div class="w ${champ?'tb':'ta'}" style="font-size:clamp(28px,5vw,44px);margin-top:12px">🏆 ${TR(`${tname(champ)} 贏得系列賽`,`${tname(champ)} win the series`)}</div>
-     <p style="margin-top:8px;font-weight:700">🏅 ${TR('系列賽 MVP','Series MVP')}　${esc(seriesMvp(seriesStats(G.gnum+1),champ))}</p>`:''}
-    ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${rankText()}</p>`:''}
+     <p style="margin-top:8px;font-weight:700">🏅 ${TR('系列賽 MVP','Series MVP')}　${esc(safe(()=>seriesMvp(seriesStats(G.gnum+1),champ)))}</p>`:''}
+    ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${safe(rankText,'')}</p>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
      ${rankedGame()||isRnd()?(seriesOver||S.rankAI?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>${isRnd()?`<button id="newmatch">🎲 ${TR('找新對手','Find a new opponent')}</button>`:''}`:''):`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}${lineBtn()}</div>
    </div>
-   ${S.mode!=='single'?seriesPanel(G.gnum+1,seriesOver):''}
+   ${S.mode!=='single'?safe(()=>seriesPanel(G.gnum+1,seriesOver),''):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
-   <div class="grid2" style="margin-top:10px">${boxScore(res,0)}${boxScore(res,1)}</div>`;
+   <div class="grid2" style="margin-top:10px">${safe(()=>boxScore(res,0),'')}${safe(()=>boxScore(res,1),'')}</div>`;
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
   countGame();
   if($('#rkhome')){$('#rkhome').onclick=()=>{S.rankAI=null;S.ai=null;leaveRoom()};if(S.rankAI)finishAIRanked();else rankCheck()}
   if($('#newmatch'))$('#newmatch').onclick=()=>{const kind=isRanked()?'ranked':'casual';leaveRoom();quickMatch(kind).catch(()=>{})};
   if($('#again'))$('#again').onclick=()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   if($('#restart'))$('#restart').onclick=()=>{S.screen=NET.on?'room':'setup';sync();render();window.scrollTo(0,0)};
-  const shareTxt=TR(`⚾ ${res.away.name} ${res.R[0]}：${res.R[1]} ${res.home.name}，${winTm.name} 獲勝！${champ!=null&&S.mode!=='single'?`系列賽 ${w[0]}：${w[1]}，${S.teams[champ].name} 封王。`:''}MVP ${mvp(res)}`,
-       `⚾ ${res.away.name} ${res.R[0]}-${res.R[1]} ${res.home.name}: ${winTm.name} win!${champ!=null&&S.mode!=='single'?` ${S.teams[champ].name} take the series ${Math.max(...w)}-${Math.min(...w)}.`:''} MVP ${mvp(res)}`);
+  const shareTxt=TR(`⚾ ${res.away.name} ${res.R[0]}：${res.R[1]} ${res.home.name}，${winTm.name} 獲勝！${champ!=null&&S.mode!=='single'?`系列賽 ${w[0]}：${w[1]}，${S.teams[champ].name} 封王。`:''}MVP ${safe(()=>mvp(res))}`,
+       `⚾ ${res.away.name} ${res.R[0]}-${res.R[1]} ${res.home.name}: ${winTm.name} win!${champ!=null&&S.mode!=='single'?` ${S.teams[champ].name} take the series ${Math.max(...w)}-${Math.min(...w)}.`:''} MVP ${safe(()=>mvp(res))}`);
   $('#sharer').onclick=()=>shareImage($('#sharer'),resultCard({res,winTm,w,champ,gnum:G.gnum,nmw,nml}),shareTxt);
   if(NET.pending) showFollow();
 }
@@ -2090,7 +2061,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='a03802dfcb';
+const BUILD='306d7ab3ef';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3103,8 +3074,7 @@ function startOnlineDraft(){
 }
 
 function render(){
-  document.title=S.screen==='home'?TR('大聯盟盲標對決｜MLB／中職 Fantasy 競標對戰','MLB Blind Auction | MLB & CPBL Fantasy Draft Game'):TR('大聯盟盲標對決','MLB Blind Auction');
-  if($('#about'))$('#about').hidden=S.screen!=='home';
+  document.title=TR('大聯盟盲標對決','MLB Blind Auction');
   if($('#followbtn')){$('#follow span').textContent=TR('對手已經前往下一步。','Your opponent has moved on.');$('#followbtn').textContent=TR('跟上','Catch up')}
   updateNetBadge();
   $('#app').className='wrap s-'+S.screen;
