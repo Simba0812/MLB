@@ -1022,8 +1022,8 @@ function staminaMap(i,g){
     const use=gameResult(g-k).use||{},w=[1,.5,.2][gap-1];
     for(const id in use) m[id]=(m[id]||0)+use[id]*w;
   }
-  // 1.5 points per pitch: a 20-pitch inning leaves a reliever at 70% the next day, 85% the day after
-  const out={};for(const id in m) out[id]=clamp(Math.round(100-1.5*m[id]),5,100);
+  // 2 points per pitch: a 20-pitch inning leaves a reliever at 60% the next day, 80% after a day off
+  const out={};for(const id in m) out[id]=clamp(Math.round(100-2*m[id]),5,100);
   return out;
 }
 const staColor=v=>v>=60?'var(--good)':v>=35?'var(--amber)':'var(--red)';
@@ -1950,7 +1950,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2b278699c8';
+const BUILD='d3cfb71ee1';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
