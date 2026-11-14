@@ -615,7 +615,7 @@ function header(){return `<header class="top"><h1>${TR('大聯盟盲標對決','
 
 /* ---------- back to lobby ---------- */
 function lobbyBar(){
-  if(!['draft','trade','pregame','pick','game','stuck'].includes(S.screen)||(NET.on&&NET.seat==null)) return '';
+  if(!['setup','draft','trade','pregame','pick','game','stuck'].includes(S.screen)||(NET.on&&NET.seat==null)) return '';
   return `<div class="lobbybar" id="lobbybar"><button class="ghost" id="tolobby">← ${TR('返回大廳','Back to lobby')}</button>
     <span id="lobbyask" hidden><span>${NET.on?TR('確定要放棄這次選秀？雙方都會回到房間，陣容會清空。','Abandon this draft? Both players go back to the room and rosters are cleared.'):TR('確定要放棄這次選秀？目前的陣容會清空。','Abandon this draft? Your rosters will be cleared.')}</span>
     <button class="solid" id="lobbyyes">${TR('確定返回','Yes, go back')}</button><button class="ghost" id="lobbyno">${TR('繼續玩','Keep playing')}</button></span></div>`;
@@ -634,7 +634,8 @@ function setLang(v){
 document.addEventListener('click',e=>{
   const id=e.target&&e.target.id;
   if(id==='langbtn') return setLang(LANG==='en'?'zh':'en');
-  if(id==='tolobby'){$('#lobbyask').hidden=false;$('#tolobby').hidden=true}
+  if(id==='tolobby'&&S.screen==='setup'){S.ai=null;S.screen='home';render();window.scrollTo(0,0)}
+  else if(id==='tolobby'){$('#lobbyask').hidden=false;$('#tolobby').hidden=true}
   else if(id==='lobbyno'){$('#lobbyask').hidden=true;$('#tolobby').hidden=false}
   else if(id==='lobbyyes') goLobby();
 });
@@ -1952,7 +1953,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='303dd6d14f';
+const BUILD='0546bc74f8';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
