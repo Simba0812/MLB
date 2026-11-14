@@ -1267,9 +1267,9 @@ function simGame(away,home,ctx){
     let choice=sug?sid(sug.id):'keep';
     const kept=c.keep&&c.keep.runs===c.runs&&c.keep.sta-sta<15;
     // blowouts are managed automatically; ask when the game is within reach or the starter is in trouble
-    // a person is asked about the starter, a reliever who is getting hit mid-inning, and the bullpen in the
-    // 8th or later of a game within two runs; the reliever-per-inning routine otherwise runs by the roles set before the game
-    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=8&&Math.abs(lead)<=2));
+    // a person is asked about the starter, a reliever who is getting hit mid-inning, and the bullpen from the
+    // 7th on in a game within four runs; the reliever-per-inning routine otherwise runs by the roles set before the game
+    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=7&&Math.abs(lead)<=4));
     if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead)||avail(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
@@ -1285,8 +1285,7 @@ function simGame(away,home,ctx){
     for(const s of st){
       const lead=R[s.ti]-R[1-s.ti],sug=tacStr(aiTactic(inning,lead,s.tac));
       let v=sug;
-      // a person is asked once, before the 7th; before the 4th their tactics just carry on
-      if(ctx.human[s.tm.i])v=inning<7?tacStr(s.tac):decide({kind:'tac',team:s.tm.i,inning,half:0,outs:0,bases:baseTxt([null,null,null]),lead,suggest:sug,cur:tacStr(s.tac)});
+      if(ctx.human[s.tm.i])v=decide({kind:'tac',team:s.tm.i,inning,half:0,outs:0,bases:baseTxt([null,null,null]),lead,suggest:sug,cur:tacStr(s.tac)});
       const t=tacOf(v);
       if(tacStr(t)!==tacStr(s.tac)){s.tac=t;ev.push({k:'note',t:TR(`📋 ${s.tm.name} 調整戰術：打擊「${TACTL().off[t.off]}」、跑壘「${TACTL().run[t.run]}」、投球「${TACTL().pit[t.pit]}」。`,`📋 ${s.tm.name} change tactics: batting "${TACTL().off[t.off]}", running "${TACTL().run[t.run]}", pitching "${TACTL().pit[t.pit]}".`)})}
     }
@@ -1297,8 +1296,9 @@ function simGame(away,home,ctx){
     const best=bench.slice().sort((a,b)=>hitBlend(b)-hitBlend(a))[0];
     let choice=inning>=7&&Math.abs(diff)<=2&&hitBlend(best)>hitBlend(h)+.03?sid(best.id):'keep';
     if(ctx.human[s.tm.i]){
-      // asked only when a pinch-hitter is the suggestion (the "keep him in" prompts were most of them)
-      if(choice==='keep') return;
+      // asked when a pinch-hitter is the suggestion, or from the 7th on with a runner in scoring position
+      // and a bench bat at least as good (before that, "keep him in" prompts were most of them)
+      if(choice==='keep'&&(inning<7||hitBlend(best)<=hitBlend(h)-.005)) return;
       choice=decide({kind:'ph',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead:diff,suggest:choice,
         cur:{id:sid(h.id),name:nm(h),pos:h.fpos,avg:h.avg,ops:h.ops,ovr:ovr(h),today:TR(`${row.ab} 打數 ${row.hits} 安打`,`${row.hits}-for-${row.ab}`)},
         opts:bench.map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,avg:p.avg,ops:p.ops,ovr:ovr(p)})),tac:tacStr(s.tac)});
@@ -2097,7 +2097,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='084b930baa';
+const BUILD='377dcd0c52';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
