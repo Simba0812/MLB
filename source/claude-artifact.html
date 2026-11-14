@@ -1944,7 +1944,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='0546bc74f8';
+const BUILD='d07c8eebec';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2046,7 +2046,7 @@ function leaveRoom(){detachRoom();clearTimeout(timer);S.screen='home';render()}
 /* ---------- play statistics ---------- */
 // stats/all holds the running totals and stats/dYYYYMMDD each day's (Taiwan time). Nothing personal is stored.
 let STAT_CACHE=null;
-const STAT_KEYS=['players','active','drafts','games','solo','local','online','ranked','rankedAI'];
+const STAT_KEYS=['players','active','visits','drafts','games','solo','local','online','ranked','rankedAI'];
 const dayKey=(t=Date.now())=>'d'+new Date(t+8*3600000).toISOString().slice(0,10).replace(/-/g,'');
 function bump(...keys){if(!NET.bump)return Promise.resolve(false);STAT_CACHE=null;
   return Promise.all([NET.bump('stats/all',keys),NET.bump('stats/'+dayKey(),keys)]).then(r=>r.every(Boolean))}
@@ -2055,6 +2055,9 @@ const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=
 async function countVisit(){
   if(!lsGet('mlbSeen')&&await bump('players'))lsSet('mlbSeen','1');
   const d=dayKey();if(lsGet('mlbDay')!==d&&await bump('active'))lsSet('mlbDay',d);
+  // a visit is one browser tab session: reloading the page or moving between screens doesn't add another
+  let seen=null;try{seen=sessionStorage.getItem('mlbVisit')}catch(e){}
+  if(!seen&&await bump('visits'))try{sessionStorage.setItem('mlbVisit','1')}catch(e){}
 }
 const gameKind=()=>S.rankAI?'rankedAI':isRanked()?'ranked':NET.on?'online':S.ai?'solo':'local';
 const COUNTED=new Set();
@@ -2077,14 +2080,14 @@ async function openStats(){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('遊玩統計','Play statistics')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📈 ${TR('遊玩統計','Play statistics')}</h2><div id="stt" style="color:#10261d;overflow-x:auto">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
-  const cols=[['active',TR('上線','Online')],['players',TR('新玩家','New')],['drafts',TR('選秀（次）','Drafts')],['games',TR('比賽（場）','Games')],['solo',TR('單人','Solo')],['local',TR('同機','Same device')],['online',TR('線上','Online')],['ranked',TR('排位','Ranked')],['rankedAI',TR('電腦排位','Ranked vs CPU')]];
+  const cols=[['visits',TR('造訪','Visits')],['active',TR('上線','Online')],['players',TR('新玩家','New')],['drafts',TR('選秀（次）','Drafts')],['games',TR('比賽（場）','Games')],['solo',TR('單人','Solo')],['local',TR('同機','Same device')],['online',TR('線上','Online')],['ranked',TR('排位','Ranked')],['rankedAI',TR('電腦排位','Ranked vs CPU')]];
   try{
     const days=[...Array(14)].map((_,i)=>dayKey(Date.now()-i*86400000));
     const docs=await Promise.all(['all',...days].map(k=>NET.db.doc('stats/'+k).get()));
     const row=(label,x,b)=>`<tr style="border-top:1px solid #c9c2a8;${b?'font-weight:900':''}"><td style="padding:4px 6px;white-space:nowrap">${label}</td>${cols.map(([k])=>`<td class="mono" style="padding:4px 6px;text-align:right">${(x[k]||0).toLocaleString()}</td>`).join('')}</tr>`;
     $('#stt').innerHTML=`<table style="border-collapse:collapse;font-size:13px;min-width:560px"><tr><th></th>${cols.map(([,l])=>`<th style="padding:4px 6px;text-align:right;font-size:12px">${l}</th>`).join('')}</tr>
       ${row(TR('累計','All time'),docs[0].exists?docs[0].data():{},true)}${days.map((d,i)=>row(`${d.slice(5,7)}/${d.slice(7)}`,docs[i+1].exists?docs[i+1].data():{})).join('')}</table>
-      <p class="hint" style="color:var(--dim);margin-top:8px">${TR('「上線」是當天打開網頁的瀏覽器數；「累計」那列的上線是所有天數加總。同一個人換手機或清除瀏覽器資料會被算成新玩家。「選秀」是開始一次選秀；「比賽」是打完一場，一次選秀可以打三戰兩勝、七戰四勝，或「同陣容再打一次」，所以比賽會比選秀多。線上和排位每場兩邊各記一次。','"Online" counts browsers that opened the page that day; in the all-time row it is the sum of all days. Someone on a new phone or with cleared browser data counts as a new player. A draft counts once when it starts and a game once when it ends; one draft can be a best-of-3 or best-of-7, or be replayed, so there are more games than drafts. Online and ranked games are counted on both devices.')}</p>`;
+      <p class="hint" style="color:var(--dim);margin-top:8px">${TR('「造訪」是打開網頁的次數（同一個分頁重新整理不重複計算）；「上線」是當天打開網頁的瀏覽器數；「累計」那列的上線是所有天數加總。同一個人換手機或清除瀏覽器資料會被算成新玩家。「選秀」是開始一次選秀；「比賽」是打完一場，一次選秀可以打三戰兩勝、七戰四勝，或「同陣容再打一次」，所以比賽會比選秀多。線上和排位每場兩邊各記一次。','"Visits" counts times the page was opened (reloading a tab does not add one); "Online" counts browsers that opened the page that day; in the all-time row it is the sum of all days. Someone on a new phone or with cleared browser data counts as a new player. A draft counts once when it starts and a game once when it ends; one draft can be a best-of-3 or best-of-7, or be replayed, so there are more games than drafts. Online and ranked games are counted on both devices.')}</p>`;
   }catch(e){$('#stt').textContent=TR('統計載入失敗。','The statistics did not load.')}
 }
 
