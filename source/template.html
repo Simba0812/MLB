@@ -2318,7 +2318,7 @@ const saveRkLg=()=>{try{localStorage.setItem('mlbRkLg',RK_LG.join(','))}catch(e)
 const pickLg=()=>RK_LG[Math.floor(Math.random()*RK_LG.length)];
 // ranked against the computer: half the points of a game against a person, five a day, and only below the
 // major-league tier, because the result is worked out on the player's own page and nothing on the server can check it
-const AI_RK={d:25,win:50,perDay:5,cap:2500};   // cap: the major-league tier and up play people only (firestore.rules)
+const AI_RK={d:25,win:50,perDay:5,cap:2100};   // cap: the major-league tier and up play people only (firestore.rules)
 // a win streak against people adds 10 for the 2nd win in a row, 20 for the 3rd, 30 from the 4th on
 const streakBonus=st=>Math.min(st||0,3)*10;
 const twDay=()=>Math.floor((Date.now()+8*3600000)/86400000);   // a day in Taiwan time; firestore.rules counts the same way
@@ -2351,8 +2351,8 @@ async function ensureSeason(){
 }
 // ranked tiers by rating; everyone starts at 1000, in the rookie league. The steps widen as you climb:
 // 300 to Single-A, 300 to Double-A, 400 to Triple-A, 500 to the majors, then 500 per tier
-const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1300,'🥉','1A','Single-A','#a8642a'],[1600,'🥈','2A','Double-A','#6b7a89'],[2000,'🥇','3A','Triple-A','#b8860b'],
-  [2500,'🏟️','大聯盟','Major League','#2a6f97'],[3000,'⭐','明星','All-Star','#c99a1e'],[3500,'🏛️','名人堂','Hall of Fame','#7b4fa0']];
+const TIERS=[[0,'🌱','新人聯盟','Rookie League','#3f8f4a'],[1200,'🥉','1A','Single-A','#a8642a'],[1400,'🥈','2A','Double-A','#6b7a89'],[1700,'🥇','3A','Triple-A','#b8860b'],
+  [2100,'🏟️','大聯盟','Major League','#2a6f97'],[2500,'⭐','明星','All-Star','#c99a1e'],[2900,'🏛️','名人堂','Hall of Fame','#7b4fa0']];
 const tierIdx=r=>{let k=0;TIERS.forEach((t,i)=>{if(r>=t[0])k=i});return k};
 const tierName=r=>{const t=TIERS[tierIdx(r)];return t[1]+' '+TR(t[2],t[3])};
 const isRanked=()=>!!(NET.on&&NET.doc&&NET.doc.cfg&&NET.doc.cfg.ranked);

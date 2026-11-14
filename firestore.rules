@@ -111,7 +111,7 @@ service cloud.firestore {
     // a confirmed win (add K back); or drop a pending game (the booked loss stays).
     // Elo with K = 100 on a 1250 scale (an even game is worth 50); a win streak against people adds
     // 10 / 20 / 30 from the 2nd win in a row. Ranked games against the computer can't be checked here,
-    // so they are worth half (-25 booked, +50 for a win), five a day, below 2500 (the major-league
+    // so they are worth half (-25 booked, +50 for a win), five a day, below 2100 (the major-league
     // tier), and leave the streak alone.
     match /players/{uid} {
       function nd() { return request.resource.data; }
@@ -159,7 +159,7 @@ service cloud.firestore {
       function aiStartOK() {
         let day = nd().aiDay;
         let n = od().get('aiDay', 0) == day ? od().get('aiN', 0) + 1 : 1;
-        return od().rating < 2500 && nd().pendAt == 0 && nd().pendD == 25 && nd().rating == od().rating - 25
+        return od().rating < 2100 && nd().pendAt == 0 && nd().pendD == 25 && nd().rating == od().rating - 25
           && nd().games == od().games + 1 && nd().losses == od().losses + 1
           && day is int && day >= od().get('aiDay', 0) && day >= today() - 1 && day <= today() + 1
           && nd().aiN == n && n <= 5;
