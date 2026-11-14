@@ -93,7 +93,7 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .statline button{padding:2px 10px;margin-left:6px}
 .bidclock{display:flex;align-items:center;gap:10px;font-weight:900;color:var(--navy)}
 .bidclock .bar{flex:1;height:10px;border:2px solid var(--navy);background:var(--panel2)}
-.bidclock .bar i{display:block;height:100%;background:var(--navy);transition:width .25s linear}
+.bidclock .bar i{display:block;height:100%;width:100%;background:var(--navy);transform-origin:left;transition:transform .25s linear;will-change:transform}
 .bidclock.low{color:var(--red)}.bidclock.low .bar{border-color:var(--red)}.bidclock.low .bar i{background:var(--red)}
 .linebtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #06c755;background:#06c755;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
 .linebtn:hover{filter:brightness(1.06)}
@@ -2016,7 +2016,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='2738ab35c4';
+const BUILD='3fff1f1d6d';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2299,8 +2299,11 @@ function drawBidClock(){
   const a=NET.afk,box=document.querySelector('.bidbox');if(!a||!box)return;
   let el=$('#bidclock');if(!el){box.insertAdjacentHTML('afterbegin','<div id="bidclock" class="bidclock"><div class="bar"><i></i></div><span class="txt"></span></div>');el=$('#bidclock')}
   const left=Math.max(0,a.limit-(Date.now()-a.since)),sec=Math.ceil(left/1000),mine=a.turn===NET.seat;
-  el.classList.toggle('low',sec<=5);el.querySelector('i').style.width=(left/a.limit*100)+'%';
-  el.querySelector('.txt').textContent=mine?TR(`⏱ 你還有 ${sec} 秒`,`⏱ ${sec}s left for you`):TR(`⏱ 對手還有 ${sec} 秒`,`⏱ ${sec}s left for your opponent`);
+  // the bar shrinks with a transform (no page layout), and the text changes only once a second:
+  // redrawing the page four times a second kept phones busy while they should be answering taps
+  el.classList.toggle('low',sec<=5);el.querySelector('i').style.transform=`scaleX(${(left/a.limit).toFixed(3)})`;
+  const txt=mine?TR(`⏱ 你還有 ${sec} 秒`,`⏱ ${sec}s left for you`):TR(`⏱ 對手還有 ${sec} 秒`,`⏱ ${sec}s left for your opponent`);
+  const te=el.querySelector('.txt');if(te.textContent!==txt)te.textContent=txt;
 }
 function afkTick(){
   const a=NET.afk;if(!a||!NET.on||S.screen!=='draft'||!S.lot)return afkStop();
