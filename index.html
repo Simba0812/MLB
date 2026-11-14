@@ -691,7 +691,7 @@ function aiValue(t,p){
   const wf=need?waitFactor(t,p,slots):1;v*=wf;              // an ordinary player while better ones are still to come: let him go
   if(need&&S.lotMax-S.lotNo<req*2)v*=1.4;                     // few lots left: pay up for a spot it must fill
   const pace=t.budget/Math.max(1,S.budget*Math.max(0,S.lotMax-S.lotNo)/S.lotMax);
-  if(pace>1.2)v*=Math.min(2.2,pace*.8);                        // more money left than the remaining lots need: spend it
+  if(pace>1)v*=Math.min(2.6,pace);                             // more money left than the remaining lots need: spend it
   v*=lv.scale*(1+(Math.random()*2-1)*lv.noise);
   return Math.max(need&&wf>=1?1:0,Math.floor(v));
 }
@@ -1976,7 +1976,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='0398528eb0';
+const BUILD='6553f43c72';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
