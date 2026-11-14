@@ -1913,7 +1913,7 @@ function finish(){
   const need={single:1,bo3:2,bo7:4}[S.mode];
   const seriesOver=w[0]>=need||w[1]>=need;
   const champ=seriesOver?(w[0]>=need?0:1):null;
-  if(seriesOver)saveHistory(champ,w);
+  if(seriesOver)try{saveHistory(champ,w)}catch(e){console.error(e)}   // never let the history keep the result from showing
   const nmw=res.wp.W?nm(res.wp.W):'—', nml=res.wp.L?nm(res.wp.L):'—';
   const watch=NET.on&&NET.seat==null;
   $('#after').innerHTML=`
@@ -2112,7 +2112,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='096918be8f';
+const BUILD='493992d9d9';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2238,16 +2238,20 @@ const histKey=()=>histUid()?HIST_KEY+':'+histUid():HIST_KEY;
 const histRead=k=>{try{const v=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
 const histGet=()=>histRead(histKey());
 const histMerge=(...ls)=>{const m=new Map();ls.flat().forEach(x=>{if(x&&x.id&&!m.has(x.id))m.set(x.id,x)});return [...m.values()].sort((a,b)=>b.t-a.t).slice(0,HIST_MAX)};
+// Firestore can't hold an array inside an array, so on the account each game's score is kept as "3:2"
+const histOut=x=>({...x,games:(x.games||[]).map(g=>Array.isArray(g)?g.join(':'):String(g))});
+const histIn=x=>({...x,games:(x.games||[]).map(g=>Array.isArray(g)?g:String(g).split(':').map(Number))});
 function histPut(list,push){
   try{localStorage.setItem(histKey(),JSON.stringify(list))}catch(e){}
-  const uid=histUid();if(push&&uid&&NET.db)NET.db.doc('players/'+uid+'/hist/recent').set({list,at:Date.now()}).catch(()=>{});
+  const uid=histUid();
+  if(push&&uid&&NET.db)try{NET.db.doc('players/'+uid+'/hist/recent').set({list:list.map(histOut),at:Date.now()}).catch(()=>{})}catch(e){}
 }
 // bring the account's list down (once a session, or after a new sign-in) and fold in what this device had
 let HIST_SYNCED='';
 async function histSync(){
   const uid=histUid();if(!uid||!NET.db||HIST_SYNCED===uid)return;HIST_SYNCED=uid;
   try{
-    const d=await NET.db.doc('players/'+uid+'/hist/recent').get(),remote=d.exists&&Array.isArray(d.data().list)?d.data().list:[];
+    const d=await NET.db.doc('players/'+uid+'/hist/recent').get(),remote=d.exists&&Array.isArray(d.data().list)?d.data().list.map(histIn):[];
     const local=histGet(),anon=histRead(HIST_KEY),all=histMerge(remote,local,anon);
     const changed=JSON.stringify(all)!==JSON.stringify(remote);
     histPut(all,changed);if(anon.length)try{localStorage.removeItem(HIST_KEY)}catch(e){}
