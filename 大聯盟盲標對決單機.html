@@ -685,6 +685,7 @@ function aiValue(t,p){
   const lv=AI_LV[S.ai.level],slots=openSlotsFor(t,p);if(!slots.length)return 0;
   const need=needsCovered(t,p,slots)>0,q=clamp((ovr(p)-50)/49,0,1),req=minRemaining(t);
   let v=1+S.budget*.32*Math.pow(q,2.4);                       // a 99 is worth about a third of the starting budget, a star far more than a regular
+  if(need)v=Math.max(v,q*q*(t.budget-req)*.5);              // a star at a needed spot: worth up to half the free money (only matters when contested)
   v=Math.min(v,(t.budget/Math.max(1,req))*(need?3:1.2));     // keep enough money for the spots still empty
   if(!need)v*=.45;                                           // depth beyond the minimum roster matters less
   const wf=need?waitFactor(t,p,slots):1;v*=wf;              // an ordinary player while better ones are still to come: let him go
@@ -1975,7 +1976,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='6553f43c72';
+const BUILD='a3bae61840';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
