@@ -551,7 +551,7 @@ function prOf(g,k,v,lowGood){const a=PRS[g][k];if(v==null||!a||!a.length)return 
 const S={screen:'home',teams:[
   {name:'',park:0,budget:200,roster:[],done:false},
   {name:'',park:1,budget:200,roster:[],done:false}],
-  budget:200,lotMax:50,league:'MLB',slots:{SP:4,RP:5,CL:2,BN:2},deck:[],lotNo:0,lot:null,log:[],speed:380,mode:'single'};
+  budget:200,lotMax:50,league:'MLB',slots:{SP:4,RP:5,CL:2,BN:2},deck:[],lotNo:0,lot:null,log:[],speed:(()=>{try{const v=+localStorage.getItem('mlbSpeed');if([1800,700,250].includes(v))return v}catch(e){}return 700})(),mode:'single'};
 
 // best-of-7 needs a fourth starter for the rotation
 // starters, relievers and closers: the exact number set before the draft
@@ -1692,7 +1692,7 @@ function renderGameShell(){
    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${title} · ${esc(res.park.n)}</div>
     <h2 style="margin-top:4px"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span> @ <span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span></h2>
     <p class="hint">${coinText(G.gnum)}${S.mode!=='single'?` <span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></div>
-    <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1400],[TR('中','Normal'),380],[TR('快','Fast'),90]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
+    <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1800],[TR('中','Normal'),700],[TR('快','Fast'),250]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
    </div>
    <div class="linescore" id="ls" style="margin-top:14px">${lineTable(res,null)}</div>
    <div class="gstat" id="gstat"></div>
@@ -1707,7 +1707,7 @@ function renderGameShell(){
    box.addEventListener('scroll',()=>{const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<40;
      if(atEnd!==!G.hold){G.hold=!atEnd;nb.hidden=atEnd}},{passive:true});
    nb.onclick=()=>{G.hold=false;nb.hidden=true;box.scrollTop=box.scrollHeight}}
-  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;try{localStorage.setItem('mlbSpeed',S.speed)}catch(e){}document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;
     if(NET.on&&NET.seat===+c.dataset.auto){const seat=NET.seat,on=c.checked;dbWrite(()=>NET.ref.update({setup:{[seat]:{auto:on}}}))}if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
   $('#skip').onclick=()=>{clearTimeout(timer);S.game.skip=true;play()};
@@ -2102,7 +2102,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='c070fe135b';
+const BUILD='3c2ea99e86';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2515,7 +2515,7 @@ async function rankStart(){
     const d=NET.doc,me=NET.seat,code=NET.code,at=d.created;let p=await loadProfile();
     if(!p){NET.rk={state:'err'};return}
     if(p.pend===code&&p.pendAt===at){NET.rk={state:'on',d:p.pendD,before:p.rating+p.pendD};return}   // a reload: already booked
-    if(p.pend&&p.pend!=='ai'){await settlePending();p=PROF.doc}
+    if(p.pend){await settlePending();p=PROF.doc}
     if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
     await ensureSeason();p=PROF.doc;
     // the opponent's rating before this game, the way firestore.rules works it out
@@ -2546,7 +2546,8 @@ async function applyRanked(p,won){
 // a ranked series still pending on my record (I left before it was settled): read its room and settle it now.
 // A win counts when both reports agree, or when the opponent left without reporting (firestore.rules checks).
 async function settlePending(){
-  const p=PROF.doc,a=acctUser();if(!p||!p.pend||p.pend==='ai'||!a)return null;
+  const p=PROF.doc,a=acctUser();if(!p||!p.pend||!a)return null;
+  if(p.pend==='ai')return settleAIres();
   let d=null;try{const x=await NET.db.doc('rooms/'+p.pend).get();d=x.exists?x.data():null}catch(e){return null}
   if(!d||d.created!==p.pendAt)return null;
   const st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;if(me==null)return null;
@@ -2581,7 +2582,7 @@ async function startAIRanked(){
   let p=await loadProfile();if(!p)throw new Error(TR('找不到你的排位紀錄。','No ranked record found.'));
   if(p.rating>=AI_RK.cap)throw new Error(TR('大聯盟以上只能和真人打排位。','From the major-league tier up, ranked games are against people only.'));
   if(aiLeft(p)<=0)throw new Error(TR(`今天的電腦排位已經打完 ${AI_RK.perDay} 場了。`,`You have played today's ${AI_RK.perDay} ranked games against the computer.`));
-  if(p.pend&&p.pend!=='ai'){await settlePending();p=PROF.doc}
+  if(p.pend){await settlePending();p=PROF.doc}
   if(p.pend){await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,...(p.pend!=='ai'?{streak:0}:{})});p=await loadProfile()}
   await ensureSeason();p=PROF.doc;
   const day=twDay(),n=(p.aiDay===day?(p.aiN||0):0)+1;
@@ -2597,14 +2598,29 @@ async function startAIRanked(){
   newDeckOrder();S.lotNo=0;S.log=[];S.lot=null;S.trade=null;S.series=null;S.game=null;S.screen='draft';
   await loadProfile();nextLot();
 }
+// a finished series against the computer is noted on this device before its result is written, so a win
+// still counts if the page closes (or the write fails) before the account is updated: the next visit settles it
+const AIRES_KEY='mlbAIres';
+const aiResGet=()=>{try{return JSON.parse(localStorage.getItem(AIRES_KEY)||'null')}catch(e){return null}};
+async function settleAIres(){
+  const p=PROF.doc,a=acctUser(),r=aiResGet();if(!p||p.pend!=='ai'||!a||!r)return null;
+  if(r.uid!==a.uid||r.day!==p.aiDay||r.n!==p.aiN||!r.won)return null;
+  try{const before=p.rating+p.pendD;
+    await profRef().update({rating:p.rating+p.pendD+(p.pendW!=null?p.pendW:AI_RK.d),wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0});
+    try{localStorage.removeItem(AIRES_KEY)}catch(e){}
+    await loadProfile();return {won:true,before,after:PROF.doc.rating,bonus:0}}
+  catch(e){return null}
+}
 async function finishAIRanked(){
   const k=S.rankAI;if(!k||k.state!=='on')return;
   const w=rankWinner();if(w==null)return;
   const won=w===0;k.state='saving';
   try{const p=await loadProfile();
     if(p&&p.pend==='ai'){
+      try{localStorage.setItem(AIRES_KEY,JSON.stringify({uid:acctUser().uid,day:p.aiDay,n:p.aiN,won}))}catch(e){}
       if(won)await profRef().update({rating:p.rating+p.pendD+(p.pendW!=null?p.pendW:AI_RK.d),wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0});
-      else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0})}
+      else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0});
+      try{localStorage.removeItem(AIRES_KEY)}catch(e){}}
     await loadProfile();Object.assign(k,{state:'done',won,after:PROF.doc.rating});
   }catch(e){Object.assign(k,{state:'err',msg:String(e&&e.message||e)})}
   showRank();
