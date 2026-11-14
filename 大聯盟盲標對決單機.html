@@ -1011,14 +1011,18 @@ function buildTeam(i,lu){
 // pitches a pitcher can throw from full strength
 const capOf=p=>p.pos==='SP'?Math.max(75,(p.np||85)*1.3):Math.max(22,(p.np||16)*1.8);
 // strength at the start of game g, from pitches thrown in the previous three games
+// a best of seven runs 2-3-2 with a day off after games 2 and 5, like the postseason; the arms recover on it
+const SER_DAY=g=>S.mode==='bo7'?[0,1,3,4,5,7,8][g]:g;
+const afterOffDay=g=>g>0&&SER_DAY(g)-SER_DAY(g-1)>1;
 function staminaMap(i,g){
   const m={};
   for(let k=1;k<=3&&g-k>=0;k++){
-    const use=gameResult(g-k).use||{},w=[1,.5,.2][k-1];
+    const gap=SER_DAY(g)-SER_DAY(g-k);if(gap>3)continue;   // pitches thrown four or more days ago are forgotten
+    const use=gameResult(g-k).use||{},w=[1,.5,.2][gap-1];
     for(const id in use) m[id]=(m[id]||0)+use[id]*w;
   }
-  // 2 points per pitch: a 20-pitch inning leaves a reliever at 60% the next day, 80% after a day off
-  const out={};for(const id in m) out[id]=clamp(Math.round(100-2*m[id]),5,100);
+  // 1.5 points per pitch: a 20-pitch inning leaves a reliever at 70% the next day, 85% the day after
+  const out={};for(const id in m) out[id]=clamp(Math.round(100-1.5*m[id]),5,100);
   return out;
 }
 const staColor=v=>v>=60?'var(--good)':v>=35?'var(--amber)':'var(--red)';
@@ -1496,7 +1500,7 @@ function renderPick(){
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${S.mode==='single'?TR('決勝戰','Winner-take-all'):TR('第 '+(g+1)+' 戰','Game '+(g+1))} · ${esc(parkOf(S.teams[homeIdx].park).n)}</div>
    <h2 style="margin-top:4px">${TR('賽前調度','Pregame')}</h2>
-   <p class="hint" style="margin-top:6px">${coinText(g)} ${TR('選這場的先發投手、排好打序。','Pick a starter and set the lineup.')}${restN()?TR(`先發投手要休息 ${restN()} 場才能再先發（${restN()+1} 人輪值）。`,` A starter must rest ${restN()} games before starting again (${restN()+1}-man rotation).`):''}${TR('前幾場投過的投手體力會比較低，體力越低越容易失分。',' Pitchers who worked recently start with less stamina, and tired pitchers give up more runs.')}${S.mode!=='single'&&g>0?`<br><span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></section>
+   <p class="hint" style="margin-top:6px">${coinText(g)} ${afterOffDay(g)?TR('🛌 昨天是休息日，投手體力恢復了一些。',"🛌 Yesterday was an off day; the arms have had some rest. "):''}${TR('選這場的先發投手、排好打序。','Pick a starter and set the lineup.')}${restN()?TR(`先發投手要休息 ${restN()} 場才能再先發（${restN()+1} 人輪值）。`,` A starter must rest ${restN()} games before starting again (${restN()+1}-man rotation).`):''}${TR('前幾場投過的投手體力會比較低，體力越低越容易失分。',' Pitchers who worked recently start with less stamina, and tired pitchers give up more runs.')}${S.mode!=='single'&&g>0?`<br><span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></section>
   <div class="grid2">${tms.map(panel).join('')}</div>
   ${NET.on&&NET.seat==null?'':`<div class="row"><button class="solid" id="startg" ${mySent?'disabled':''}>${NET.on?TR('確定我的調度','Confirm my setup'):TR('確定，開打 ⚾','Confirm and play ⚾')}</button>${NET.on&&!mySent?'<span class="hint" id="pickcd"></span>':''}</div>`}`;
   if(NET.on&&NET.seat!=null&&!mySent)pickCountdown();
@@ -1945,7 +1949,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='a79fa5e17f';
+const BUILD='2b278699c8';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
