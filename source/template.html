@@ -1,6 +1,9 @@
 <title>大聯盟盲標對決｜MLB／中職 Fantasy 競標對戰</title>
 <meta name="description" content="和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。每位球員附傳統與進階數據（Baseball Savant、野球革命），可排打序、選先發、分配牛棚、調戰術。免註冊，傳邀請連結就能線上對戰。">
 <link rel="canonical" href="https://simba0812.github.io/MLB/">
+<link rel="alternate" hreflang="zh-Hant" href="https://simba0812.github.io/MLB/">
+<link rel="alternate" hreflang="en" href="https://simba0812.github.io/MLB/?lang=en">
+<link rel="alternate" hreflang="x-default" href="https://simba0812.github.io/MLB/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="zh_TW">
 <meta property="og:title" content="大聯盟盲標對決｜MLB／中職 Fantasy 競標對戰">
@@ -374,7 +377,11 @@ button.mini{padding:3px 8px;font-size:13px}
 const POOLS = {MLB:/*POOL*/[], CPBL:/*POOL_CPBL*/[]};
 let POOL = POOLS.MLB;
 /* ---------- language: 中文 / English, remembered on this device ---------- */
-let LANG=(()=>{try{const v=localStorage.getItem('mlbLang');if(v==='en'||v==='zh')return v}catch(e){}return 'zh'})();   // Chinese unless the player picked English
+// ?lang=en / ?lang=zh wins, then the player's saved choice, otherwise Chinese (so search engines index the Chinese page)
+let LANG=(()=>{let q='';try{q=new URLSearchParams(location.search).get('lang')||''}catch(e){}
+  if(q==='en'||q==='zh'){try{localStorage.setItem('mlbLang',q)}catch(e){}return q}
+  try{const v=localStorage.getItem('mlbLang');if(v==='en'||v==='zh')return v}catch(e){}return 'zh'})();
+try{if(new URLSearchParams(location.search).get('lang')==='en'){const c=document.querySelector('link[rel=canonical]');if(c)c.href='https://simba0812.github.io/MLB/?lang=en'}}catch(e){}
 document.documentElement.lang=LANG==='en'?'en':'zh-Hant';
 const TR=(zh,en)=>LANG==='en'?en:zh;   // pick the text for the current language
 const ord=n=>{const t=['th','st','nd','rd'],v=n%100;return n+(t[(v-20)%10]||t[v]||t[0])};
