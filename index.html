@@ -1307,7 +1307,9 @@ function simGame(away,home,ctx){
     const s=st[bt],slot=s.bi,row=s.lu[slot],h=row.h,bench=s.bench;
     if(!bench.length||inning<6||Math.abs(diff)>3||!(bases[1]||bases[2])) return;
     const best=bench.slice().sort((a,b)=>hitBlend(b)-hitBlend(a))[0];
-    let choice=inning>=7&&Math.abs(diff)<=2&&hitBlend(best)>hitBlend(h)+.03?sid(best.id):'keep';
+    // a pinch-hitter is suggested from the 7th on in a game within two runs (from the 6th, within three, when
+    // the bench bat is clearly better), with a runner in scoring position
+    let choice=(inning>=7&&Math.abs(diff)<=2&&hitBlend(best)>hitBlend(h)+.025)||(hitBlend(best)>hitBlend(h)+.06)?sid(best.id):'keep';
     if(ctx.human[s.tm.i]){
       // asked only when a pinch-hitter is the suggestion (the "keep him in" prompts were most of them)
       if(choice==='keep') return;
@@ -2118,7 +2120,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='1d5ae90135';
+const BUILD='46b9f75caf';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2708,7 +2710,12 @@ function newerBuild(){
   NEWER.then(v=>{if(!v)setTimeout(()=>{NEWER=null},5*60000)});
   return NEWER;
 }
-const reloadFresh=()=>location.replace(location.pathname+'?v='+Date.now());
+const reloadFresh=(room)=>location.replace(location.pathname+'?v='+Date.now()+(room?'&room='+room:''));
+// before a room with a friend: two different builds replay the same game differently, so get the newest page first
+async function freshBeforeRoom(room){
+  if(!(await newerBuild()))return false;
+  reloadFresh(room);return true;
+}
 async function quickMatch(kind){
   // two players on different builds can never be paired, so get the newest page first
   if(await newerBuild()){if(confirm(TR('網頁有新版本，要先更新嗎？（舊版配不到用新版的玩家）','A newer version of the page is out. Update now? (Older pages can\'t be paired with newer ones.)')))return reloadFresh()}
@@ -2763,7 +2770,7 @@ function inviteFromLink(){
   const code=(new URLSearchParams(location.search).get('room')||'').toUpperCase();
   if(!/^[A-Z0-9]{4}$/.test(code)||S.screen!=='home')return;
   try{history.replaceState(null,'',location.pathname)}catch(e){}
-  joinRoom(code).catch(e=>{renderNetBox();const el=$('#neterr');if(el)el.textContent=e&&e.message&&!e.code?e.message:TR('連線失敗，請再試一次。','Connection failed. Try again.')});
+  freshBeforeRoom(code).then(r=>r?null:joinRoom(code)).catch(e=>{renderNetBox();const el=$('#neterr');if(el)el.textContent=e&&e.message&&!e.code?e.message:TR('連線失敗，請再試一次。','Connection failed. Try again.')});
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
@@ -2886,12 +2893,12 @@ function renderNetBox(){
    ${/^[A-Z0-9]{4}$/.test(last)?`<button class="ghost" id="rejoin">${TR('回到','Back to')} ${esc(last)}</button>`:''}</div>
    <p class="hint" id="neterr" role="alert" style="margin-top:8px"></p>`;
   const busy=async(btn,fn)=>{btn.disabled=true;$('#neterr').textContent='';try{await fn()}catch(e){$('#neterr').textContent=e&&e.message&&!e.code?e.message:TR('連線失敗，請再試一次。','Connection failed. Try again.');btn.disabled=false}};
-  $('#mk').onclick=()=>busy($('#mk'),()=>createRoom());
+  $('#mk').onclick=()=>busy($('#mk'),async()=>{if(await freshBeforeRoom())return;await createRoom()});
   $('#qm').onclick=()=>busy($('#qm'),()=>quickMatch('casual'));
   renderRankBox();
-  $('#join').onclick=()=>busy($('#join'),()=>joinRoom($('#code').value));
+  $('#join').onclick=()=>busy($('#join'),async()=>{const c=String($('#code').value||'').trim().toUpperCase();if(/^[A-Z0-9]{4}$/.test(c)&&await freshBeforeRoom(c))return;await joinRoom(c)});
   $('#code').onkeydown=e=>{if(e.key==='Enter')$('#join').click()};
-  if($('#rejoin'))$('#rejoin').onclick=()=>busy($('#rejoin'),()=>joinRoom(last));
+  if($('#rejoin'))$('#rejoin').onclick=()=>busy($('#rejoin'),async()=>{if(await freshBeforeRoom(last))return;await joinRoom(last)});
 }
 /* ---------- the ranked panel on the home page ---------- */
 function renderRankBox(){
