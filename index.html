@@ -1278,8 +1278,10 @@ function simGame(away,home,ctx){
     const kept=c.keep&&c.keep.runs===c.runs&&c.keep.sta-sta<15;
     // blowouts are managed automatically; ask when the game is within reach or the starter is in trouble
     // a person is asked about the starter, a reliever who is getting hit mid-inning, and the bullpen from the
-    // 7th on in a game within four runs; the reliever-per-inning routine otherwise runs by the roles set before the game
-    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=7&&Math.abs(lead)<=4));
+    // 6th on in a game within three runs; the reliever-per-inning routine otherwise runs by the roles set before
+    // the game. From the 6th on, the moment a close game (3 runs or less) opens up to 4 or more, they are asked too.
+    const gap=Math.abs(lead),swing=inning>=6&&gap>=4&&s.lastGap!=null&&s.lastGap<=3;s.lastGap=gap;
+    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=6&&Math.abs(lead)<=3))||swing;
     if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead)||avail(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
@@ -1408,7 +1410,7 @@ function simGame(away,home,ctx){
           if(bases[0]){if(rnd()<.4+.15*spd+(outs===2?.2:0)+ta(to,'run','send'))score(bases[0],bb);else bases[2]=bases[0];bases[0]=null}
           bases[1]=h;
           {const w=pick(TR(['左外野','右外野','左中外野','右中外野'],['left-field','right-field','left-center','right-center'])),ln=pick(TR(['三壘','一壘'],['third','first'])),v=(98+rnd()*14).toFixed(1);
-          say(pick(TR([`${B} 一棒轟向${w}全壘打牆，二壘安打！`,`${B} 沿著${ln}邊線的強勁滾地球，長打上二壘。`],[`${B} drives one off the ${w} wall: double!`,`${B} smokes a grounder down the ${ln}-base line for a double.`]))+TR(` 擊球初速 ${v} 英里。`,` Exit velocity ${v} mph.`));}}
+          say(pick(TR([`${B} 一棒打到${w}圍牆彈回，二壘安打！`,`${B} 沿著${ln}邊線的強勁滾地球，長打上二壘。`],[`${B} drives one off the ${w} wall: double!`,`${B} smokes a grounder down the ${ln}-base line for a double.`]))+TR(` 擊球初速 ${v} 英里。`,` Exit velocity ${v} mph.`));}}
         else if(res==='s3'){bb.ab++;bb.hits++;bb.d3++;pb.h++;H[bt]++;
           [2,1,0].forEach(j=>{if(bases[j]){score(bases[j],bb);bases[j]=null}});bases[2]=h;
           {const g=pick(TR(['右中外野','左中外野'],['right-center','left-center']));say(TR(`${B} 打到${g}最深處，一路衝上三壘，三壘安打！`,`${B} hits it to the deepest part of ${g} and races into third: triple!`));}}
@@ -1929,6 +1931,8 @@ function finish(){
    ${S.mode!=='single'?safe(()=>seriesPanel(G.gnum+1,seriesOver),''):''}
    <h2 style="margin-top:20px">${TR('本場 Box Score','This game')}</h2>
    <div class="grid2" style="margin-top:10px">${safe(()=>boxScore(res,0),'')}${safe(()=>boxScore(res,1),'')}</div>`;
+  // the result sits under a long play-by-play: bring it into view (unless the player is reading back)
+  if(!G.hold)setTimeout(()=>{const el=$('#after');if(el&&S.game===G)el.scrollIntoView({behavior:'smooth',block:'start'})},250);
   if($('#nextg'))$('#nextg').onclick=()=>{S.game={gnum:G.gnum+1};S.screen='pick';sync();render();window.scrollTo(0,0)};
   countGame();
   if($('#rkhome')){$('#rkhome').onclick=()=>{S.rankAI=null;S.ai=null;leaveRoom()};if(S.rankAI)finishAIRanked();else rankCheck()}
@@ -2107,7 +2111,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='377dcd0c52';
+const BUILD='6bab4cb587';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
