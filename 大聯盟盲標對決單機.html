@@ -1601,7 +1601,7 @@ function renderGameShell(){
    ${auto?`<div class="row" style="margin-top:8px">${auto}</div>`:''}
   </section>
   <div id="decide"></div>
-  <div class="pbp" id="pbp" aria-live="polite"><button type="button" class="pbpnew" id="pbpnew" hidden>⏸ ${TR('播報已暫停（你在看前面的內容）· 按這裡回到最新並繼續','Paused while you read back · tap to jump to the latest and resume')}</button></div>
+  <div class="pbp" id="pbp" aria-live="polite"><button type="button" class="pbpnew" id="pbpnew" hidden>⬇ ${TR('回到最新','Back to latest')}</button></div>
   <div id="after"></div>`;
   {const box=$('#pbp'),nb=$('#pbpnew');G.hold=false;
    // scrolling up holds the play-by-play where it is; coming back down (or the button) carries on
@@ -1984,7 +1984,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='9a4a88e887';
+const BUILD='ec61925659';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2101,8 +2101,30 @@ async function countVisit(){
 }
 const gameKind=()=>S.rankAI?'rankedAI':isRanked()?'ranked':NET.on?'online':S.ai?'solo':'local';
 /* ---------- recent matches: the last five finished series, kept on this device ---------- */
+// signed-in players keep them on their account (players/{uid}/hist/recent, one small document) so every
+// device shows the same list; anonymous players keep them in this browser only
 const HIST_KEY='mlbHist',HIST_MAX=5;
-const histGet=()=>{try{const v=JSON.parse(localStorage.getItem(HIST_KEY)||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
+const histUid=()=>{const a=acctUser();return a&&!a.anon?a.uid:''};
+const histKey=()=>histUid()?HIST_KEY+':'+histUid():HIST_KEY;
+const histRead=k=>{try{const v=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
+const histGet=()=>histRead(histKey());
+const histMerge=(...ls)=>{const m=new Map();ls.flat().forEach(x=>{if(x&&x.id&&!m.has(x.id))m.set(x.id,x)});return [...m.values()].sort((a,b)=>b.t-a.t).slice(0,HIST_MAX)};
+function histPut(list,push){
+  try{localStorage.setItem(histKey(),JSON.stringify(list))}catch(e){}
+  const uid=histUid();if(push&&uid&&NET.db)NET.db.doc('players/'+uid+'/hist/recent').set({list,at:Date.now()}).catch(()=>{});
+}
+// bring the account's list down (once a session, or after a new sign-in) and fold in what this device had
+let HIST_SYNCED='';
+async function histSync(){
+  const uid=histUid();if(!uid||!NET.db||HIST_SYNCED===uid)return;HIST_SYNCED=uid;
+  try{
+    const d=await NET.db.doc('players/'+uid+'/hist/recent').get(),remote=d.exists&&Array.isArray(d.data().list)?d.data().list:[];
+    const local=histGet(),anon=histRead(HIST_KEY),all=histMerge(remote,local,anon);
+    const changed=JSON.stringify(all)!==JSON.stringify(remote);
+    histPut(all,changed);if(anon.length)try{localStorage.removeItem(HIST_KEY)}catch(e){}
+    if(S.screen==='home'){const el=$('#histbox');if(el)el.innerHTML=histPanel()}
+  }catch(e){HIST_SYNCED=''}
+}
 function saveHistory(champ,w){
   if(!S.series||(NET.on&&NET.seat==null))return;
   const id=String(S.series.id||''),h=histGet();if(!id||h.some(x=>x.id===id))return;
@@ -2111,13 +2133,13 @@ function saveHistory(champ,w){
   let mvpTxt='';try{mvpTxt=seriesMvp(seriesStats(n),champ)}catch(e){}
   const me=S.ai?1-S.ai.seat:NET.on?NET.seat:null;
   h.unshift({id,t:Date.now(),kind:gameKind(),lg:S.league,mode:S.mode,names:S.teams.map(t=>t.name),w:[...w],champ,me,games,mvp:mvpTxt});
-  try{localStorage.setItem(HIST_KEY,JSON.stringify(h.slice(0,HIST_MAX)))}catch(e){}
+  histPut(h.slice(0,HIST_MAX),true);
 }
 function histPanel(){
   const h=histGet();if(!h.length)return '';
   const KIND={solo:TR('單人','Solo'),local:TR('同機','Same device'),online:TR('線上','Online'),ranked:TR('排位','Ranked'),rankedAI:TR('電腦排位','Ranked vs CPU')};
   const when=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
-  return `<section class="panel hist"><h2>📜 ${TR('最近對戰','Recent matches')}</h2><p class="hint" style="margin-top:4px">${TR(`最近 ${HIST_MAX} 場對戰（單場或系列賽），存在這台裝置上。點一下看細節。`,`Your last ${HIST_MAX} matches on this device. Tap one for details.`)}</p>
+  return `<section class="panel hist"><h2>📜 ${TR('最近對戰','Recent matches')}</h2><p class="hint" style="margin-top:4px">${TR(histUid()?`最近 ${HIST_MAX} 場對戰（單場或系列賽），跟著你的帳號，換裝置也看得到。點一下看細節。`:`最近 ${HIST_MAX} 場對戰（單場或系列賽），存在這台裝置上；登入後會跟著帳號。點一下看細節。`,histUid()?`Your last ${HIST_MAX} matches, kept on your account. Tap one for details.`:`Your last ${HIST_MAX} matches on this device; sign in to keep them on your account. Tap one for details.`)}</p>
    ${h.map(x=>{const one=x.mode==='single'&&x.games.length===1,res=x.me==null?'':x.champ===x.me?`<span class="hw">${TR('勝','W')}</span>`:`<span class="hl">${TR('敗','L')}</span>`;
      const nm2=i=>`<span class="${i?'tb':'ta'}">${esc(x.names[i]||'')}</span>`;
      return `<details class="hrow"><summary>${res}<span class="hmeta">${when(x.t)} · ${KIND[x.kind]||''} · ${x.lg==='CPBL'?TR('中職','CPBL'):'MLB'} · ${MODEZH[x.mode]||''}</span><span class="hsc">${nm2(0)} <b class="mono">${one?x.games[0][0]:x.w[0]}：${one?x.games[0][1]:x.w[1]}</b> ${nm2(1)}</span></summary>
@@ -2597,7 +2619,7 @@ function enterRoom(code,seat,mm){
       const uid=await user.id(),cw=await user.can('data.write');
       if(!uid){NET.status='off';NET.msg=TR('請先登入 claude.ai 再使用線上對戰。','Sign in to claude.ai to play online.')}
       else if(cw===false){NET.status='off';NET.msg=TR('你目前只有檢視權限，沒辦法加入對戰。請房主從頁面的 Share 選單把你設為可以編輯（Editor）。','You only have view access. Ask the host to make you an Editor from the page\'s Share menu.')}
-      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink();countVisit().then(()=>{if(S.screen==='home')statLine()})}
+      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink();countVisit().then(()=>{if(S.screen==='home'){statLine();histSync()}})}
     }
   }catch(e){NET.status='off';NET.msg=window.STANDALONE?TR(`Firebase 連線失敗，請確認設定正確、匿名登入已啟用。（${(e&&(e.code||e.message))||''}）`,`Couldn't connect to Firebase. Check the config and that anonymous sign-in is enabled. (${(e&&(e.code||e.message))||''})`):TR('線上功能暫時無法使用，請重新整理頁面。','Online play is unavailable right now. Reload the page.')}
   renderNetBox();
@@ -2670,14 +2692,14 @@ function renderHome(){
    <section class="panel"><h2>${TR('同一台輪流玩','Same device')}</h2><p class="hint" style="margin-top:6px">${TR('兩個人用同一台電腦或手機，輪流出價、輪流選先發。','Two people share one computer or phone and take turns.')}</p><button class="solid" id="local" style="margin-top:14px">${TR('開始','Start')}</button></section>
    ${window.OFFLINE?`<section class="panel soon"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('和朋友各用自己的裝置連線對戰，敬請期待。','Play a friend from your own devices. Coming soon.')}</p><button disabled style="margin-top:14px">${TR('敬請期待','Coming soon')}</button></section>`:`<section class="panel"><h2>${TR('線上對戰','Online')}</h2><p class="hint" style="margin-top:6px">${TR('你和朋友各用自己的裝置，同步看到同一場選秀和比賽，輪到誰誰才能出手。','You and a friend each use your own device and see the same draft and games; only the player whose turn it is can act.')}${window.STANDALONE?TR('把網址和房號傳給朋友就能一起玩，不用註冊。',' Send your friend the link and room code; no sign-up needed.'):TR('朋友需要登入 claude.ai，並被你從 Share 選單加為可以編輯的成員。',' Your friend needs a claude.ai account and Editor access from the Share menu.')}</p><div id="netbox" style="margin-top:14px"></div></section>`}
   </div>
-  ${histPanel()}
+  <div id="histbox">${histPanel()}</div>
   <p class="statline" id="statline"></p>
   ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我，也歡迎到 LINE 社群找人對戰、聊天。','How was it? Tell me about bugs or features you want, or find opponents in the LINE group.')}</span><span id="fbhome"></span>${lineBtn()}</div>`}
   <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
   // the three ways to play are drawn as tickets: a stub on the left, the details on the right
   document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub"><span class="si">${['🤖','👥','🌐'][i]}</span><span class="sl">${[TR('單人','SOLO'),TR('雙人','2P'),TR('線上','ONLINE')][i]}</span></div>`);
     const st=p.firstElementChild,rest=[...p.children].slice(1),b=document.createElement('div');b.className='tbody';rest.forEach(x=>b.appendChild(x));p.appendChild(b)});
-  statLine();
+  statLine();histSync();
   if($('#fbhome'))$('#fbhome').innerHTML=feedbackBtn('home');
   $('#local').onclick=()=>{S.ai=null;S.screen='setup';render()};
   $('#solo').onclick=()=>{S.ai={seat:1,level:(S.ai&&S.ai.level)||'normal'};S.teams[1].name=randomName();S.teams[1].park=Math.floor(Math.random()*PARKS.length);S.screen='setup';render()};
@@ -2704,6 +2726,7 @@ function renderNetBox(){
 }
 /* ---------- the ranked panel on the home page ---------- */
 function renderRankBox(){
+  histSync();   // the account may only just be known (sign-in, page load): bring its match list down
   const box=$('#rankbox');if(!box)return;
   if(NET.status!=='ready'||!NET.acct){box.hidden=true;return}
   box.hidden=false;
