@@ -189,6 +189,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .linescore td.tn{text-align:left;font-family:var(--body);font-weight:700;white-space:nowrap}
 .linescore th{color:var(--dim);font-weight:400;font-size:12px}
 .linescore td.tot{font-weight:600;background:var(--panel2)}
+.pbpnew{position:sticky;bottom:0;order:9999;align-self:center;margin-top:6px;padding:8px 14px;border:2px solid var(--navy);background:var(--navy);color:var(--paper);font-weight:900;border-radius:20px;box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:2}
 .pbp{background:var(--paper);border:2px solid var(--line);border-radius:4px;padding:14px;max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:15px}
 .pbp .half{font-family:var(--serif);font-weight:900;font-size:20px;color:var(--navy);letter-spacing:.03em;margin-top:12px;padding-top:8px;border-top:1px solid var(--rule)}
 .pbp .half:first-child{margin-top:0;border-top:0}
@@ -1568,15 +1569,20 @@ function renderGameShell(){
    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${title} · ${esc(res.park.n)}</div>
     <h2 style="margin-top:4px"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span> @ <span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span></h2>
     <p class="hint">${coinText(G.gnum)}${S.mode!=='single'?` <span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></div>
-    <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),900],[TR('中','Normal'),380],[TR('快','Fast'),90]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
+    <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1400],[TR('中','Normal'),380],[TR('快','Fast'),90]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
    </div>
    <div class="linescore" id="ls" style="margin-top:14px">${lineTable(res,null)}</div>
    <div class="gstat" id="gstat"></div>
    ${auto?`<div class="row" style="margin-top:8px">${auto}</div>`:''}
   </section>
   <div id="decide"></div>
-  <div class="pbp" id="pbp" aria-live="polite"></div>
+  <div class="pbp" id="pbp" aria-live="polite"><button type="button" class="pbpnew" id="pbpnew" hidden>⏸ ${TR('播報已暫停（你在看前面的內容）· 按這裡回到最新並繼續','Paused while you read back · tap to jump to the latest and resume')}</button></div>
   <div id="after"></div>`;
+  {const box=$('#pbp'),nb=$('#pbpnew');G.hold=false;
+   // scrolling up holds the play-by-play where it is; coming back down (or the button) carries on
+   box.addEventListener('scroll',()=>{const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<40;
+     if(atEnd!==!G.hold){G.hold=!atEnd;nb.hidden=atEnd||G.finished}},{passive:true});
+   nb.onclick=()=>{G.hold=false;nb.hidden=true;box.scrollTop=box.scrollHeight}}
   document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   document.querySelectorAll('[data-auto]').forEach(c=>c.onchange=()=>{AUTO[+c.dataset.auto]=c.checked;
     if(NET.on&&NET.seat===+c.dataset.auto){const seat=NET.seat,on=c.checked;dbWrite(()=>NET.ref.update({setup:{[seat]:{auto:on}}}))}if(c.checked&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length)showDecision()});
@@ -1594,11 +1600,13 @@ function emit(){
     if(e.bo)d.insertAdjacentHTML('afterbegin',`<span class="bo">${TR(e.bo+' 棒','#'+e.bo)}</span>`);
     if(e.sc){const s=document.createElement('span');s.className='sc';s.textContent=`${G.res.away.name} ${e.sc[0]} : ${e.sc[1]} ${G.res.home.name}`;d.appendChild(s)}}
   if(e.ps){$('#gstat').innerHTML=[0,1].map(t=>`<div class="gp"><span class="${(t?G.homeIdx:1-G.homeIdx)?'tb':'ta'}">${esc(t?G.res.home.name:G.res.away.name)}</span><span>${esc(e.ps[t][0])}</span><span class="mono">${e.ps[t][1]} ${TR('球','pitches')}</span>${staBar(e.ps[t][2])}</div>`).join('')}
-  box.appendChild(d);box.scrollTop=box.scrollHeight;
+  // keep the newest play in view, unless the reader has scrolled back to an earlier inning
+  const nb=$('#pbpnew');box.insertBefore(d,nb);if(!G.hold)box.scrollTop=box.scrollHeight;
 }
 function play(){
   const G=S.game;
-  if(G.skip){while(G.pos<G.res.ev.length)emit()}
+  if(G.skip){G.hold=false;const nb=$('#pbpnew');if(nb)nb.hidden=true;while(G.pos<G.res.ev.length)emit()}
+  else if(G.hold&&G.pos<G.res.ev.length){timer=setTimeout(play,300);return}   // reading back: wait
   if(G.pos>=G.res.ev.length){
     if(G.res.paused){if(decList(G.gnum).length>G.res.paused.di)return resumeGame();return showDecision()}   // the answer may have come in while we were still playing back
     return finish();
