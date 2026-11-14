@@ -68,14 +68,14 @@ service cloud.firestore {
     // Play statistics: stats/all and one document per day (dYYYYMMDD). Anyone may read them; a write may
     // only add one to counters, so the numbers can't be reset or inflated in one go.
     match /stats/{id} {
-      function sk() { return ['players', 'active', 'drafts', 'games', 'solo', 'local', 'online', 'ranked', 'rankedAI']; }
+      function sk() { return ['players', 'active', 'visits', 'drafts', 'games', 'solo', 'local', 'online', 'ranked', 'rankedAI']; }
       function plusOne(k) {
         return !(k in request.resource.data) || request.resource.data[k] == (resource == null ? 0 : resource.data.get(k, 0)) + 1
           || (resource != null && request.resource.data[k] == resource.data.get(k, 0));
       }
       function countersOK() {
         return request.resource.data.keys().hasOnly(sk())
-          && plusOne('players') && plusOne('active') && plusOne('drafts') && plusOne('games') && plusOne('solo')
+          && plusOne('players') && plusOne('active') && plusOne('visits') && plusOne('drafts') && plusOne('games') && plusOne('solo')
           && plusOne('local') && plusOne('online') && plusOne('ranked') && plusOne('rankedAI');
       }
       allow read: if true;
