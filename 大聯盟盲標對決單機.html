@@ -338,11 +338,44 @@ button.mini{padding:3px 8px;font-size:13px}
   .opt{padding:8px 10px}
   .reveal{padding:18px 12px}
 }
+.about{line-height:1.75;font-size:15px}
+.about h3{font-family:var(--serif);font-size:18px;margin:18px 0 6px;color:var(--navy)}
+.about p,.about ol,.about ul,.about dl{margin:6px 0}
+.about dt{font-weight:700;margin-top:10px}
+.about dd{margin:2px 0 0;color:var(--dim)}
+#about{margin-top:20px}
 </style>
 </head>
 <body>
 
 <div class="wrap" id="app"></div>
+<div class="wrap" id="about">
+<section class="panel about">
+<h2>關於大聯盟盲標對決</h2>
+<p>大聯盟盲標對決是一款免費的線上棒球選秀遊戲，也是 MLB／中職 Fantasy 競標對戰。你可以選大聯盟（MLB）或中華職棒（CPBL）的真實球員，和朋友或電腦用預算競標，組成自己的球隊，再模擬比賽分出勝負。打開網頁就能玩，不用下載也不用註冊。</p>
+<h3>怎麼玩</h3>
+<ol>
+<li><b>盲標選秀：</b>球員一個一個隨機抽出，事先不知道下一個是誰。兩邊用各自的預算出價，不加價的一方就放棄這位球員。</li>
+<li><b>交易：</b>選秀結束後，雙方可以交換球員 3 次，補強缺的位置。</li>
+<li><b>排兵佈陣：</b>排打序、選先發投手、分配牛棚、調整戰術。</li>
+<li><b>模擬對戰：</b>系統依球員數據模擬比賽，有文字轉播，最後才公布勝負。可以打單場或系列賽。</li>
+</ol>
+<h3>三種玩法</h3>
+<ul>
+<li><b>單人對戰：</b>和電腦競標、交易再對戰，電腦會依球員評價、缺的位置和剩餘預算出價。</li>
+<li><b>同一台輪流玩：</b>兩個人用同一台電腦或手機輪流出價。</li>
+<li><b>線上對戰：</b>你和朋友各用自己的手機或電腦，把網址和房號傳給朋友就能一起玩。</li>
+</ul>
+<h3>常見問題</h3>
+<dl>
+<dt>要錢嗎？要註冊嗎？</dt><dd>完全免費，不用註冊。這是粉絲做的作品，不賭博、不收費、不營利。</dd>
+<dt>球員數據從哪裡來？</dt><dd>MLB 使用 MLB.com 例行賽統計和 Baseball Savant 進階數據（xwOBA、xERA、擊球初速、衝刺速度），中職參考野球革命的數據。</dd>
+<dt>可以用手機玩嗎？</dt><dd>可以，手機、平板、電腦的瀏覽器都能玩。</dd>
+<dt>哪裡可以找人對戰？</dt><dd>歡迎加入 LINE 社群找人對戰、回報 bug 或提出想要的功能。</dd>
+</dl>
+<p lang="en"><b>MLB Blind Auction</b> is a free browser-based fantasy baseball draft game. Bid on real MLB or CPBL players with a budget, build your team, set your lineup and rotation, and simulate games against a friend or the computer. No download or sign-up.</p>
+</section>
+</div>
 <div id="follow" class="follow" hidden role="status"><span>對手已經前往下一步。</span><button id="followbtn" class="solid">跟上</button></div>
 
 <script>window.STANDALONE=true;window.OFFLINE=true</script>
@@ -2061,7 +2094,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='306d7ab3ef';
+const BUILD='9c81f1b3ac';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3074,7 +3107,8 @@ function startOnlineDraft(){
 }
 
 function render(){
-  document.title=TR('大聯盟盲標對決','MLB Blind Auction');
+  document.title=S.screen==='home'?TR('大聯盟盲標對決｜MLB／中職 Fantasy 競標對戰','MLB Blind Auction | MLB & CPBL Fantasy Draft Game'):TR('大聯盟盲標對決','MLB Blind Auction');
+  if($('#about'))$('#about').hidden=S.screen!=='home';
   if($('#followbtn')){$('#follow span').textContent=TR('對手已經前往下一步。','Your opponent has moved on.');$('#followbtn').textContent=TR('跟上','Catch up')}
   updateNetBadge();
   $('#app').className='wrap s-'+S.screen;
