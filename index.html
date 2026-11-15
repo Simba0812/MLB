@@ -7,6 +7,10 @@
 <title>大聯盟盲標對決｜MLB／中職 Fantasy 競標對戰</title>
 <meta name="description" content="和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。每位球員附傳統與進階數據（Baseball Savant、野球革命），可排打序、選先發、分配牛棚、調戰術。免註冊，傳邀請連結就能線上對戰。">
 <link rel="canonical" href="https://simba0812.github.io/MLB/">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect x=%222%22 y=%222%22 width=%2260%22 height=%2260%22 rx=%2212%22 fill=%22%23c42f26%22/><circle cx=%2232%22 cy=%2233%22 r=%2221%22 fill=%22%23fffcf4%22/><path d=%22M17.5 17.5 Q26 33 17.5 48.5 M46.5 17.5 Q38 33 46.5 48.5%22 fill=%22none%22 stroke=%22%23c42f26%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/><path d=%22M10 25 Q32 21 54 25 L54 35 Q32 31 10 35 Z%22 fill=%22%231d3557%22/><path d=%22M52 27 Q57 22 60 18 M52 32 Q57 34 60 38%22 stroke=%22%231d3557%22 stroke-width=%223.2%22 stroke-linecap=%22round%22 fill=%22none%22/></svg>">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#1d3557">
 <link rel="alternate" hreflang="zh-Hant" href="https://simba0812.github.io/MLB/">
 <link rel="alternate" hreflang="en" href="https://simba0812.github.io/MLB/?lang=en">
 <link rel="alternate" hreflang="x-default" href="https://simba0812.github.io/MLB/">
@@ -49,6 +53,8 @@ body{background:var(--board);color:var(--chalk);font-family:var(--body);font-siz
 .draft .panel{padding:12px 14px}
 header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:6px double var(--navy);padding-bottom:12px}
 h1{font-family:var(--serif);font-weight:900;font-size:clamp(32px,5.4vw,54px);line-height:1.05;margin:0;letter-spacing:.08em;color:var(--navy)}
+h1 .brand{display:flex;align-items:center;gap:.22em}
+h1 .logo{width:1.05em;height:1.05em;flex:none}
 h1 small{display:table;font-family:var(--body);font-size:13px;font-weight:700;color:var(--paper);background:var(--red);letter-spacing:.22em;padding:3px 12px;margin-top:8px}
 h2{font-family:var(--serif);font-weight:900;font-size:26px;margin:0;letter-spacing:.04em;color:var(--navy);text-wrap:balance}
 h3{margin:0;font-size:16px;font-weight:700}
@@ -658,7 +664,8 @@ function srcLine(){return S.league==='CPBL'
   :`<div class="src">${TR('數據：','Data: ')}<a href="https://www.mlb.com/stats" target="_blank" rel="noopener">MLB.com</a> ${TR('例行賽統計','season stats')}<br><a href="https://baseballsavant.mlb.com" target="_blank" rel="noopener">Baseball Savant</a> xwOBA · xERA · ${TR('擊球初速 · 衝刺速度','exit velo · sprint speed')}</div>`}
 const modeSeg=()=>`<div class="seg" role="group" aria-label="${TR('賽制','Format')}">${Object.entries(MODEZH).map(([k,l])=>`<button data-m="${k}" aria-pressed="${S.mode===k}">${l}</button>`).join('')}</div>`;
 const leagueSeg=dis=>`<div class="seg" role="group" aria-label="${TR('聯盟','League')}">${[['MLB',TR('美國職棒大聯盟','MLB')],['CPBL',TR('中華職棒','CPBL')]].map(([k,l])=>`<button data-lg="${k}" aria-pressed="${S.league===k}" ${dis||!POOLS[k].length?'disabled':''}>${l}</button>`).join('')}</div>`;
-function header(){return `<header class="top"><h1>${TR('大聯盟盲標對決','MLB Blind Auction')}<small>${TR('2026 球季真實數據 · 雙人競標 · 模擬對戰','Real 2026 stats · head-to-head auction · simulated games')}</small></h1>
+const LOGO=`<svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="2" y="2" width="60" height="60" rx="12" fill="#c42f26"/><circle cx="32" cy="33" r="21" fill="#fffcf4"/><path d="M17.5 17.5 Q26 33 17.5 48.5 M46.5 17.5 Q38 33 46.5 48.5" fill="none" stroke="#c42f26" stroke-width="2.4" stroke-linecap="round"/><path d="M10 25 Q32 21 54 25 L54 35 Q32 31 10 35 Z" fill="#1d3557"/><path d="M52 27 Q57 22 60 18 M52 32 Q57 34 60 38" stroke="#1d3557" stroke-width="3.2" stroke-linecap="round" fill="none"/></svg>`;
+function header(){return `<header class="top"><h1><span class="brand">${LOGO}<span>${TR('大聯盟盲標對決','MLB Blind Auction')}</span></span><small>${TR('2026 球季真實數據 · 雙人競標 · 模擬對戰','Real 2026 stats · head-to-head auction · simulated games')}</small></h1>
 <div class="hdr-r">${srcLine()}<button class="ghost mini" id="langbtn" lang="${TR('en','zh-Hant')}">${TR('English','中文')}</button></div></header>${lobbyBar()}<div class="netbar" id="netbar" ${NET.on?'':'hidden'}>${netBadge()}</div>`}
 
 /* ---------- back to lobby ---------- */
@@ -2120,7 +2127,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='46b9f75caf';
+const BUILD='f2d268bbd2';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
