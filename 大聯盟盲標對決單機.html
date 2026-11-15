@@ -2181,7 +2181,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='d0bf484f9c';
+const BUILD='babd18053d';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2580,7 +2580,9 @@ const curSeason=()=>{if(Date.now()<S1_START)return 0;const d=twNow();return Math
 const seasonEnd=n=>n<1?new Date(S1_START+8*3600000-86400000):(()=>{const k=10+n*3;return new Date(Date.UTC(2026+Math.floor(k/12),k%12,1)-86400000)})();   // the last day of season n
 const szName=n=>n<1?TR('測試賽季','Test season'):`S${n}`;
 // a record from before S1 opened counts as the test season (some were stamped season 1 early)
-const seasonOf=p=>{const v=p.season??0;return v===1&&(p.created||0)<S1_START?0:v};
+// a record stamped season 1 before S1 opened belongs to the test season, unless it has already rolled over
+// (rolling over keeps the old created time but writes the test season into hist['0'])
+const seasonOf=p=>{const v=p.season??0;return v===1&&(p.created||0)<S1_START&&!(p.hist&&p.hist[0]!=null)?0:v};
 const seasonDaysLeft=()=>Math.max(0,Math.ceil((seasonEnd(curSeason()).getTime()+86400000-twNow().getTime())/86400000));
 const fmtDay=d=>`${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`;
 // a new season: the rating comes halfway back to 1000 and the season's record starts over; the old one is kept
