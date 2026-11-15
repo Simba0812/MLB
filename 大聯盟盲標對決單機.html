@@ -1208,8 +1208,8 @@ function aiTactic(inning,lead,cur){
   if(inning>=7&&Math.abs(lead)<=1)return {off:'small',run:'aggr',pit:'norm'};
   return {...cur};
 }
-function tacticsPicker(t,prefix,i){
-  return ['off','run','pit'].map(side=>`<div class="row" style="margin-top:8px;gap:6px 10px"><span class="eyebrow" style="min-width:4em">${{off:TR('打擊','Batting'),run:TR('跑壘','Running'),pit:TR('投球','Pitching')}[side]}</span>
+function tacticsPicker(t,prefix,i,sides=['off','run','pit']){
+  return sides.map(side=>`<div class="row" style="margin-top:8px;gap:6px 10px"><span class="eyebrow" style="min-width:4em">${{off:TR('打擊','Batting'),run:TR('跑壘','Running'),pit:TR('投球','Pitching')}[side]}</span>
     <div class="seg" role="group" style="flex-wrap:wrap">${Object.keys(TACT[side]).map(k=>`<button data-${prefix}="${i},${side},${k}" aria-pressed="${t[side]===k}" title="${esc(TACT_HINT()[k==='aggr'&&side==='run'?'aggr_run':k==='power'&&side==='pit'?'power_pit':k]||'')}">${TACTL()[side][k]}</button>`).join('')}</div></div>`).join('')
    +`<p class="hint tachint" style="margin-top:6px">${tacHint(t)}</p>`;
 }
@@ -1324,9 +1324,13 @@ function simGame(away,home,ctx){
     if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead)||avail(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
-      choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,
+      choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,tac:tacStr(s.tac),
         cur:{id:sid(c.p.id),name:nm(c.p),pc:c.pc,sta:Math.round(sta),runs:c.runs,era:c.p.era},
         opts:avail(s).map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,role:p.pos==='CL'?null:s.roles[sid(p.id)],era:p.era,sta:s.sta0(p),velo:p.velo}))});
+      // the manager may change the pitching tactic along with the decision: the answer then reads "choice~tactics"
+      const cut=String(choice).indexOf('~');
+      if(cut>=0){const t=tacOf(String(choice).slice(cut+1));choice=String(choice).slice(0,cut);
+        if(tacStr(t)!==tacStr(s.tac)){s.tac=t;ev.push({k:'note',t:TR(`📋 ${s.tm.name} 調整投球戰術：「${TACTL().pit[t.pit]}」。`,`📋 ${s.tm.name} change their pitching approach: "${TACTL().pit[t.pit]}".`)})}}
       if(choice==='keep') c.keep={runs:c.runs,sta};
     }
     if(choice!=='keep'){const np=avail(s).find(p=>sid(p.id)===choice);if(np)doChange(dt,np,lead)}
@@ -1836,7 +1840,7 @@ function showDecision(){
   if(AUTO[q.team]&&!q.req){NET.timerAct=true;try{return submitDecision(q.suggest)}finally{NET.timerAct=false}}
   const sug=q.suggest, tag=v=>v===sug?`<span class="sugg">${TR('建議','Suggested')}</span>`:'';
   let body;
-  if(q.kind==='tac'||q.kind==='ph')G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.kind==='tac'?q.cur:q.tac),ph:String(q.suggest)};
+  if(q.kind==='tac'||q.kind==='ph'||q.kind==='pitch')G.tsel=G.tsel&&G.tsel.di===q.di?G.tsel:{di:q.di,t:tacOf(q.kind==='tac'?q.cur:q.tac),ph:String(q.suggest)};
   if(q.kind==='tac'){
     // a tactics checkpoint: three rows of choices, then confirm
     const sg=tacOf(sug);
@@ -1850,6 +1854,7 @@ function showDecision(){
     const c=q.cur;
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換投嗎？',': change pitchers?')}</h2>
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
+     ${q.tac?`<div style="margin-top:8px;padding:8px 12px;border:1.5px solid var(--rule);background:var(--panel2)"><div class="eyebrow">${TR('投球戰術（可以一起調整，再選投手）','Pitching approach (optional; set it, then pick the pitcher)')}</div>${tacticsPicker(G.tsel.t,'tq',q.team,['pit'])}</div>`:''}
      <div class="optlist"><button class="opt" data-choose="keep">${TR(`繼續由 ${esc(c.name)} 投球`,`Stay with ${esc(c.name)}`)} ${tag('keep')}<span class="hint">${TR(`已投 ${c.pc} 球 · 本場失 ${c.runs} 分`,`${c.pc} pitches · ${c.runs} R today`)} · ERA ${c.era}</span>${staBar(c.sta)}</button>
      ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('換上','Bring in')} ${o.role?ROLEL()[o.role]:o.pos} ${esc(o.name)} ${tag(o.id)}<span class="hint">ERA ${o.era}${o.velo?` · ${o.velo.toFixed(1)} mph`:''}</span>${staBar(o.sta)}</button>`).join('')}</div>`;
   }else{
@@ -1865,7 +1870,9 @@ function showDecision(){
   }
   box.innerHTML=`<section class="panel decide">${body}${NET.on?'<p class="hint" id="deccd" style="margin-top:8px"></p>':''}</section>`;
   if(NET.on)decCountdown(DEC_SEC,()=>{NET.timerAct=true;try{submitDecision(q.suggest)}finally{NET.timerAct=false}strike()});
-  box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>submitDecision(b.dataset.choose));
+  // a pitching change carries the pitching tactic when it was changed in the same card
+  box.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>{const v=b.dataset.choose;
+    submitDecision(q.kind==='pitch'&&q.tac&&tacStr(G.tsel.t)!==q.tac?v+'~'+tacStr(G.tsel.t):v)});
   // pinch-hit: the batter buttons only mark a choice; Confirm sends it, with the tactics when they changed
   box.querySelectorAll('[data-phsel]').forEach(b=>b.onclick=()=>{G.tsel.ph=b.dataset.phsel;box.querySelectorAll('[data-phsel]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   if($('#phgo'))$('#phgo').onclick=()=>submitDecision(q.tac&&tacStr(G.tsel.t)!==q.tac?G.tsel.ph+'~'+tacStr(G.tsel.t):G.tsel.ph);
@@ -2182,7 +2189,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='fa8754b994';
+const BUILD='c19e4757cc';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
