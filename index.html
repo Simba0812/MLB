@@ -253,6 +253,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .netbar .sync{color:var(--amber);font-family:var(--mono);font-size:12px}
 .netbar .sync.ok{color:var(--dim)}
 .netbar .sync.slow{color:var(--red);font-weight:700}
+.netbar .verbig{flex-basis:100%;order:-1;background:var(--red);color:#fff;padding:8px 12px;font-weight:900;border-radius:3px}
 .follow{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--panel2);border-top:3px solid var(--amber);
   padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));font-weight:700}
 .waiting{color:var(--dim);font-weight:500}
@@ -2181,14 +2182,19 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='7b0151380d';
+const BUILD='59a891f12e';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
-  if(!seated||ov===BUILD){NET.verSince=0;return ''}
+  if(!seated||ov===BUILD){NET.verSince=0;NET.verChecked=false;NET.verOld='';return ''}
   // the other player's stamp lands a moment after they sit down, so give it a few seconds
   if(!NET.verSince){NET.verSince=Date.now();setTimeout(updateNetBadge,3100)}
   if(Date.now()-NET.verSince<3000)return '';
+  // two builds replay the same game differently (a bid on one screen never shows on the other). Whichever page
+  // is older finds a newer one on the server, reloads itself and comes back to this room by itself.
+  if(!NET.verChecked){NET.verChecked=true;newerBuild().then(v=>{if(v&&NET.on){NET.verReload=true;updateNetBadge();setTimeout(()=>reloadFresh(NET.code),2500)}else{NET.verOld='them';updateNetBadge()}})}
+  if(NET.verReload)return `<span class="warn verbig">🔄 ${TR('你的網頁是舊版，正在自動更新，更新後會回到這個房間…','Your page is out of date. Updating now; you will come back to this room…')}</span>`;
+  if(NET.verOld==='them')return `<span class="warn verbig">⚠ ${TR('對手的網頁是舊版，比賽會對不上。請對手重新整理頁面（重新整理後會回到這個房間），在那之前先不要出手。','Your opponent\'s page is out of date, so the game will not match. Ask them to reload (they will come back to this room); hold your moves until then.')}</span>`;
   return `<span class="warn">⚠ ${TR('對手的網頁版本和你不同，比賽結果可能對不上。請雙方都重新整理頁面。','Your opponent is on a different version of the page, so results may not match. Both of you, please reload.')}</span>`;
 }
 const NET={on:false,status:'loading',msg:'',db:null,user:null,uid:null,ref:null,code:null,seat:null,doc:null,pending:null,unsub:null,err:''};
