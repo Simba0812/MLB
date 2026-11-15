@@ -666,7 +666,7 @@ function header(){return `<header class="top"><h1><span class="brand">${LOGO}<sp
 function lobbyBar(){
   if(!['setup','draft','trade','pregame','pick','game','stuck'].includes(S.screen)||(NET.on&&NET.seat==null)) return '';
   return `<div class="lobbybar" id="lobbybar"><button class="ghost" id="tolobby">← ${TR('返回大廳','Back to lobby')}</button>
-    <span id="lobbyask" hidden><span>${NET.on?TR('確定要放棄這次選秀？雙方都會回到房間，陣容會清空。','Abandon this draft? Both players go back to the room and rosters are cleared.'):TR('確定要放棄這次選秀？目前的陣容會清空。','Abandon this draft? Your rosters will be cleared.')}</span>
+    <span id="lobbyask" hidden><span>${rankedLive()?TR('離開這場排位會算你棄賽（輸一場），對手獲勝。','Leaving counts as a forfeit (a loss); your opponent wins.'):NET.on?TR('確定要放棄這次選秀？雙方都會回到房間，陣容會清空。','Abandon this draft? Both players go back to the room and rosters are cleared.'):TR('確定要放棄這次選秀？目前的陣容會清空。','Abandon this draft? Your rosters will be cleared.')}</span>
     <button class="solid" id="lobbyyes">${TR('確定返回','Yes, go back')}</button><button class="ghost" id="lobbyno">${TR('繼續玩','Keep playing')}</button></span></div>`;
 }
 function setLang(v){
@@ -686,7 +686,8 @@ document.addEventListener('click',e=>{
   if(id==='tolobby'&&S.screen==='setup'){S.ai=null;S.screen='home';render();window.scrollTo(0,0)}
   else if(id==='tolobby'){$('#lobbyask').hidden=false;$('#tolobby').hidden=true}
   else if(id==='lobbyno'){$('#lobbyask').hidden=true;$('#tolobby').hidden=false}
-  else if(id==='lobbyyes') goLobby();
+  // in ranked, the lobby button can't send both players back to the room (that left the series stuck): it forfeits
+  else if(id==='lobbyyes'){if(rankedLive())forfeitCore().then(()=>{clearDecTimers();clearTimeout(timer);detachRoom();S.screen='home';render();window.scrollTo(0,0)});else goLobby()}
 });
 function goLobby(){
   clearTimeout(timer);clearTimeout(aiTimer);LUED_KEY='';
@@ -2123,7 +2124,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='edad895431';
+const BUILD='08d8be491c';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2214,7 +2215,10 @@ function netBadge(){
   const me=NET.seat==null?TR('你正在觀戰','You are watching'):`${TR('你是 玩家 ','You are Player ')}${NET.seat?'B':'A'}${S.teams[NET.seat]&&S.teams[NET.seat].name&&S.screen!=='room'?' ('+esc(S.teams[NET.seat].name)+')':''}`;
   return `<span class="dot" aria-hidden="true"></span><span>${TR('線上房間','Room')} <b class="mono">${NET.code}</b></span><span>${me}</span>${NET.pend?`<span class="sync">${TR('傳送中…','Sending…')}</span>`:NET.lag!=null?`<span class="sync ok">${TR(`已同步 · 送出 ${(NET.lag/1000).toFixed(1)} 秒`,`Synced · sent in ${(NET.lag/1000).toFixed(1)}s`)}</span>`:''}${NET.rx!=null?`<span class="sync ${NET.rx>=1500?'slow':'ok'}" title="${TR('對手出手到你看到的時間（兩台裝置的時鐘可能有些微誤差）','From the other player\'s move to your screen (the two clocks may differ slightly)')}">${TR(`收到對手動作 ${(NET.rx/1000).toFixed(1)} 秒`,`Their move arrived in ${(NET.rx/1000).toFixed(1)}s`)}</span>`:''}${NET.err?`<span class="warn">⚠ ${esc(NET.err)}</span>`:''}${verWarn()}${oppWarn()}${isRanked()&&NET.rk&&rankText()&&!(S.screen==='game'&&S.game&&S.game.res&&S.game.pos<S.game.res.ev.length)?`<span class="sync">${rankText()}</span>`:''}<button class="ghost" id="leave" style="margin-left:auto;padding:4px 10px">${TR('離開房間','Leave room')}</button>`;
 }
-function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=leaveRoom;const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()}}
+function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=()=>rankedLive()?quitRanked():leaveRoom();const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;claimForfeit()};
+  // ranked: once the opponent is gone, claim the win on its own (the rules accept it once they left, or after
+  // 3 minutes without a heartbeat; rankCheck retries each minute until then)
+  if(isRanked()&&rankedLive()&&oppGone()&&!NET.ffAuto){NET.ffAuto=true;claimForfeit()}}
 // let go of the room without touching the game on screen; the other player sees that this seat left
 function detachRoom(){
   if(isRnd()&&NET.seat!=null){const o=(NET.doc.seats||{})[1-NET.seat];if(o)LAST_OPP=o;try{if(localStorage.getItem('mlbRoom')===NET.code)localStorage.removeItem('mlbRoom')}catch(e){}}
@@ -2380,6 +2384,21 @@ function afkSign(title,body,btn,onBtn){
     <div class="row"><button class="solid" id="afkok">${btn||TR('我還在！','I\'m here!')}</button></div></div>`;
   document.body.appendChild(w);$('#afkok').onclick=onBtn||(()=>unstrike());$('#afkok').focus();
 }
+// a ranked series that has started and isn't decided: leaving it is a forfeit (a loss), not a trip back to the room
+const rankedLive=()=>isRanked()&&NET.seat!=null&&S.screen!=='room'&&!(NET.rk&&NET.rk.state==='done')&&rankWinner()==null;
+async function quitRanked(){
+  if(!confirm(TR('離開這場排位會算你棄賽（輸一場），對手獲勝。確定要離開嗎？','Leaving this ranked series counts as a forfeit (a loss) and your opponent wins. Leave anyway?')))return;
+  await forfeitCore();clearDecTimers();clearTimeout(timer);detachRoom();S.screen='home';render();window.scrollTo(0,0);
+}
+async function forfeitCore(){
+  NET.ffDone=true;const me=NET.seat,o=1-me,rp=(NET.doc&&NET.doc.rep)||{};
+  if(!rp[me]){
+    NET.rk={...(NET.rk||{}),state:'on'};
+    await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(o),ff:true}},setup:{[me]:{left:true}}}).then(r,r)));
+    NET.doc={...NET.doc,rep:{...(NET.doc.rep||{}),[me]:{w:String(o),ff:true}}};
+  }
+  try{const code=NET.code,p=await loadProfile();if(p&&p.pend===code)await applyRanked(p,false);await loadProfile()}catch(e){}
+}
 async function selfForfeit(){
   NET.ffDone=true;const me=NET.seat,o=1-me,rp=(NET.doc&&NET.doc.rep)||{};
   if(!rp[me]){
@@ -2397,7 +2416,7 @@ function oppForfeitSign(d){
   if(!isRanked()||NET.seat==null||NET.oppFfShown)return;const o=1-NET.seat,r=(d.rep||{})[o];
   if(!r||!r.ff||r.w!==String(NET.seat))return;
   NET.oppFfShown=true;clearDecTimers();clearTimeout(timer);
-  afkSign(TR('🏆 對手放棄比賽','🏆 Your opponent forfeited'),TR(`${esc(S.teams[o].name)} 連續 ${AFK_MAX} 次沒有動作，判定放棄，這場排位算你贏。`,`${esc(S.teams[o].name)} made no move ${AFK_MAX} turns in a row and forfeits; this ranked series is yours.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});
+  afkSign(TR('🏆 對手放棄比賽','🏆 Your opponent forfeited'),TR(`${esc(S.teams[o].name)} 放棄了這場排位（離開或連續 ${AFK_MAX} 次沒有動作），算你贏。`,`${esc(S.teams[o].name)} gave up this ranked series (left, or no move ${AFK_MAX} turns in a row); it's yours.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});
 }
 function afkWatch(){
   if(!isRanked()||NET.seat==null||S.screen!=='draft'||!S.lot||!(NET.doc&&(NET.doc.seats||{})[1])){afkStop();return}
@@ -2448,9 +2467,9 @@ function oppGone(){
   return Date.now()-NET.opp.seen>90000?'quiet':'';
 }
 function oppWarn(){
-  const g=oppGone();if(!g)return '';
+  const g=oppGone();if(!g||(isRanked()&&NET.rk&&NET.rk.state==='done'))return '';
   const playing=['draft','trade','pregame','pick','game'].includes(S.screen);
-  return `<span class="warn">⚠ ${g==='left'?TR('對手已離開房間。','Your opponent has left.'):TR('對手已超過 90 秒沒有回應，可能已經離線。','Your opponent has not responded for 90 s and may be offline.')}</span>${playing?(isRanked()?`<button class="solid" id="ffclaim" style="padding:4px 10px">${TR('判對手棄賽（我方勝）','Claim the win by forfeit')}</button>`:`<button class="solid" id="takeover" style="padding:4px 10px">${TR('改由電腦接手','Let the computer take over')}</button>`):''}`;
+  return `<span class="warn">⚠ ${g==='left'?TR('對手已離開房間。','Your opponent has left.'):TR('對手已超過 90 秒沒有回應，可能已經離線。','Your opponent has not responded for 90 s and may be offline.')}${isRanked()?TR('系統會自動判你獲勝（最多約 3 分鐘），請先不要離開。',' The win is being claimed for you (up to about 3 minutes); please stay.'):''}</span>${playing?(isRanked()?`<button class="solid" id="ffclaim" style="padding:4px 10px">${TR('判對手棄賽（我方勝）','Claim the win by forfeit')}</button>`:`<button class="solid" id="takeover" style="padding:4px 10px">${TR('改由電腦接手','Let the computer take over')}</button>`):''}`;
 }
 // the opponent is gone: finish the game on this device against the computer
 function takeOver(){
@@ -2777,7 +2796,7 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,oppFfShown:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
