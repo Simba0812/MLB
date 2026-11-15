@@ -23,7 +23,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"大聯盟盲標對決","alternateName":["MLB Blind Auction","大聯盟盲標","MLB 盲標 Fantasy","中職盲標"],"url":"https://simba0812.github.io/MLB/","image":"https://simba0812.github.io/MLB/og/mlb-v3.png","description":"和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。附傳統與進階數據，排位賽、隨機配對，免註冊。","genre":["Sports","Fantasy baseball"],"gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","inLanguage":["zh-TW","en"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"TWD"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"大聯盟盲標對決","alternateName":["MLB Blind Auction","大聯盟盲標","MLB 盲標 Fantasy","中職盲標"],"url":"https://simba0812.github.io/MLB/","sameAs":["https://www.threads.com/@baseball_blind_auction"],"image":"https://simba0812.github.io/MLB/og/mlb-v3.png","description":"和朋友輪流盲標 MLB 或中華職棒球員，組成自己的球隊模擬對戰。附傳統與進階數據，排位賽、隨機配對，免註冊。","genre":["Sports","Fantasy baseball"],"gamePlatform":"Web browser","applicationCategory":"Game","operatingSystem":"Any","inLanguage":["zh-TW","en"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"TWD"}}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -106,6 +106,9 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .bidclock.low{color:var(--red)}.bidclock.low .bar{border-color:var(--red)}.bidclock.low .bar i{background:var(--red)}
 .linebtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #06c755;background:#06c755;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
 .linebtn:hover{filter:brightness(1.06)}
+.thbtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #101010;background:#101010;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
+.thbtn b{font-size:18px;line-height:1}
+.thbtn:hover{background:#2a2a2a}
 .hist .hrow{border-top:1px solid #d9cfb2;padding:6px 0}.hist .hrow:first-of-type{margin-top:8px}
 .hist summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;cursor:pointer;list-style:none}.hist summary::-webkit-details-marker{display:none}
 .hist .hmeta{font-size:13px;color:var(--dim)}.hist .hsc{font-weight:900;margin-left:auto}
@@ -1966,6 +1969,8 @@ function finish(){
 const FB_TAGS=()=>[['fun',TR('好玩','Fun')],['bug',TR('有 bug','Bug')],['idea',TR('建議','Idea')],['balance',TR('平衡','Balance')],['ui',TR('介面','Looks')]];
 // the players' LINE OpenChat
 const LINE_CHAT='https://line.me/ti/g2/ugXZG7mEZAP526k_C4FL11eLszg2B7tqd7L-IQ';
+const THREADS='https://www.threads.com/@baseball_blind_auction';
+const threadsBtn=()=>window.OFFLINE?'':`<a class="thbtn" href="${THREADS}" target="_blank" rel="noopener"><b aria-hidden="true">@</b>${TR('追蹤 Threads','Follow on Threads')}</a>`;
 const lineBtn=()=>window.OFFLINE?'':`<a class="linebtn" href="${LINE_CHAT}" target="_blank" rel="noopener">💬 ${TR('加入 LINE 社群','Join the LINE group')}</a>`;
 function feedbackBtn(page){return NET.bump?`<button class="ghost" data-fb="${page}">💬 ${TR('意見回饋','Feedback')}</button>`:''}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-fb]');if(b)openFeedback(b.dataset.fb)});
@@ -2127,7 +2132,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='f2d268bbd2';
+const BUILD='6af91c42e9';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2877,7 +2882,7 @@ function renderHome(){
   </div>
   <div id="histbox">${histPanel()}</div>
   <p class="statline" id="statline"></p>
-  ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我，也歡迎到 LINE 社群找人對戰、聊天。','How was it? Tell me about bugs or features you want, or find opponents in the LINE group.')}</span><span id="fbhome"></span>${lineBtn()}</div>`}
+  ${window.OFFLINE?'':`<div class="fbrow"><span>${TR('玩得怎麼樣？有 bug 或想要的功能都可以告訴我；LINE 社群找人對戰，Threads 看最新更新。','How was it? Tell me about bugs or ideas; find opponents on LINE, follow updates on Threads.')}</span><span id="fbhome"></span>${lineBtn()}${threadsBtn()}</div>`}
   <div class="disc"><div class="stamp">${TR('僅供<br>娛樂','JUST<br>FOR FUN')}</div><p><b>${TR('本站為非營利的球迷自製作品，僅供娛樂。','A non-profit fan project, just for fun.')}</b>${TR('遊戲中的「$」是每隊的虛擬預算，不能儲值、兌換或交易，網站不收取任何費用、不提供任何獎金或博弈。球員數據來自 MLB.com、Baseball Savant 與野球革命（Rebas），比賽結果為電腦模擬，不代表真實表現。','The "$" in the game is a pretend budget: it can\'t be bought, cashed out or traded, the site charges nothing, and there are no prizes and no gambling. Player stats come from MLB.com, Baseball Savant and Rebas; games are computer simulations, not real performances.')}</p></div>`;
   // the three ways to play are drawn as tickets: a stub on the left, the details on the right
   document.querySelectorAll('.tickets > .panel').forEach((p,i)=>{p.classList.add('ticket');p.insertAdjacentHTML('afterbegin',`<div class="stub"><span class="si">${['🤖','👥','🌐'][i]}</span><span class="sl">${[TR('單人','SOLO'),TR('雙人','2P'),TR('線上','ONLINE')][i]}</span></div>`);
