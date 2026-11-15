@@ -2181,7 +2181,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='59a891f12e';
+const BUILD='d0bf484f9c';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3092,6 +3092,11 @@ async function openBoard(){
 
 let setupTimer=null;
 function renderRoom(){
+  // until the room's first snapshot arrives we don't know what kind of room it is (a friend's, random or ranked),
+  // so show a plain "connecting" card instead of the friend-room layout with its invite buttons
+  if(!NET.doc){NET.drawn=false;
+    $('#app').innerHTML=`${header()}<section class="panel"><h2>${TR('連線到房間中…','Connecting to the room…')}</h2><p class="hint" style="margin-top:6px">${TR('通常一兩秒就好。超過 10 秒還停在這裡，請重新整理頁面，或改用 Safari／Chrome 開啟（LINE 內建瀏覽器比較容易連不上）。','Usually a second or two. If you are still here after 10 s, reload the page or open it in Safari or Chrome (in-app browsers such as LINE\'s connect less reliably).')}</p><div class="row" style="margin-top:10px"><button class="ghost" id="rmreload">${TR('重新整理','Reload')}</button></div></section>`;
+    const r=$('#rmreload');if(r)r.onclick=()=>reloadFresh(NET.code);return}
   const d=NET.doc||{},su=d.setup||{},cfg=d.cfg||{budget:200,lotMax:50},me=NET.seat;
   NET.drawn=!!NET.doc;
   // a ranked room open to both leagues settles its league only when the opponent arrives
