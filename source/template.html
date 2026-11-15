@@ -151,8 +151,9 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 @keyframes emoin{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 @keyframes emoout{to{opacity:0;transform:translate(-50%,-10px)}}
 #pvwrap{position:fixed;inset:0;z-index:50;background:rgba(29,42,58,.55);display:flex;align-items:center;justify-content:center;padding:16px}
-#pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto}
-#pvwrap .pvx{align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
+/* phones: 100vh is taller than what Safari shows (its bars), so the card ran off both ends; dvh is the visible height */
+#pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#pvwrap .pvx{position:sticky;top:0;z-index:2;box-shadow:0 2px 0 var(--paper);align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
 .card{background:var(--paper);color:var(--chalk);border:2.5px solid var(--navy);box-shadow:5px 5px 0 var(--navy);border-radius:4px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;transform-origin:50% 50%}
