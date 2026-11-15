@@ -146,7 +146,8 @@ service cloud.firestore {
           : math.floor(((twNow().year() - 2026) * 12 + twNow().month() - 11) / 3.0) + 1;
       }
       // a record stamped season 1 before S1 opened belongs to the test season
-      function seasonOf(d) { return d.get('season', 0) == 1 && d.get('created', 0) < s1Start() ? 0 : d.get('season', 0); }
+      // ...unless it has already rolled over: a rolled record keeps its old created time but has hist['0']
+      function seasonOf(d) { return d.get('season', 0) == 1 && d.get('created', 0) < s1Start() && !('0' in d.get('hist', {})) ? 0 : d.get('season', 0); }
       function inSeason() { return seasonOf(od()) == season(); }
       // a new season: the rating comes halfway back to 1000 (all the way after the test season), the record
       // starts over, the old one is kept in hist
