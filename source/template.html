@@ -157,6 +157,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 #pvwrap{position:fixed;inset:0;z-index:50;background:rgba(29,42,58,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 /* phones: 100vh is taller than what Safari shows (its bars), so the card ran off both ends; dvh is the visible height */
 #pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#pvwrap .card>*{flex-shrink:0}   /* a scrolling card must not squash its rows (the sign-in tabs were cut in half) */
 #pvwrap .pvx{position:sticky;top:0;z-index:2;box-shadow:0 2px 0 var(--paper);align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
@@ -3033,7 +3034,8 @@ const AUTHERR={'auth/email-already-in-use':['這個 Email 已經註冊過，請�
   'auth/operation-not-allowed':['網站還沒開啟這種登入方式。','This sign-in method is not turned on for the site yet.'],'auth/unauthorized-domain':['網站還沒在 Firebase 設定允許這個網域。','This domain is not authorised in Firebase yet.'],
   'auth/too-many-requests':['嘗試太多次了，請稍後再試。','Too many attempts. Try again later.']};
 const authMsg=e=>{const m=e&&AUTHERR[e.code];return m?TR(m[0],m[1]):(e&&e.message)||TR('發生錯誤，請再試一次。','Something went wrong. Try again.')};
-function openAcct(note){
+function openAcct(note,mode){
+  mode=mode==='up'?'up':'in';
   closeAcct();const a=acctUser()||{anon:true},p=PROF.doc,w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('帳號','Account')}" style="gap:10px">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
@@ -3043,9 +3045,11 @@ function openAcct(note){
     <button id="ggl" style="background:#fff;font-size:16px;padding:12px">🔵 ${TR('用 Google 登入','Continue with Google')}</button>
     <p class="hint" style="color:var(--dim)">${TR('在 LINE、FB 的內建瀏覽器裡 Google 登入可能被擋，請改用 Safari 或 Chrome 開啟。','Google sign-in may not work inside the LINE or Facebook app browser; open the page in Safari or Chrome.')}</p>
     <div style="border-top:1px solid #c9c2a8;margin:4px 0"></div>
+    <div class="seg" role="tablist" style="align-self:flex-start">${[['in',TR('用 Email 登入','Sign in with email')],['up',TR('註冊新帳號','New account')]].map(([k,l])=>`<button role="tab" data-amode="${k}" aria-pressed="${mode===k}">${l}</button>`).join('')}</div>
+    <p class="hint" style="color:var(--dim)">${mode==='up'?TR('先填好下面的 Email 和密碼，再按「建立帳號」。','Fill in an email and a password below, then press "Create account".'):TR('已經有帳號：填 Email 和密碼後按「登入」。','Already have an account: enter your email and password, then press "Sign in".')}</p>
     <label style="color:var(--chalk)">Email<input id="ae" type="email" autocomplete="email" style="width:100%"></label>
-    <label style="color:var(--chalk)">${TR('密碼（至少 6 個字元）','Password (6+ characters)')}<input id="ap" type="password" autocomplete="current-password" style="width:100%"></label>
-    <div class="row"><button class="solid" id="asin">${TR('登入','Sign in')}</button><button id="asup">${TR('註冊新帳號','Create account')}</button><button class="ghost" id="arst">${TR('忘記密碼','Forgot password')}</button></div>`
+    <label style="color:var(--chalk)">${mode==='up'?TR('設定密碼（至少 6 個字元）','Choose a password (6+ characters)'):TR('密碼','Password')}<input id="ap" type="password" autocomplete="${mode==='up'?'new-password':'current-password'}" style="width:100%"></label>
+    <div class="row">${mode==='up'?`<button class="solid" id="asup">${TR('建立帳號','Create account')}</button>`:`<button class="solid" id="asin">${TR('登入','Sign in')}</button><button class="ghost" id="arst">${TR('忘記密碼','Forgot password')}</button>`}</div>`
    :`<h2>${TR('帳號','Account')}</h2><p style="color:#10261d">${esc(a.email||'')}${a.google?' · Google':''}</p>
     <label style="color:var(--chalk)">${TR('暱稱（排行榜和排位賽會顯示）','Nickname (shown in ranked games and on the leaderboard)')}<input id="an" maxlength="16" value="${esc(p?p.name:'')}" style="width:100%"></label>
     <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>`}
@@ -3056,9 +3060,12 @@ function openAcct(note){
   const after=()=>{loadProfile().then(()=>{closeAcct();openAcct(TR('登入成功！取個暱稱就能打排位賽。','Signed in! Pick a nickname to play ranked.'));renderNetBox()})};
   if(a.anon){
     $('#ggl').onclick=()=>run($('#ggl'),()=>NET.acct.google(),after);
-    $('#asin').onclick=()=>run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value));
-    $('#asup').onclick=()=>run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after);
-    $('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
+    w.querySelectorAll('[data-amode]').forEach(b=>b.onclick=()=>{const e=$('#ae').value;openAcct(note,b.dataset.amode);$('#ae').value=e});
+    const filled=()=>{if(!$('#ae').value.trim()){msg(TR('請先填 Email。','Enter your email first.'));$('#ae').focus();return false}
+      if($('#ap').value.length<6){msg(TR('請先填密碼（至少 6 個字元）。','Enter a password (6+ characters) first.'));$('#ap').focus();return false}return true};
+    if($('#asin'))$('#asin').onclick=()=>{if(filled())run($('#asin'),()=>NET.acct.signIn($('#ae').value.trim(),$('#ap').value))};
+    if($('#asup'))$('#asup').onclick=()=>{if(filled())run($('#asup'),()=>NET.acct.signUp($('#ae').value.trim(),$('#ap').value),after)};
+    if($('#arst'))$('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
