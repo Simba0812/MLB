@@ -2180,7 +2180,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='c19e4757cc';
+const BUILD='a979bb1325';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3186,6 +3186,9 @@ function mmWait(d){
 const READY_MS=60000;
 const bothReady=d=>[0,1].every(i=>((d.setup||{})[i]||{}).ready);
 function closeReady(){clearInterval(NET.rdyTick);NET.rdyTick=null}
+// ranked: until the draft starts, the opponent stays anonymous, so nobody backs out after seeing who it is
+const oppMasked=(d,i)=>!!((d.cfg||{}).ranked&&NET.seat!=null&&i!==NET.seat&&!d.state);
+const MASK_NAME=()=>TR('神秘對手（開打後揭曉）','Mystery opponent (revealed at the start)');
 function readyPanel(d){
   const el=$('#rdy');if(!el)return;
   const on=!!((d.cfg||{}).rnd&&NET.seat!=null&&(d.seats||{})[0]&&(d.seats||{})[1]&&!d.state);
@@ -3196,7 +3199,7 @@ function readyPanel(d){
     <p class="hint" style="margin-top:6px">${(d.cfg||{}).ranked?TR('⚠ 排位賽是七戰四勝。進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','⚠ Ranked is best of seven. Leaving for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')+'<br>':''}${TR(`${(d.cfg||{}).ranked?'排位賽':'隨機配對'}：兩邊都按「準備開始」就開始選秀。<b id="rdyleft">60</b> 秒內沒按的人會回到大廳。`,`${(d.cfg||{}).ranked?'Ranked':'Random match'}: the draft starts once both press "Ready". Whoever hasn't within <b id="rdyleft">60</b> s goes back to the lobby.`)}</p>
     <div class="row" style="margin-top:10px;gap:8px 24px;font-weight:700"><span id="rdy0"></span><span id="rdy1"></span></div>
     <div class="row" style="margin-top:12px"><button class="solid rankgo" id="rdybtn">${TR('準備開始','Ready')}</button></div>`;
-  [0,1].forEach(i=>{const x=$('#rdy'+i);if(x)x.textContent=`${i===me?TR('你','You'):TR('對手','Opponent')}（${(su[i]||{}).name||'—'}）：${st(i)}`});
+  [0,1].forEach(i=>{const x=$('#rdy'+i);if(x)x.textContent=`${i===me?TR('你','You'):TR('對手','Opponent')}（${oppMasked(d,i)?TR('神秘對手','mystery'):(su[i]||{}).name||'—'}）：${st(i)}`});
   const mine=!!(su[me]||{}).ready,b=$('#rdybtn');b.disabled=mine;b.textContent=mine?TR('已準備，等對手…','Ready, waiting…'):TR('準備開始','Ready');
   b.onclick=()=>{b.disabled=true;NET.doc={...NET.doc,setup:{...su,[me]:{...(su[me]||{}),ready:true}}};dbWrite(()=>NET.ref.update({setup:{[me]:{ready:true}}}));readyPanel(NET.doc)};
   if(!NET.rdyTick)NET.rdyTick=setInterval(()=>{
@@ -3230,7 +3233,7 @@ function updateRoom(){
   [0,1].forEach(i=>{const el=$('#seat'+i);if(!el)return;const s=su[i]||{},joined=!!seats[i];
     el.innerHTML=`<div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${NET.seat==null?'':TR('（對手）',' (opponent)')}</div>
      <h2 style="margin-top:6px"></h2><p class="hint" style="margin-top:6px"></p>`;
-    el.querySelector('h2').textContent=joined?(s.name||TR('（還沒取隊名）','(no name yet)')):TR('等待朋友加入…','Waiting for your friend…');
+    el.querySelector('h2').textContent=joined?(oppMasked(d,i)?MASK_NAME():s.name||TR('（還沒取隊名）','(no name yet)')):TR('等待朋友加入…','Waiting for your friend…');
     el.querySelector('p').textContent=joined?TR('主場：','Home park: ')+PARKS[Math.min(s.park??i,PARKS.length-1)].n:TR('把房號傳給朋友。','Send the code to your friend.')});
   mmWait(d);readyPanel(d);
   const n=roomNames();
