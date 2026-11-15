@@ -106,6 +106,10 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .bidclock.low{color:var(--red)}.bidclock.low .bar{border-color:var(--red)}.bidclock.low .bar i{background:var(--red)}
 .linebtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #06c755;background:#06c755;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
 .linebtn:hover{filter:brightness(1.06)}
+.raterow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:12px;font-weight:700}
+.raterow .stars button{all:unset;cursor:pointer;font-size:28px;line-height:1;padding:0 2px;color:var(--amber)}
+.raterow .stars button:hover,.raterow .stars button:focus-visible{transform:scale(1.15)}
+.raterow .stars:hover button{color:var(--amber)}
 .thbtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #101010;background:#101010;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
 .thbtn b{font-size:18px;line-height:1}
 .thbtn:hover{background:#2a2a2a}
@@ -613,6 +617,7 @@ function renderSetup(){
   <section class="panel"><div class="row"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}<span class="hint">${TR(`${POOL.length} 位 2026 球季球員`,`${POOL.length} players from the 2026 season`)}</span></div>
    <div class="row" style="margin-top:12px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}<span class="hint">${S.mode==='bo7'?TR('七戰四勝要選 4 位先發投手輪值。','Best of 7: draft at least 4 starters for the rotation.'):S.mode==='bo3'?TR('三戰兩勝用 3 人先發輪值。','Best of 3 uses a 3-man rotation.'):TR('只打一場。','One game.')}</span></div>
    <div class="row" style="margin-top:12px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}<span class="hint">${TR('每隊要選滿這麼多人。','Each team must fill exactly this many.')}</span></div>
+   <div class="row" style="margin-top:12px"><span class="eyebrow">${TR('球員池','Player pool')}</span><div class="seg" role="group" aria-label="${TR('球員池','Player pool')}">${[[0,TR('一般','Everyone')],[1,TR('精英','Elite')]].map(([v,l])=>`<button data-elite="${v}" aria-pressed="${!!S.elite===!!v}">${l}</button>`).join('')}</div><span class="hint">${S.elite?(()=>{const d=eliteDeck(),lo=k=>Math.min(...d.filter(p=>(p.type==='H'?'H':p.pos)===k).map(ovr));return TR(`只抽高評分球員：打者 ${lo('H')}+、先發 ${lo('SP')}+、中繼 ${lo('RP')}+、終結者 ${lo('CL')}+（共 ${d.length} 人）。`,`Only highly rated players: hitters ${lo('H')}+, starters ${lo('SP')}+, relievers ${lo('RP')}+, closers ${lo('CL')}+ (${d.length} players).`)})():TR('所有球員都可能抽到。','Anyone can come up.')}</span></div>
    ${S.ai?`<div class="row" style="margin-top:12px"><span class="eyebrow">${TR('電腦難度','Computer level')}</span><div class="seg" role="group" aria-label="${TR('電腦難度','Computer level')}">${Object.entries(AI_LV).filter(([k,v])=>!v.rank).map(([k,v])=>`<button data-lv="${k}" aria-pressed="${S.ai.level===k}">${v.label}</button>`).join('')}</div><span class="hint">${AI_LV[S.ai.level].hint}</span></div>`:''}</section>
   <div class="grid2">
    ${[0,1].map(i=>`<section class="panel teamcard ${i?'B':''}">
@@ -644,6 +649,7 @@ function renderSetup(){
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{keepTyped();S.mode=b.dataset.m;fixSlots();render()});
   document.querySelectorAll('[data-slot]').forEach(el=>el.onchange=()=>{keepTyped();S.slots[el.dataset.slot]=+el.value;render()});
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{keepTyped();S.ai.level=b.dataset.lv;render()});
+  document.querySelectorAll('[data-elite]').forEach(b=>b.onclick=()=>{keepTyped();S.elite=b.dataset.elite==='1';render()});
   document.querySelectorAll('[data-rn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.rn,other=$('#tn'+(1-i)).value.trim();let n;do{n=randomName()}while(n===other);$('#tn'+i).value=n});
   $('#go').onclick=()=>{
     const a=$('#tn0').value.trim(),b=$('#tn1').value.trim();
@@ -652,7 +658,7 @@ function renderSetup(){
     const bud=clamp(parseInt($('#bud').value)||200,30,1000);
     S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots').value)||50,lotsNeeded(),200),lotsNeeded());
     S.teams.forEach((t,i)=>{t.name=i?b:a;t.park=+$('#pk'+i).value;t.budget=bud;t.roster=[];t.done=false});
-    S.deck=POOL.slice();
+    S.deck=S.elite?eliteDeck():POOL.slice();
     for(let i=S.deck.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]]}
     newDeckOrder();
     S.lotNo=0;S.log=[];S.screen='draft';nextLot();
@@ -708,6 +714,22 @@ function goLobby(){
 }
 
 /* ---------- computer opponent (single-player) ---------- */
+// the elite pool (single player / same device): only players rated at least this much. Where a league is thin
+// at a position (the CPBL has few catchers or closers that good), its best players there are let in until there
+// are two for every spot the two teams must fill, so a draft can always be completed.
+const ELITE={H:75,SP:80,RP:75,CL:75};
+function eliteDeck(){
+  const min=p=>p.type==='H'?ELITE.H:(ELITE[p.pos]||75);
+  const keep=new Set(POOL.filter(p=>ovr(p)>=min(p)));
+  const fits=(p,k)=>k==='SP'||k==='RP'||k==='CL'?p.type!=='H'&&p.pos===k&&!p.twp:p.type==='H'&&(p.pos===k||(p.alt||[]).includes(k));
+  const need=[...POSLIST.filter(k=>k!=='DH').map(k=>[k,1]),['SP',S.slots.SP||4],['RP',S.slots.RP||4],['CL',S.slots.CL||2]];
+  for(const [k,n] of need){const at=POOL.filter(p=>fits(p,k)).sort((a,b)=>ovr(b)-ovr(a)),want=n*2*2;
+    for(const p of at){if([...keep].filter(x=>fits(x,k)).length>=want)break;keep.add(p)}}
+  // enough hitters overall too (9 starters and the bench, both teams, twice over)
+  const hit=POOL.filter(p=>p.type==='H').sort((a,b)=>ovr(b)-ovr(a));
+  for(const p of hit){if([...keep].filter(x=>x.type==='H').length>=(9+(S.slots.BN||0))*2*2)break;keep.add(p)}
+  return POOL.filter(p=>keep.has(p));
+}
 const AI_LV={
   easy:{get label(){return TR('簡單','Easy')},get hint(){return TR('出價保守、判斷粗略，交易時稍微吃虧也會接受。','Bids cautiously, judges loosely, and accepts trades that cost it a little.')},scale:.8,noise:.4,accept:-3},
   normal:{get label(){return TR('普通','Normal')},get hint(){return TR('照球員價值出價，交易只接受不吃虧的。','Bids what players are worth and only accepts fair trades.')},scale:1,noise:.2,accept:0},
@@ -736,11 +758,16 @@ function waitFactor(t,p,slots){
   return 1;
 }
 // what the computer is willing to pay for this player right now
+// how much each role plays, against a hitter's plate appearances (measured in simulated best-of-7 series: a
+// starter faces 1.19x a hitter's PAs, a middle reliever 0.95x, a closer 0.35x but in the tightest spots)
+const ROLE_W={SP:1.2,RP:.95,CL:.6};
+const roleW=p=>p.type==='H'?1:(ROLE_W[p.pos]||1);
 function aiValue(t,p){
   const lv=AI_LV[S.ai.level],slots=openSlotsFor(t,p);if(!slots.length)return 0;
   const need=needsCovered(t,p,slots)>0,q=clamp((ovr(p)-50)/49,0,1),req=minRemaining(t);
   let v=1+S.budget*.32*Math.pow(q,2.4);                       // a 99 is worth about a third of the starting budget, a star far more than a regular
   if(need)v=Math.max(v,q*q*(t.budget-req)*.5);              // a star at a needed spot: worth up to half the free money (only matters when contested)
+  v*=roleW(p);                                               // and by how much he plays: a reliever faces fewer batters than a starter
   v=Math.min(v,(t.budget/Math.max(1,req))*(need?6:1.2));     // keep enough money for the spots still empty (maxBid keeps the $1 a spot)
   if(!need)v*=.45;                                           // depth beyond the minimum roster matters less
   const wf=need?waitFactor(t,p,slots):1;v*=wf;              // an ordinary player while better ones are still to come: let him go
@@ -1945,6 +1972,7 @@ function finish(){
     ${champ!=null&&S.mode!=='single'?`<div class="w ${champ?'tb':'ta'}" style="font-size:clamp(28px,5vw,44px);margin-top:12px">🏆 ${TR(`${tname(champ)} 贏得系列賽`,`${tname(champ)} win the series`)}</div>
      <p style="margin-top:8px;font-weight:700">🏅 ${TR('系列賽 MVP','Series MVP')}　${esc(safe(()=>seriesMvp(seriesStats(G.gnum+1),champ)))}</p>`:''}
     ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${safe(rankText,'')}</p>`:''}
+    ${seriesOver&&!watch?rateRow():''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
      ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
      ${rankedGame()||isRnd()?(seriesOver||S.rankAI?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>${isRnd()?`<button id="newmatch">🎲 ${TR('找新對手','Find a new opponent')}</button>`:''}`:''):`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}${lineBtn()}</div>
@@ -1974,6 +2002,25 @@ const LINE_CHAT='https://line.me/ti/g2/ugXZG7mEZAP526k_C4FL11eLszg2B7tqd7L-IQ';
 const THREADS='https://www.threads.com/@baseball_blind_auction';
 const threadsBtn=()=>window.OFFLINE?'':`<a class="thbtn" href="${THREADS}" target="_blank" rel="noopener"><b aria-hidden="true">@</b>${TR('追蹤 Threads','Follow on Threads')}</a>`;
 const lineBtn=()=>window.OFFLINE?'':`<a class="linebtn" href="${LINE_CHAT}" target="_blank" rel="noopener">💬 ${TR('加入 LINE 社群','Join the LINE group')}</a>`;
+// after a finished match: a one-tap 1–5 star rating (optional; shown at most every 12 hours). It goes to the same
+// feedback collection as the feedback form, with no text.
+const RATE_KEY='mlbRatedAt';
+function rateRow(){
+  if(!NET.bump||window.OFFLINE)return '';
+  try{if(Date.now()-(+localStorage.getItem(RATE_KEY)||0)<12*3600000)return ''}catch(e){}
+  return `<div class="raterow" id="raterow"><span>${TR('這場玩得開心嗎？','Enjoy that one?')}</span><span class="stars" role="group" aria-label="${TR('評分','Rating')}">${[1,2,3,4,5].map(n=>`<button type="button" data-rate="${n}" aria-label="${n} ${TR('顆星','stars')}">☆</button>`).join('')}</span></div>`;
+}
+async function sendRating(n){
+  const row=$('#raterow');if(!row||row.dataset.sent)return;row.dataset.sent='1';
+  row.querySelectorAll('[data-rate]').forEach(b=>{b.textContent=+b.dataset.rate<=n?'★':'☆';b.disabled=true});
+  try{localStorage.setItem(RATE_KEY,String(Date.now()))}catch(e){}
+  try{const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8),p=PROF.doc;
+    await NET.db.doc('feedback/'+id).set({text:'',stars:n,tags:[],contact:'',page:'result',league:S.league,lang:LANG,ver:BUILD,
+      created:Date.now(),uid:NET.uid||'',name:p?p.name:'',ua:navigator.userAgent.slice(0,160)});
+    row.insertAdjacentHTML('beforeend',`<span class="hint">${TR('謝謝！想多說點什麼可以按「意見回饋」。','Thanks! Use "Feedback" to say more.')}</span>`);
+  }catch(e){row.insertAdjacentHTML('beforeend',`<span class="hint">${TR('送出失敗，沒關係。','Could not send; never mind.')}</span>`)}
+}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-rate]');if(b)sendRating(+b.dataset.rate)});
 function feedbackBtn(page){return NET.bump?`<button class="ghost" data-fb="${page}">💬 ${TR('意見回饋','Feedback')}</button>`:''}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-fb]');if(b)openFeedback(b.dataset.fb)});
 function openFeedback(page){
@@ -2134,7 +2181,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='08d8be491c';
+const BUILD='7b0151380d';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
