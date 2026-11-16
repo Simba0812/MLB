@@ -2190,7 +2190,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='182b0e170b';
+const BUILD='4864054531';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2683,6 +2683,9 @@ async function settlePending(){
   try{const before=p.rating+(won?0:p.pendD),bonus=await applyRanked(p,won);await loadProfile();return {won,before:p.rating+p.pendD,after:PROF.doc.rating,bonus}}
   catch(e){return null}
 }
+// a stamped forfeit claim stands when the other player had left or been silent 3 minutes at that moment
+// (firestore.rules judges it the same way); an older unstamped one: null, nobody can tell from the room
+function claimStands(c){if(!c||c.at==null)return null;const at=typeof c.at==='number'?c.at:c.at.toMillis?c.at.toMillis():null;return at==null?null:!!c.ol||at-(c.oh||0)>=180000}
 // has the opponent's record moved past this room (their forfeit claim was credited)? asked at most every 20 s
 async function oppCredited(){
   const c=NET.oppCred;if(c&&c.code===NET.code&&Date.now()-c.at<20000)return c.v;
@@ -2702,7 +2705,7 @@ async function rankCheck(){
     await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:w==null?NET.del():{w:String(w),ff:false}}}).then(r,r)));
     return showRank()}
   // the opponent claimed a forfeit win of their own and it was credited: I was the one judged gone
-  if(selfClaim(o)&&!(rp[me]&&rp[me].w===String(o))&&await oppCredited()){
+  if(selfClaim(o)&&!(rp[me]&&rp[me].w===String(o))&&(claimStands(rp[o])??await oppCredited())){
     try{const p=await loadProfile();if(p&&p.pend===NET.code)await applyRanked(p,false);await loadProfile()}catch(e){}
     NET.rk={...NET.rk,state:'lostff'};return showRank()}
   if(!rp[me]){let w=rankWinner();if(w==null&&rp[o]&&rp[o].ff&&rp[o].w===String(me))w=me;if(w==null)return;NET.rk.state='wait';await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w)}}}).then(r,r)));return}
@@ -2779,7 +2782,9 @@ async function claimForfeit(){
   if(!oppGone()){NET.ffAuto=false;return updateNetBadge()}
   if((NET.doc.rep||{})[me])return rankCheck();
   NET.rk={...(NET.rk||{}),state:'on'};
-  await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(me),ff:true}}}).then(r,r)));
+  // stamped with the server time and the opponent's last heartbeat as the room has it (firestore.rules checks both)
+  const su=(NET.doc.setup||{})[1-me]||{};
+  await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(me),ff:true,at:NET.now(),oh:su.hb||0,ol:!!su.left}}}).then(r,r)));
   NET.doc={...NET.doc,rep:{...(NET.doc.rep||{}),[me]:{w:String(me),ff:true}}};
   await rankCheck();
 }
@@ -2962,7 +2967,7 @@ async function firebaseBackend(cfg){
     }).catch(e=>{throw err(e)}),
     onSnapshot:(next,onErr)=>r.onSnapshot(x=>next(wrap(x)),e=>onErr&&onErr(err(e)))}}};
   // play statistics: add one to each named counter (firestore.rules allows exactly that)
-  NET.del=()=>fb.firestore.FieldValue.delete();
+  NET.del=()=>fb.firestore.FieldValue.delete();NET.now=()=>fb.firestore.FieldValue.serverTimestamp();
   NET.bump=(path,keys)=>{const o={};keys.forEach(k=>o[k]=fb.firestore.FieldValue.increment(1));return fs.doc(path).set(o,{merge:true}).then(()=>true,e=>{console.warn('stats',e&&e.code);return false})};
   // accounts: a visitor plays on an anonymous account; signing up or in with Google turns that same
   // account permanent (so a ranked record carries over), or switches to an existing one. The page reloads
