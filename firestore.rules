@@ -39,8 +39,18 @@ service cloud.firestore {
       function ownReport() {
         return !('rep' in changed())
           || (request.resource.data.rep.diff(resource.data.get('rep', {})).affectedKeys().hasOnly([mySeat()])
-              && (!(mySeat() in resource.data.get('rep', {})) || openClaim()));
+              && (!(mySeat() in resource.data.get('rep', {})) || openClaim())
+              && claimStamped());
       }
+      // a forfeit win claimed for yourself carries the server time and what the room said about the
+      // opponent at that moment (last heartbeat, left), so a claim made while they were still here can be told apart
+      function claimStamped() {
+        let n = request.resource.data.get('rep', {}).get(mySeat(), {});
+        let them = resource.data.get('setup', {}).get(otherSeat(), {});
+        return !(n.get('ff', false) == true && n.get('w', '') == mySeat())
+          || (n.get('at', null) == request.time && n.get('oh', -1) == them.get('hb', 0) && n.get('ol', null) == them.get('left', false));
+      }
+      function otherSeat() { return mySeat() == '0' ? '1' : '0'; }
       function openClaim() {
         let r = resource.data.rep[mySeat()];
         return r.get('ff', false) == true && r.get('w', '') == mySeat()
@@ -191,10 +201,15 @@ service cloud.firestore {
           && nd().rating == od().rating - d
           && nd().games == od().games + 1 && nd().losses == od().losses + 1;
       }
-      // the opponent claimed a forfeit win that was never credited (they still wait on this room), then left
+      // the opponent claimed a forfeit win of their own that doesn't stand: made while I was still here (my last
+      // heartbeat under 3 minutes old and I hadn't left). Older claims carry no stamp: those count as not standing
+      // while their record still waits on this room (never credited)
       function staleClaim(r, o, theirs, rep) {
-        return theirs == o && rep.get(o, {}).get('ff', false) == true
-          && get(/databases/$(database)/documents/players/$(r.seats[o])).data.get('pend', '') == od().pend;
+        let c = rep.get(o, {});
+        return theirs == o && c.get('ff', false) == true
+          && ('at' in c
+              ? (c.ol != true && c.at.toMillis() - c.oh < 180000)
+              : get(/databases/$(database)/documents/players/$(r.seats[o])).data.get('pend', '') == od().pend);
       }
       function winOK() {
         let r = room(od().pend);
