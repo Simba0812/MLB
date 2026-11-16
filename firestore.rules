@@ -33,11 +33,18 @@ service cloud.firestore {
         return !('emo' in changed())
           || request.resource.data.emo.diff(resource.data.get('emo', {})).affectedKeys().hasOnly([mySeat()]);
       }
-      // ... and reports a ranked result once, for their own seat only
+      // ... and reports a ranked result once, for their own seat only. A forfeit claimed for themselves that
+      // has not been credited (their record still waits on this room) may be withdrawn or replaced: the
+      // opponent may only have looked gone.
       function ownReport() {
         return !('rep' in changed())
           || (request.resource.data.rep.diff(resource.data.get('rep', {})).affectedKeys().hasOnly([mySeat()])
-              && !(mySeat() in resource.data.get('rep', {})));
+              && (!(mySeat() in resource.data.get('rep', {})) || openClaim()));
+      }
+      function openClaim() {
+        let r = resource.data.rep[mySeat()];
+        return r.get('ff', false) == true && r.get('w', '') == mySeat()
+          && get(/databases/$(database)/documents/players/$(request.auth.uid)).data.get('pend', '') == code;
       }
 
       allow read: if signedIn();
@@ -184,6 +191,11 @@ service cloud.firestore {
           && nd().rating == od().rating - d
           && nd().games == od().games + 1 && nd().losses == od().losses + 1;
       }
+      // the opponent claimed a forfeit win that was never credited (they still wait on this room), then left
+      function staleClaim(r, o, theirs, rep) {
+        return theirs == o && rep.get(o, {}).get('ff', false) == true
+          && get(/databases/$(database)/documents/players/$(r.seats[o])).data.get('pend', '') == od().pend;
+      }
       function winOK() {
         let r = room(od().pend);
         let s = seatOf(r);
@@ -195,7 +207,7 @@ service cloud.firestore {
         // a forfeit counts when the opponent left, or has sent no heartbeat for 3 minutes
         let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 180000;
         return inRoom(r) && r.created == od().pendAt
-          && mine == s && (theirs == s || (theirs == '' && gone))
+          && mine == s && (theirs == s || ((theirs == '' || staleClaim(r, o, theirs, rep)) && gone))
           && nd().rating == od().rating + od().pendD + od().get('pendW', 100 - od().pendD) + (od().get('streak', 0) >= 3 ? 30 : od().get('streak', 0) * 10)
           && nd().get('pendW', 0) == 0
           && nd().streak == od().get('streak', 0) + 1
