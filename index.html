@@ -110,6 +110,8 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .raterow .stars button{all:unset;cursor:pointer;font-size:28px;line-height:1;padding:0 2px;color:var(--amber)}
 .raterow .stars button:hover,.raterow .stars button:focus-visible{transform:scale(1.15)}
 .raterow .stars:hover button{color:var(--amber)}
+.ttl{display:inline-block;vertical-align:middle;margin-left:8px;font-family:var(--body);font-size:12px;font-weight:900;letter-spacing:.04em;line-height:1.5;color:var(--red);background:var(--paper);border:1.5px solid var(--red);border-radius:2px;padding:0 7px;white-space:nowrap}
+.pcard .ttl{margin:6px 0 0}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
 .thbtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #101010;background:#101010;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
@@ -1319,6 +1321,8 @@ function simGame(away,home,ctx){
   }
   function managePitcher(dt,inning,lead,mid,bases,outs,half){
     const s=st[dt],c=s.cur,sta=curSta(c);
+    if(!mid)c.inn0=c.runs;   // runs already charged to him when this inning began
+    const innRuns=c.runs-(c.inn0||0);
     let forced=false;
     if(mid){const n=paAt.length;paAt.push(ev.length);
       const rq=(ctx.req||[]).find(r=>r[0]===s.tm.i&&n>=r[1]&&!reqUsed.has(r));if(rq){reqUsed.add(rq);forced=true}}
@@ -1335,11 +1339,12 @@ function simGame(away,home,ctx){
     let ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=6&&Math.abs(lead)<=3));
     if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
     // a person's pitcher never leaves without them saying so. Where the routine above wouldn't ask (an early inning,
-    // a lopsided score, or right after they chose to keep him), he stays on; they are asked only once he is spent
-    // (under 20% at the start of an inning, under 10% or four runs given up within it)
+    // a lopsided score, or right after they chose to keep him), he stays on; they are asked when he is spent (under
+    // 20% at the start of an inning, under 10% within it) or has given up two runs in this inning
     if(ctx.human[s.tm.i]&&!ask&&!forced){
-      if(want&&!kept&&(mid?sta<10||c.runs>=4:sta<20))ask=true;else choice='keep';
+      if(!kept&&(mid?sta<10||innRuns>=2:want&&sta<20))ask=true;else choice='keep';
     }
+    if(ask&&ctx.human[s.tm.i]&&choice==='keep'&&mid&&innRuns>=2&&!kept&&!sug){const r=pickReliever(s,inning,lead);if(r&&curSta(c)<40)choice=sid(r.id)}
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead,true)||avail(s)[0]||spare(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
       choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,tac:tacStr(s.tac),
@@ -1672,7 +1677,7 @@ function renderPick(){
     const rest=recentStarters(i,g),avail0=tm.sps.filter(p=>!rest.includes(sid(p.id))),avail=avail0.length?avail0:tm.sps;
     const sta=staminaMap(i,g),sv=p=>sta[sid(p.id)]??100;
     const mine=isMine(i),sent=NET.on&&picks[i]!=null;
-    const head=`<div class="eyebrow ${i?'tb':'ta'}">${i===homeIdx?TR('主隊','Home'):TR('客隊','Away')}${NET.on&&mine?TR('（你）',' (you)'):''}</div><h2>${esc(tm.name)}</h2>`;
+    const head=`<div class="eyebrow ${i?'tb':'ta'}">${i===homeIdx?TR('主隊','Home'):TR('客隊','Away')}${NET.on&&mine?TR('（你）',' (you)'):''}</div><h2>${esc(tm.name)}<span data-ttl="${i}"></span></h2>`;
     if(!mine) return `<section class="panel teamcard ${i?'B':''}">${head}
       <p style="margin-top:10px">${S.ai?TR('電腦會在開打時決定先發和打序，開打時揭曉。','The computer sets its starter and lineup at first pitch.'):sent?TR('✅ 已選好先發和打序，開打時揭曉。','✅ Starter and lineup set; revealed at first pitch.'):TR('對手正在調整先發和打序…','Your opponent is setting a starter and lineup…')}</p>${NET.on&&!sent?'<p class="hint" id="oppcd" style="margin-top:6px"></p>':''}</section>`;
     const sentSp=sent&&picks[i].sp!=null?pid(picks[i].sp):null;
@@ -1762,7 +1767,7 @@ function renderGameShell(){
   $('#app').innerHTML=`${header()}
   <section class="panel">
    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${title} · ${esc(res.park.n)}</div>
-    <h2 style="margin-top:4px"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span> @ <span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span></h2>
+    <h2 style="margin-top:4px"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span><span data-ttl="${1-G.homeIdx}"></span> @ <span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span><span data-ttl="${G.homeIdx}"></span></h2>
     <p class="hint">${coinText(G.gnum)}${S.mode!=='single'?` <span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></div>
     <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1400],[TR('中','Normal'),380],[TR('快','Fast'),90]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
    </div>
@@ -2216,7 +2221,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ff06a20238';
+const BUILD='61d4588375';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2305,6 +2310,7 @@ function onRoom(snap){
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length&&decList(S.game.gnum).length>S.game.res.paused.di) resumeGame();
   if(S.screen==='room'&&NET.seat===0&&(d.cfg||{}).rnd&&!(d.cfg||{}).mm&&bothReady(d)&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;closeReady();startOnlineDraft()}
   if(isRanked()&&NET.seat!=null&&S.screen!=='room')rankStart().then(rankCheck);
+  seatTitles();
   NET.rxReady=true;updateNetBadge();
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)NET.shownAt=Date.now()});
@@ -2650,6 +2656,43 @@ async function loadProfile(){
   if(!a||a.anon){PROF.doc=null;return null}
   const x=await profRef().get();PROF.doc=x.exists?x.data():null;return PROF.doc;
 }
+/* ---------- titles: a tag beside the nickname ---------- */
+// Earned ones are worked out from the parts of the record only the rules can change (wins, the best streak, how
+// each past season ended); cup titles are ones the site owner writes into the record's ctitles list by hand. A
+// player picks which one to show; every page works the list out again before showing it, so a forged pick shows nothing.
+const TTL_MAX=24;
+function ownedTitles(p){
+  if(!p)return [];const t=[],hs=p.hist||{};
+  (Array.isArray(p.ctitles)?p.ctitles:[]).forEach(x=>{if(typeof x==='string'&&x.trim())t.push(x.trim().slice(0,TTL_MAX))});
+  Object.keys(hs).filter(k=>+k>=1).sort((a,b)=>b-a).forEach(k=>{const i=tierIdx((hs[k]||{}).r||0);if(i>=3)t.push(`${TIERS[i][1]} S${k} ${TIERS[i][2]}`)});
+  const b=Math.max(p.best||0,p.streak||0);
+  if(b>=10)t.push('⚡ 十連勝');if(b>=5)t.push('🔥 五連勝');if(b>=3)t.push('✨ 三連勝');
+  const tw=(p.wins||0)+Object.values(hs).reduce((a,h)=>a+((h&&h.w)||0),0);
+  if(tw>=100)t.push('🏆 百勝');if(tw>=50)t.push('🎖️ 五十勝');if(tw>=10)t.push('🏅 十勝');
+  return [...new Set(t)];
+}
+const shownTitle=p=>p&&p.title&&ownedTitles(p).includes(p.title)?p.title:'';
+const titleChip=t=>t?`<span class="ttl">${esc(t)}</span>`:'';
+async function saveTitle(t){await profRef().update({title:String(t||'').slice(0,40)});await loadProfile()}
+// the two seats' titles in an online room, read from their records (hidden while a ranked opponent is masked)
+const TTL_CACHE=new Map();
+async function titleOf(uid){
+  const c=TTL_CACHE.get(uid);if(c&&Date.now()-c.at<120000)return c.t;
+  let t='';try{const x=await NET.db.doc('players/'+uid).get();t=x.exists?shownTitle(x.data()):''}catch(e){}
+  TTL_CACHE.set(uid,{t,at:Date.now()});return t;
+}
+function seatTitles(){
+  const d=NET.doc;if(!d||!NET.db)return;const seats=d.seats||{};NET.ttl=NET.ttl||{};NET.ttlUid=NET.ttlUid||{};
+  [0,1].forEach(i=>{const uid=seats[i];if(!uid||oppMasked(d,i)||NET.ttlUid[i]===uid)return;
+    NET.ttlUid[i]=uid;titleOf(uid).then(t=>{if(NET.ttlUid&&NET.ttlUid[i]===uid){NET.ttl[i]=t;paintTitles()}})});
+}
+function seatTitle(i){
+  if(NET.on){const d=NET.doc;return !d||oppMasked(d,i)?'':((NET.ttl||{})[i]||'')}
+  return S.ai&&i!==S.ai.seat?shownTitle(PROF.doc):'';   // against the computer: the signed-in player's own team
+}
+function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{el.innerHTML=titleChip(seatTitle(+el.dataset.ttl))})}
+// every screen that names the two teams fills in their titles once it is drawn
+['renderGameShell','renderPick','renderRoom'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
 async function saveNick(name){
   name=String(name||'').trim().slice(0,16);if(name.length<2)throw new Error(TR('暱稱至少 2 個字。','A nickname needs at least 2 characters.'));
   if(PROF.doc)await profRef().update({name});
@@ -2687,7 +2730,7 @@ function rankWinner(){
 async function applyRanked(p,won){
   const bonus=streakBonus(p.streak);
   const gain=p.pendW!=null?p.pendW:ELO_K-p.pendD;
-  if(won)await profRef().update({rating:p.rating+p.pendD+gain+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0,streak:(p.streak||0)+1});
+  if(won)await profRef().update({rating:p.rating+p.pendD+gain+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0,streak:(p.streak||0)+1,best:Math.max(p.best||0,(p.streak||0)+1)});
   else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,streak:0});
   return bonus;
 }
@@ -2935,7 +2978,7 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -3093,7 +3136,7 @@ function renderRankBox(){
     :`<p class="hint" style="margin-top:4px">${TR(`S${SN} 賽季到 ${fmtDay(seasonEnd(SN))}，還剩 ${seasonDaysLeft()} 天。新賽季積分會往 1000 回落一半。`,`Season ${SN} ends ${fmtDay(seasonEnd(SN))} (${seasonDaysLeft()} days left). A new season brings ratings halfway back to 1000.`)}</p>`;
   const past=p&&p.hist?Object.keys(p.hist).sort((a,b)=>a-b).map(k=>{const h=p.hist[k],t=TIERS[tierIdx(h.r)];return `<span class="pastsz" title="${TR(`${szName(+k)} 最終積分 ${h.r}，${h.w} 勝 ${h.l} 敗`,`${szName(+k)}: ${h.r}, ${h.w}-${h.l}`)}">${szName(+k)} ${t[1]} ${TR(t[2],t[3])}</span>`}).join(''):'';
   const played=p?p.wins+p.losses:0,rate=played?Math.round(p.wins/played*100):0;
-  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">${SN<1?TR('測試','TEST'):'S'+SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}</div>
+  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">${SN<1?TR('測試','TEST'):'S'+SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}${shownTitle(p)?`<br>${titleChip(shownTitle(p))}`:''}</div>
       <div class="st"><div><b>${p.wins}</b><span>${TR('勝','W')}</span></div><div><b>${p.losses}</b><span>${TR('敗','L')}</span></div><div><b>${played?rate+'%':'—'}</b><span>${TR('勝率','Win %')}</span></div><div><b>${p.streak>=2?'🔥'+p.streak:p.streak||0}</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`
     :`<div class="pcard"><div class="in"><span class="no">No. ????</span><div class="em" style="opacity:.35">⚾</div><div class="tn" style="font-size:40px">${TR('你的球員卡','Your card')}</div><div class="nm" style="font-size:15px;font-weight:700;color:var(--dim)">${!a||a.anon?TR('登入後就會發一張給你','Sign in to get yours'):TR('取個暱稱就能拿到','Pick a nickname to get it')}</div>
       <div class="st"><div><b>—</b><span>${TR('勝','W')}</span></div><div><b>—</b><span>${TR('敗','L')}</span></div><div><b>—</b><span>${TR('勝率','Win %')}</span></div><div><b>—</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`;
@@ -3153,7 +3196,11 @@ function openAcct(note,mode){
     <div class="row">${mode==='up'?`<button class="solid" id="asup">${TR('建立帳號','Create account')}</button>`:`<button class="solid" id="asin">${TR('登入','Sign in')}</button><button class="ghost" id="arst">${TR('忘記密碼','Forgot password')}</button>`}</div>`
    :`<h2>${TR('帳號','Account')}</h2><p style="color:#10261d">${esc(a.email||'')}${a.google?' · Google':''}</p>
     <label style="color:var(--chalk)">${TR('暱稱（排行榜和排位賽會顯示）','Nickname (shown in ranked games and on the leaderboard)')}<input id="an" maxlength="16" value="${esc(p?p.name:'')}" style="width:100%"></label>
-    <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>`}
+    <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>
+    ${p?(()=>{const own=ownedTitles(p),cur=shownTitle(p);return `<div style="border-top:1px solid #c9c2a8;margin:4px 0"></div>
+     <label style="color:var(--chalk)">${TR('稱號（顯示在暱稱旁邊，對手在比賽中也看得到）','Title (shown beside your nickname, also to opponents in a game)')}
+      <select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option ${t===cur?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+     <p class="hint" style="color:var(--dim)">${TR('怎麼拿：排位累積 10／50／100 勝；最佳連勝 3／5／10 場；賽季結束時 3A 以上；盃賽獎勵的特別稱號。','How to earn: 10 / 50 / 100 ranked wins; a best streak of 3 / 5 / 10; finishing a season at Triple-A or higher; special titles from cups.')}</p>`})():''}`}
    <p id="amsg" role="alert" style="color:#a8441a;font-weight:700"></p></div>`;
   document.body.appendChild(w);
   const msg=t=>{$('#amsg').style.color='';$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
@@ -3169,6 +3216,7 @@ function openAcct(note,mode){
     if($('#arst'))$('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
+    if($('#attl'))$('#attl').onchange=()=>run($('#attl'),()=>saveTitle($('#attl').value),()=>{$('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 稱號已更新。','✅ Title updated.');if(S.screen==='home')renderRankBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
   }
 }
@@ -3187,7 +3235,7 @@ async function openBoard(){
     if(!q)q=await P.orderBy('rating','desc').limit(100).get();
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN).slice(0,50);
     $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}${titleChip(shownTitle(p))}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
@@ -3204,7 +3252,7 @@ function renderRoom(){
   const lgPend=lgPending(d);NET.lgPend=lgPend;
   const mine=me!=null?(su[me]||{name:'',park:me}):null;
   const opts=sel=>PARKS.map((p,j)=>`<option value="${j}" ${sel===j?'selected':''}>${esc(p.n)}</option>`).join('');
-  const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}</div>
+  const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}<span data-ttl="${i}"></span></div>
      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <label for="tn">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:-8px"><input id="tn" maxlength="18" style="flex:1" placeholder="${TR('例：高雄海神','e.g. Kaohsiung Sea Kings')}" value="${esc(mine.name)}" ${(d.cfg||{}).ranked?'readonly':''}><button type="button" class="ghost" id="rn" ${(d.cfg||{}).ranked?'hidden':''}>🎲 ${TR('隨機取名','Random name')}</button></div>
       <label>${TR('主場','Home park')}<select id="pk" ${lgPend?'disabled':''}>${opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
@@ -3325,11 +3373,11 @@ function updateRoom(){
   if((cfg.mode||'single')!==S.mode){S.mode=cfg.mode||'single';return renderRoom()}
   if(cfg.slots&&JSON.stringify(cfg.slots)!==JSON.stringify(S.slots)){S.slots={...cfg.slots};return renderRoom()}
   [0,1].forEach(i=>{const el=$('#seat'+i);if(!el)return;const s=su[i]||{},joined=!!seats[i];
-    el.innerHTML=`<div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${NET.seat==null?'':TR('（對手）',' (opponent)')}</div>
+    el.innerHTML=`<div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${NET.seat==null?'':TR('（對手）',' (opponent)')}<span data-ttl="${i}"></span></div>
      <h2 style="margin-top:6px"></h2><p class="hint" style="margin-top:6px"></p>`;
     el.querySelector('h2').textContent=joined?(oppMasked(d,i)?MASK_NAME():s.name||TR('（還沒取隊名）','(no name yet)')):TR('等待朋友加入…','Waiting for your friend…');
     el.querySelector('p').textContent=joined?TR('主場：','Home park: ')+PARKS[Math.min(s.park??i,PARKS.length-1)].n:TR('把房號傳給朋友。','Send the code to your friend.')});
-  mmWait(d);readyPanel(d);
+  mmWait(d);readyPanel(d);paintTitles();
   const n=roomNames();
   const why=!seats[1]?TR('等待玩家 B 加入。','Waiting for Player B to join.'):(!n[0]||!n[1])?TR('兩隊都要先取好隊名。','Both teams need a name.'):n[0]===n[1]?TR('兩隊隊名不能相同。','The two teams need different names.'):'';
   if($('#go')){$('#go').disabled=!!why;$('#gowhy').textContent=why}
