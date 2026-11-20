@@ -3059,7 +3059,13 @@ async function cupSeatAud(uid,i){
 }
 function paintAud(d){
   const el=$('#cupaud');if(!el)return;const st=d.seats||{},aud=Object.entries(d.aud||{}).filter(([u,a])=>u!==st[0]&&u!==st[1]&&Date.now()-(a.at||0)<5*60000);
-  el.innerHTML=`<div class="eyebrow" style="margin-top:10px">${TR('觀眾席（最近 5 分鐘在線）','In the stands (here in the last 5 minutes)')}</div>${aud.length?aud.map(([u,a])=>`<div class="row" style="margin-top:6px;gap:6px 10px"><span>${esc(a.n||'')}${u===NET.uid?TR('（你）',' (you)'):''}</span><button class="ghost mini" data-caud="${esc(u)},0">${TR('放到 A 席','Seat A')}</button><button class="ghost mini" data-caud="${esc(u)},1">${TR('放到 B 席','Seat B')}</button></div>`).join(''):`<p class="hint">${TR('目前沒有觀眾。','Nobody is watching yet.')}</p>`}`;
+  // a free seat if there is one (an open or locked one before one kept for someone else); with both taken, the
+  // organizer picks who comes off, by name
+  const al=(d.cfg.cup.allow)||[],free=[0,1].filter(i=>!st[i]).sort((x,y)=>(al[y]===''||al[y]==='-')-(al[x]===''||al[x]==='-'));
+  const pname=i=>((d.setup||{})[i]||{}).name||'';
+  const btns=u=>free.length?`<button class="ghost mini" data-caud="${esc(u)},${free[0]}">${TR('放上選手席','Put in to play')}</button>`
+    :[0,1].map(i=>`<button class="ghost mini" data-caud="${esc(u)},${i}">${TR(`換下 ${esc(pname(i))} 讓他上場`,`Bring on for ${esc(pname(i))}`)}</button>`).join('');
+  el.innerHTML=`<div class="eyebrow" style="margin-top:10px">${TR('觀眾席（最近 5 分鐘在線）','In the stands (here in the last 5 minutes)')}</div>${aud.length?aud.map(([u,a])=>`<div class="row" style="margin-top:6px;gap:6px 10px"><span>${esc(a.n||'')}${u===NET.uid?TR('（你）',' (you)'):''}</span>${btns(u)}</div>`).join(''):`<p class="hint">${TR('目前沒有觀眾。','Nobody is watching yet.')}</p>`}`;
   el.querySelectorAll('[data-caud]').forEach(b=>b.onclick=()=>{const [u,i]=b.dataset.caud.split(',');b.disabled=true;cupSeatAud(u,+i).catch(e=>{alert(e.message||e);b.disabled=false})});
 }
 async function cupOpen(i){const c=NET.doc.cfg.cup,allow=c.allow.slice(),names=(c.names||['','']).slice();allow[i]='';names[i]='';await NET.ref.update({cfg:{cup:{...c,allow,names}}})}
@@ -3388,7 +3394,7 @@ function cupPanel(d){
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享房號','Share code')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把房號傳給選手和觀眾。選手席由主辦安排：有指定的位置只留給那個帳號，開放的位置由先進房的人入座，其他人都是觀眾。','Send the code to the players and the audience. The organizer runs the seats: a named seat is kept for that account, an open one goes to whoever comes in first, and everyone else watches.')}
    ${host?'<div id="cupaud"></div>':''}
-   ${me==null?(host?TR('你是主辦（觀眾席）：可以把觀眾放上選手席、把選手移到觀眾席。','You are the organizer (watching): seat people from the stands, or move a player to the stands.'):TR('你正在觀戰。如果你是選手，請先登入報名時的帳號，再重新輸入房號。','You are watching. If you are a player, sign in with your entry account and enter the code again.')):''}</p></section>`;
+   ${me==null?(host?TR('你是主辦（坐在觀眾席）：在下面的觀眾名單把人放上選手席，或在選手卡上把選手移到觀眾席。','You are the organizer (in the stands): put people in to play from the list below, or move a player to the stands from their card.'):TR('你正在觀戰。如果你是選手，請先登入報名時的帳號，再重新輸入房號。','You are watching. If you are a player, sign in with your entry account and enter the code again.')):''}</p></section>`;
 }
 let setupTimer=null;
 function renderRoom(){
