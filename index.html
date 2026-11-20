@@ -110,6 +110,7 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .raterow .stars button{all:unset;cursor:pointer;font-size:28px;line-height:1;padding:0 2px;color:var(--amber)}
 .raterow .stars button:hover,.raterow .stars button:focus-visible{transform:scale(1.15)}
 .raterow .stars:hover button{color:var(--amber)}
+.offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
 .thbtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #101010;background:#101010;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
 .thbtn b{font-size:18px;line-height:1}
@@ -1277,6 +1278,9 @@ function simGame(away,home,ctx){
   const fielder=(ti,pos)=>`${POSZH[pos]} ${nm(st[ti].field[pos]||{n:''})}`;
   const pstat=s=>[nm(s.cur.p),s.cur.pc,Math.round(curSta(s.cur))];
   const avail=s=>s.pen.filter(p=>!s.used.has(p));
+  // starters left out of the bullpen, rested enough for a long relief turn when the bullpen is used up
+  const spare=s=>s.tm.sps.filter(p=>!s.used.has(p)&&!s.pen.includes(p)&&s.sta0(p)>=50);
+  const best0=(s,a)=>a.slice().sort((x,y)=>(pitBlend(x)-s.sta0(x)/40)-(pitBlend(y)-s.sta0(y)/40))[0];
   const baseTxt=b=>{const on=TR(['一','二','三'],['1st','2nd','3rd']).filter((_,j)=>b[j]);return on.length?TR(on.join('、')+'壘有人','runner'+(on.length>1?'s':'')+' on '+on.join(' & ')):TR('壘上無人','bases empty')};
 
   function decide(info){
@@ -1285,20 +1289,26 @@ function simGame(away,home,ctx){
   }
   // the situation decides which group pitches: the closer for saves (and a tie late at home), the high-leverage group
   // late and close, the low-leverage group in blowouts, middle relief otherwise. An empty group hands over to the next one.
-  function pickReliever(s,inning,lead){
-    const pen=avail(s);if(!pen.length)return null;
+  function pickReliever(s,inning,lead,exhausted){
+    const pen=avail(s);if(!pen.length)return spare(s).length?best0(s,spare(s)):null;
     const sta=p=>s.sta0(p);
     const save=inning>=9&&lead>=1&&lead<=3, tieLate=inning>=9&&lead===0&&s.ti===1;
     const cl=pen.find(p=>p.pos==='CL'&&sta(p)>=40);
     if(cl&&(save||tieLate)) return cl;
-    const order=Math.abs(lead)>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
+    // behind by three or more (or up by five): the low-leverage arms; the winning group is kept for games within reach
+    const order=lead<=-3||lead>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
     const best=a=>a.slice().sort((x,y)=>(pitBlend(x)-sta(x)/40)-(pitBlend(y)-sta(y)/40))[0];
     for(const min of [45,30])for(const r of order){const g=pen.filter(p=>p.pos!=='CL'&&s.roles[sid(p.id)]===r&&sta(p)>=min);if(g.length)return best(g)}
     // nobody fresh: whoever is left. The computer calls on a closer only from the 7th on, and only from one run
     // behind to three ahead; further behind, in a blowout, or before the 7th, the pitcher on the mound stays in
     // rather than spend the closer's arm. (A manager picking by hand can still call on the closer at any time.)
-    const rest=pen.filter(p=>p.pos!=='CL'||(inning>=7&&lead>=-1&&lead<=3));
-    return rest.length?best(rest):null;
+    // Behind by three or more, the winning group comes last too. An arm with little left goes only when nobody
+    // else can, and before that a starter not in the bullpen takes a long relief turn.
+    const rest=pen.filter(p=>p.pos!=='CL'||(inning>=7&&lead>=-1&&lead<=3)||exhausted);
+    const pref=lead<=-3?rest.filter(p=>s.roles[sid(p.id)]!=='win'&&p.pos!=='CL'):rest;
+    const fresh=a=>a.filter(p=>sta(p)>=20);
+    const pool=fresh(pref).length?fresh(pref):fresh(rest).length?fresh(rest):spare(s).length?spare(s):rest;
+    return pool.length?best(pool):null;
   }
   function doChange(dt,np,lead){
     const s=st[dt],old=s.cur.p;
@@ -1312,30 +1322,36 @@ function simGame(away,home,ctx){
     let forced=false;
     if(mid){const n=paAt.length;paAt.push(ev.length);
       const rq=(ctx.req||[]).find(r=>r[0]===s.tm.i&&n>=r[1]&&!reqUsed.has(r));if(rq){reqUsed.add(rq);forced=true}}
-    if(!avail(s).length) return;
+    if(!avail(s).length&&!spare(s).length) return;
     const want=autoWantsChange(c,inning,lead,mid,s.hook==='early');
     const closer=!mid&&inning>=9&&lead>=1&&lead<=3&&c.p.pos!=='CL'&&avail(s).some(p=>p.pos==='CL'&&s.sta0(p)>=40);
-    const sug=want||closer?pickReliever(s,inning,lead):null;
+    const sug=want||closer?pickReliever(s,inning,lead,sta<5):null;
     let choice=sug?sid(sug.id):'keep';
     const kept=c.keep&&c.keep.runs===c.runs&&c.keep.sta-sta<15;
     // blowouts are managed automatically; ask when the game is within reach or the starter is in trouble
     // a person is asked about the starter, a reliever who is getting hit mid-inning, and the bullpen from the
     // 6th on in a game within three runs; the reliever-per-inning routine otherwise runs by the roles set before
     // the game.
-    const ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=6&&Math.abs(lead)<=3));
+    let ask=(Math.abs(lead)<=4||c.starter)&&(mid?want&&!kept:(want||closer||(sta<40&&!c.tiredAsked)))&&(c.starter||mid||(inning>=6&&Math.abs(lead)<=3));
     if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
-    if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead)||avail(s)[0];choice=sid(r.id)}
+    // a person's pitcher never leaves without them saying so. Where the routine above wouldn't ask (an early inning,
+    // a lopsided score, or right after they chose to keep him), he stays on; they are asked only once he is spent
+    // (under 20% at the start of an inning, under 10% or four runs given up within it)
+    if(ctx.human[s.tm.i]&&!ask&&!forced){
+      if(want&&!kept&&(mid?sta<10||c.runs>=4:sta<20))ask=true;else choice='keep';
+    }
+    if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead,true)||avail(s)[0]||spare(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
       choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,tac:tacStr(s.tac),
         cur:{id:sid(c.p.id),name:nm(c.p),pc:c.pc,sta:Math.round(sta),runs:c.runs,era:c.p.era},
-        opts:avail(s).map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,role:p.pos==='CL'?null:s.roles[sid(p.id)],era:p.era,sta:s.sta0(p),velo:p.velo}))});
+        opts:avail(s).concat(spare(s)).map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,role:p.pos==='CL'?null:s.roles[sid(p.id)],era:p.era,sta:s.sta0(p),velo:p.velo}))});
       // the manager may change the pitching tactic along with the decision: the answer then reads "choice~tactics"
       const cut=String(choice).indexOf('~');
       if(cut>=0){const t=tacOf(String(choice).slice(cut+1));choice=String(choice).slice(0,cut);
         if(tacStr(t)!==tacStr(s.tac)){s.tac=t;ev.push({k:'note',t:TR(`📋 ${s.tm.name} 調整投球戰術：「${TACTL().pit[t.pit]}」。`,`📋 ${s.tm.name} change their pitching approach: "${TACTL().pit[t.pit]}".`)})}}
       if(choice==='keep') c.keep={runs:c.runs,sta};
     }
-    if(choice!=='keep'){const np=avail(s).find(p=>sid(p.id)===choice);if(np)doChange(dt,np,lead)}
+    if(choice!=='keep'){const np=avail(s).concat(spare(s)).find(p=>sid(p.id)===choice);if(np)doChange(dt,np,lead)}
   }
   // a person is asked once, before the 5th (the away side first); the computer adjusts before the 4th and the 7th
   function manageTactics(inning){
@@ -1677,7 +1693,8 @@ function renderPick(){
   $('#app').innerHTML=`${header()}
   <section class="panel"><div class="eyebrow">${S.mode==='single'?TR('決勝戰','Winner-take-all'):TR('第 '+(g+1)+' 戰','Game '+(g+1))} · ${esc(parkOf(S.teams[homeIdx].park).n)}</div>
    <h2 style="margin-top:4px">${TR('賽前調度','Pregame')}</h2>
-   <p class="hint" style="margin-top:6px">${coinText(g)} ${afterOffDay(g)?TR('🛌 昨天是休息日，投手體力恢復了一些。',"🛌 Yesterday was an off day; the arms have had some rest. "):''}${TR('選這場的先發投手、排好打序。','Pick a starter and set the lineup.')}${restN()?TR(`先發投手要休息 ${restN()} 場才能再先發（${restN()+1} 人輪值）。`,` A starter must rest ${restN()} games before starting again (${restN()+1}-man rotation).`):''}${TR('前幾場投過的投手體力會比較低，體力越低越容易失分。',' Pitchers who worked recently start with less stamina, and tired pitchers give up more runs.')}${S.mode!=='single'&&g>0?`<br><span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></section>
+   ${afterOffDay(g)?`<div class="offday" role="note" style="margin-top:10px">🛌 ${TR(`昨天是休息日，投手體力恢復了：第 ${g} 戰投的球只算一半的疲勞。看看下面牛棚的體力條。`,`Yesterday was an off day and the arms have recovered: Game ${g}'s pitches now weigh only half. Check the bullpen stamina below.`)}</div>`:''}
+   <p class="hint" style="margin-top:6px">${coinText(g)} ${TR('選這場的先發投手、排好打序。','Pick a starter and set the lineup.')}${restN()?TR(`先發投手要休息 ${restN()} 場才能再先發（${restN()+1} 人輪值）。`,` A starter must rest ${restN()} games before starting again (${restN()+1}-man rotation).`):''}${TR('前幾場投過的投手體力會比較低，體力越低越容易失分。',' Pitchers who worked recently start with less stamina, and tired pitchers give up more runs.')}${S.mode!=='single'&&g>0?`<br><span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></section>
   <div class="grid2">${tms.map(panel).join('')}</div>
   ${NET.on&&NET.seat==null?'':`<div class="row"><button class="solid" id="startg" ${mySent?'disabled':''}>${NET.on?TR('確定我的調度','Confirm my setup'):TR('確定，開打 ⚾','Confirm and play ⚾')}</button>${NET.on&&!mySent?'<span class="hint" id="pickcd"></span>':''}</div>`}`;
   if(NET.on&&NET.seat!=null&&!mySent)pickCountdown();
@@ -1983,8 +2000,9 @@ function finish(){
      <p style="margin-top:8px;font-weight:700">🏅 ${TR('系列賽 MVP','Series MVP')}　${esc(safe(()=>seriesMvp(seriesStats(G.gnum+1),champ)))}</p>`:''}
     ${rankedGame()?`<p id="rkres" style="margin-top:10px;font-weight:700">${safe(rankText,'')}</p>`:''}
     ${seriesOver&&!watch?rateRow():''}
+    ${!seriesOver&&afterOffDay(G.gnum+1)?`<div class="offday" role="note">🛌 ${TR(`明天是休息日。第 ${G.gnum+2} 戰前休息一天，投手體力會恢復：今天投的球，到時只算一半的疲勞。`,`Tomorrow is an off day. The arms rest before Game ${G.gnum+2}: today's pitches will weigh only half as much.`)}</div>`:''}
     <div class="row" id="endbtns" style="justify-content:center;margin-top:16px">
-     ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
+     ${!seriesOver?`<button class="solid" id="nextg" ${watch?'disabled':''}>${afterOffDay(G.gnum+1)?TR(`🛌 休息一天，準備第 ${G.gnum+2} 戰`,`🛌 Rest a day, set up Game ${G.gnum+2}`):TR(`準備第 ${G.gnum+2} 戰`,`Set up Game ${G.gnum+2}`)}</button>`:''}
      ${rankedGame()||isRnd()?(seriesOver||S.rankAI?`<button class="solid" id="rkhome">${TR('回大廳','Back to the lobby')}</button>${isRnd()?`<button id="newmatch">🎲 ${TR('找新對手','Find a new opponent')}</button>`:''}`:''):`<button id="again" ${watch?'disabled':''}>${TR('同陣容再打一次','Replay with these rosters')}</button><button class="ghost" id="restart" ${watch?'disabled':''}>${TR('重新選秀','New draft')}</button>`}<button class="ghost" id="sharer">📸 ${TR('存圖／分享','Save picture / share')}</button>${feedbackBtn('result')}${lineBtn()}${threadsBtn()}</div>
    </div>
    ${S.mode!=='single'?safe(()=>seriesPanel(G.gnum+1,seriesOver),''):''}
@@ -2018,11 +2036,18 @@ const RATE_KEY='mlbRatedAt';
 function rateRow(){
   if(!NET.bump||window.OFFLINE)return '';
   try{if(Date.now()-(+localStorage.getItem(RATE_KEY)||0)<12*3600000)return ''}catch(e){}
-  return `<div class="raterow" id="raterow"><span>${TR('這場玩得開心嗎？','Enjoy that one?')}</span><span class="stars" role="group" aria-label="${TR('評分','Rating')}">${[1,2,3,4,5].map(n=>`<button type="button" data-rate="${n}" aria-label="${n} ${TR('顆星','stars')}">☆</button>`).join('')}</span></div>`;
+  return `<div class="raterow" id="raterow"><span>${TR('這場玩得開心嗎？','Enjoy that one?')}</span><span class="stars" role="group" aria-label="${TR('評分','Rating')}">${[1,2,3,4,5].map(n=>`<button type="button" data-rate="${n}" aria-label="${n} ${TR('顆星','stars')}" aria-pressed="false">☆</button>`).join('')}</span><button type="button" class="solid mini" id="ratesend" hidden>${TR('送出','Send')}</button></div>`;
+}
+// tapping a star only picks it (it can be changed); "Send" sends it
+function pickRating(n){
+  const row=$('#raterow');if(!row||row.dataset.sent)return;row.dataset.pick=String(n);
+  row.querySelectorAll('[data-rate]').forEach(b=>{const on=+b.dataset.rate<=n;b.textContent=on?'★':'☆';b.setAttribute('aria-pressed',String(+b.dataset.rate===n))});
+  const sb=$('#ratesend');if(sb){sb.hidden=false;sb.onclick=()=>sendRating(+row.dataset.pick)}
 }
 async function sendRating(n){
   const row=$('#raterow');if(!row||row.dataset.sent)return;row.dataset.sent='1';
   row.querySelectorAll('[data-rate]').forEach(b=>{b.textContent=+b.dataset.rate<=n?'★':'☆';b.disabled=true});
+  const sb=$('#ratesend');if(sb)sb.remove();
   try{localStorage.setItem(RATE_KEY,String(Date.now()))}catch(e){}
   try{const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8),p=PROF.doc;
     await NET.db.doc('feedback/'+id).set({text:'',stars:n,tags:[],contact:'',page:'result',league:S.league,lang:LANG,ver:BUILD,
@@ -2030,7 +2055,7 @@ async function sendRating(n){
     row.insertAdjacentHTML('beforeend',`<span class="hint">${TR('謝謝！想多說點什麼可以按「意見回饋」。','Thanks! Use "Feedback" to say more.')}</span>`);
   }catch(e){row.insertAdjacentHTML('beforeend',`<span class="hint">${TR('送出失敗，沒關係。','Could not send; never mind.')}</span>`)}
 }
-document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-rate]');if(b)sendRating(+b.dataset.rate)});
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-rate]');if(b)pickRating(+b.dataset.rate)});
 function feedbackBtn(page){return NET.bump?`<button class="ghost" data-fb="${page}">💬 ${TR('意見回饋','Feedback')}</button>`:''}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-fb]');if(b)openFeedback(b.dataset.fb)});
 function openFeedback(page){
@@ -2191,7 +2216,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='4864054531';
+const BUILD='ff06a20238';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
