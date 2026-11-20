@@ -158,10 +158,11 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .emobub .big{font-size:26px;vertical-align:middle}
 @keyframes emoin{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 @keyframes emoout{to{opacity:0;transform:translate(-50%,-10px)}}
-#pvwrap{position:fixed;inset:0;z-index:50;background:rgba(29,42,58,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+#pvwrap,#afkwrap,#gonewrap{position:fixed;inset:0;z-index:50;background:rgba(29,42,58,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+#afkwrap,#gonewrap{z-index:60}   /* the "you or your opponent stopped" boxes go over anything else that is open */
 /* phones: 100vh is taller than what Safari shows (its bars), so the card ran off both ends; dvh is the visible height */
-#pvwrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-#pvwrap .card>*{flex-shrink:0}   /* a scrolling card must not squash its rows (the sign-in tabs were cut in half) */
+#pvwrap .card,#afkwrap .card,#gonewrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#pvwrap .card>*,#afkwrap .card>*,#gonewrap .card>*{flex-shrink:0}   /* a scrolling card must not squash its rows (the sign-in tabs were cut in half) */
 #pvwrap .pvx{position:sticky;top:0;z-index:2;box-shadow:0 2px 0 var(--paper);align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
@@ -1189,7 +1190,7 @@ const ta=(t,side,k)=>tm_(t,side,k)??0;   // an addition, 0 when it doesn't
 /* ---------- bullpen roles: high-leverage (勝利組), middle relief (佈局), low-leverage (敗戰組) ---------- */
 const ROLES=['win','mid','mop'];
 const ROLEL=()=>({win:TR('勝利組','High leverage'),mid:TR('佈局','Middle relief'),mop:TR('敗戰組','Low leverage')});
-const ROLEHINT=()=>({win:TR('7 局以後比分接近','late and close'),mid:TR('中段局數、比分普通','middle innings'),mop:TR('差距 5 分以上','games out of reach')});
+const ROLEHINT=()=>({win:TR('6 局以後比分接近','6th inning on, close'),mid:TR('中段局數、比分普通','middle innings'),mop:TR('落後 3 分以上或領先 5 分以上','behind by 3+ or ahead by 5+')});
 // the default split: the two best relievers set up the closer, the worst mops up, the rest pitch the middle
 function defaultRoles(rps){
   const r=rps.slice().sort((a,b)=>pitBlend(a)-pitBlend(b)),out={};
@@ -1270,8 +1271,8 @@ function simGame(away,home,ctx){
   const fielder=(ti,pos)=>`${POSZH[pos]} ${nm(st[ti].field[pos]||{n:''})}`;
   const pstat=s=>[nm(s.cur.p),s.cur.pc,Math.round(curSta(s.cur))];
   const avail=s=>s.pen.filter(p=>!s.used.has(p));
-  // starters left out of the bullpen, rested enough for a long relief turn when the bullpen is used up
-  const spare=s=>s.tm.sps.filter(p=>!s.used.has(p)&&!s.pen.includes(p)&&s.sta0(p)>=50);
+  // a starter pitches in relief only when the manager put him in a bullpen role before the game
+  const spare=s=>[];
   const best0=(s,a)=>a.slice().sort((x,y)=>(pitBlend(x)-s.sta0(x)/40)-(pitBlend(y)-s.sta0(y)/40))[0];
   const baseTxt=b=>{const on=TR(['一','二','三'],['1st','2nd','3rd']).filter((_,j)=>b[j]);return on.length?TR(on.join('、')+'壘有人','runner'+(on.length>1?'s':'')+' on '+on.join(' & ')):TR('壘上無人','bases empty')};
 
@@ -1288,14 +1289,14 @@ function simGame(away,home,ctx){
     const cl=pen.find(p=>p.pos==='CL'&&sta(p)>=40);
     if(cl&&(save||tieLate)) return cl;
     // behind by three or more (or up by five): the low-leverage arms; the winning group is kept for games within reach
-    const order=lead<=-3||lead>=5?['mop','mid','win']:inning>=7&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
+    const order=lead<=-3||lead>=5?['mop','mid','win']:inning>=6&&lead>=-2&&lead<=3?['win','mid','mop']:['mid','mop','win'];
     const best=a=>a.slice().sort((x,y)=>(pitBlend(x)-sta(x)/40)-(pitBlend(y)-sta(y)/40))[0];
     for(const min of [45,30])for(const r of order){const g=pen.filter(p=>p.pos!=='CL'&&s.roles[sid(p.id)]===r&&sta(p)>=min);if(g.length)return best(g)}
     // nobody fresh: whoever is left. The computer calls on a closer only from the 7th on, and only from one run
     // behind to three ahead; further behind, in a blowout, or before the 7th, the pitcher on the mound stays in
     // rather than spend the closer's arm. (A manager picking by hand can still call on the closer at any time.)
     // Behind by three or more, the winning group comes last too. An arm with little left goes only when nobody
-    // else can, and before that a starter not in the bullpen takes a long relief turn.
+    // else can.
     const rest=pen.filter(p=>p.pos!=='CL'||(inning>=7&&lead>=-1&&lead<=3)||exhausted);
     const pref=lead<=-3?rest.filter(p=>s.roles[sid(p.id)]!=='win'&&p.pos!=='CL'):rest;
     const fresh=a=>a.filter(p=>sta(p)>=20);
@@ -1330,11 +1331,12 @@ function simGame(away,home,ctx){
     if(!mid&&sta<40)c.tiredAsked=true;   // "he's tiring" comes up once per pitcher, not every inning after
     // a person's pitcher never leaves without them saying so. Where the routine above wouldn't ask (an early inning,
     // a lopsided score, or right after they chose to keep him), he stays on; they are asked when he is spent (under
-    // 20% at the start of an inning, under 10% within it) or has given up two runs in this inning
+    // 20% at the start of an inning, under 10% within it) or has given up runs in this inning: three for a
+    // starter, two for a reliever
     if(ctx.human[s.tm.i]&&!ask&&!forced){
-      if(!kept&&(mid?sta<10||innRuns>=2:want&&sta<20))ask=true;else choice='keep';
+      if(!kept&&(mid?sta<10||innRuns>=(c.starter?3:2):want&&sta<20))ask=true;else choice='keep';
     }
-    if(ask&&ctx.human[s.tm.i]&&choice==='keep'&&mid&&innRuns>=2&&!kept&&!sug){const r=pickReliever(s,inning,lead);if(r&&curSta(c)<40)choice=sid(r.id)}
+    if(ask&&ctx.human[s.tm.i]&&choice==='keep'&&mid&&innRuns>=(c.starter?3:2)&&!kept&&!sug){const r=pickReliever(s,inning,lead);if(r&&curSta(c)<40)choice=sid(r.id)}
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead,true)||avail(s)[0]||spare(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
       choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,tac:tacStr(s.tac),
@@ -2325,7 +2327,38 @@ function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=
   // ranked: once the opponent is gone, claim the win on its own (the rules accept it once they left, or after
   // 3 minutes without a heartbeat; rankCheck retries each minute until then)
   if(isRanked()&&rankedLive()&&oppGone()&&!NET.ffAuto){NET.ffAuto=true;claimForfeit()}
-  if(isCup()&&rankedLive()&&NET.opp&&!NET.ffAuto&&(oppGone()==='left'||Date.now()-NET.opp.seen>180000)){NET.ffAuto=true;claimCup()}}
+  if(isCup()&&rankedLive()&&NET.opp&&!NET.ffAuto&&(oppGone()==='left'||Date.now()-NET.opp.seen>180000)){NET.ffAuto=true;claimCup()}
+  goneBox();}
+// the opponent dropped out: say so in a box over the game, not only in the bar at the top. Ranked and cup games
+// count down to the win (3 minutes of silence, or a minute after they left) and then show the result; a friend's
+// game offers the computer to take their side.
+function goneBox(){
+  const w=$('#gonewrap'),g=oppGone(),contest=isRanked()||isCup(),k=NET.rk&&NET.rk.state;
+  if(!g)NET.goneDismissed=false;   // they came back: a later drop asks again
+  const playing=['draft','trade','pregame','pick','game'].includes(S.screen);
+  // the win is in: show it once
+  if(contest&&k==='done'&&NET.goneShown&&!NET.goneDone){NET.goneDone=true;clearInterval(NET.goneTick);if(w)w.remove();
+    afkSign(TR('🏆 對手棄賽，你獲勝！','🏆 Your opponent forfeited: you win!'),rankText()||TR('這場算你贏。','This one is yours.'),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});return}
+  if(!g||!playing||NET.seat==null||(contest&&(k==='done'||k==='lostff'))||NET.goneDone||NET.ffDone||(!contest&&NET.goneDismissed)){
+    if(w){w.remove();clearInterval(NET.goneTick)}return}
+  NET.goneShown=true;
+  const name=esc((S.teams[1-NET.seat]||{}).name||TR('對手','Your opponent'));
+  if(!w){const x=document.createElement('div');x.id='gonewrap';x.className='acctwrap';
+    x.innerHTML=`<div class="card" role="alertdialog" aria-modal="true" style="gap:10px;border:4px solid var(--red)"><h2 style="color:var(--red)" id="gonet"></h2><p id="goneb"></p><p class="hint" id="gones" style="font-weight:700"></p><div class="row" id="goner"></div></div>`;
+    document.body.appendChild(x);NET.goneTick=setInterval(()=>{if(!$('#gonewrap'))return clearInterval(NET.goneTick);goneBox()},1000)}
+  const left=g==='left',wait=contest?Math.max(0,Math.ceil(((left?(NET.opp.leftAt||Date.now())+60000:NET.opp.seen+180000)-Date.now())/1000)):0;
+  $('#gonet').textContent=left?TR(`⚠ ${(S.teams[1-NET.seat]||{}).name||'對手'} 離開了比賽`,`⚠ ${(S.teams[1-NET.seat]||{}).name||'Your opponent'} left the game`):TR(`⚠ ${(S.teams[1-NET.seat]||{}).name||'對手'} 已經離線`,`⚠ ${(S.teams[1-NET.seat]||{}).name||'Your opponent'} has gone offline`);
+  $('#goneb').innerHTML=contest?TR(`${name} 已經沒有回應。<b>${left?'對手已離開房間，':'對手離線滿 3 分鐘，'}系統會自動判你獲勝</b>，你不用做任何事，請留在這個畫面。對手在那之前回來的話，比賽照常繼續。`,`${name} is not responding. <b>${left?'They left the room, so':'Once they have been gone 3 minutes,'} the win is claimed for you automatically</b>; stay on this screen. If they come back first, the game carries on.`)
+    :TR(`${name} 已經沒有回應。你可以等他回來，或改由電腦接手他的球隊，把比賽打完。`,`${name} is not responding. Wait for them, or let the computer take over their team and finish the game.`);
+  $('#gones').textContent=contest?(wait>0?TR(`約 ${Math.floor(wait/60)} 分 ${wait%60} 秒後自動判你獲勝`,`Win claimed automatically in about ${Math.floor(wait/60)}:${String(wait%60).padStart(2,'0')}`):TR('判定中…（伺服器確認對手離線滿 3 分鐘後成立）','Checking… (it stands once the server sees 3 minutes without them)')):'';
+  // the countdown ran out while an earlier try was refused: try again now rather than at the next minute
+  if(contest&&isRanked()&&wait===0&&k==='ffwait'&&Date.now()-(NET.rk.tried||0)>8000){NET.rk.tried=0;rankCheck()}
+  const r=$('#goner');
+  if(contest){if(!$('#gonego'))r.innerHTML=`<button class="solid" id="gonego">${TR('現在就判對手棄賽','Claim the win now')}</button>`;
+    const b=$('#gonego');b.disabled=wait>0;b.onclick=()=>{b.disabled=true;if(isCup())claimCup();else claimForfeit()}}
+  else if(!$('#gonetk')){r.innerHTML=`<button class="solid" id="gonetk">${TR('改由電腦接手','Let the computer take over')}</button><button class="ghost" id="gonewt">${TR('再等等','Keep waiting')}</button>`;
+    $('#gonetk').onclick=()=>{$('#gonewrap').remove();clearInterval(NET.goneTick);takeOver()};$('#gonewt').onclick=()=>{NET.goneDismissed=true;$('#gonewrap').remove();clearInterval(NET.goneTick)}}
+}
 // a cup opponent gone 3 minutes (or left): the series is ours. Checked against the room on the server first.
 async function claimCup(){
   const me=NET.seat;if(me==null)return;
@@ -2333,7 +2366,7 @@ async function claimCup(){
   if(!(oppGone()==='left'||Date.now()-NET.opp.seen>180000)||(NET.doc.rep||{})[me]){NET.ffAuto=false;return}
   const su=(NET.doc.setup||{})[1-me]||{};
   await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(me),ff:true,at:NET.now(),oh:su.hb||0,ol:!!su.left}}}).then(r,r)));
-  clearDecTimers();clearTimeout(timer);
+  clearDecTimers();clearTimeout(timer);NET.goneDone=true;{const gw=$('#gonewrap');if(gw)gw.remove()}
   afkSign(TR('🏆 對手棄賽','🏆 Your opponent forfeited'),TR(`${esc((S.teams[1-me]||{}).name||'')} 離線超過 3 分鐘，判你獲勝，晉級！`,`${esc((S.teams[1-me]||{}).name||'')} has been gone over 3 minutes: the series is yours.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});
 }
 // a cup series that ended on the field: each player notes the winner for the organizer's list
@@ -3113,6 +3146,20 @@ async function joinRoom(raw){
     const lease=await ref.acquire({holder:NET.uid,ttlMs:5000});
     if(lease.acquired){const d2=(await ref.get()).data();if(!d2.seats||!d2.seats[1]){await ref.update({seats:{1:NET.uid}});return enterRoom(code,1)}}
   }
+  throw new Error(TR('這個房間已經有兩位玩家了。想看比賽請按「輸入房號觀賽」。','This room already has two players. To watch, use "Join to watch".'));
+}
+// watch a room: never takes a seat (a player of that room goes back to their own seat). Ranked and random
+// matches are not open to watchers.
+async function watchRoom(raw){
+  const code=String(raw||'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{4}$/.test(code)) throw new Error(TR('房號是 4 個英文字母或數字。','Room codes are 4 letters or digits.'));
+  const s=await roomDoc(code).get();
+  if(!s.exists||roomExpired(s.data())) throw new Error(TR('找不到這個房號，請確認後再試一次。','No room with that code. Check it and try again.'));
+  const d=s.data(),c=d.cfg||{},seats=d.seats||{};
+  if(c.game==='nba') throw new Error(TR('這是 NBA 版的房號，請到 NBA 版的網頁觀賽。','That code belongs to the NBA game; watch it there.'));
+  if(seats[0]===NET.uid) return enterRoom(code,0);
+  if(seats[1]===NET.uid) return enterRoom(code,1);
+  if(c.rnd&&!c.cup) throw new Error(c.ranked?TR('排位賽不開放觀戰。','Ranked games cannot be watched.'):TR('隨機配對的比賽不開放觀戰。','Random matches cannot be watched.'));
   enterRoom(code,null);
 }
 // opened from an invite link (?room=CODE): join that room at once, then tidy the address bar
@@ -3124,7 +3171,7 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -3240,7 +3287,7 @@ function renderNetBox(){
   let last='';try{last=localStorage.getItem('mlbRoom')||''}catch(e){}
   box.innerHTML=`<div class="row"><button class="solid" id="qm">🎲 ${TR('隨機配對','Random match')}</button><button id="mk">${TR('建立房間','Create room')}</button></div>
    <p class="hint" style="margin-top:6px">${TR('隨機配對會找一位正在等待的玩家；沒人在等就幫你開房間等人。不計積分。','Random match pairs you with someone who is waiting, or opens a room and waits for one. No rating.')}</p>
-   <div class="row" style="margin-top:12px"><input id="code" maxlength="4" placeholder="${TR('房號','Code')}" autocomplete="off" style="width:110px;text-transform:uppercase;font-family:var(--mono)" aria-label="${TR('房號','Room code')}"><button id="join">${TR('加入房間','Join room')}</button>
+   <div class="row" style="margin-top:12px"><input id="code" maxlength="4" placeholder="${TR('房號','Code')}" autocomplete="off" style="width:110px;text-transform:uppercase;font-family:var(--mono)" aria-label="${TR('房號','Room code')}"><button id="join">🎮 ${TR('輸入房號遊玩','Join to play')}</button><button class="ghost" id="watch">👀 ${TR('輸入房號觀賽','Join to watch')}</button>
    ${/^[A-Z0-9]{4}$/.test(last)?`<button class="ghost" id="rejoin">${TR('回到','Back to')} ${esc(last)}</button>`:''}</div>
    <div class="row" style="margin-top:12px"><button class="ghost" id="mkcup">🏆 ${TR('開盃賽房（主辦用）','Open a cup room (organizers)')}</button></div><div id="cuplist"></div>
    <p class="hint" id="neterr" role="alert" style="margin-top:8px"></p>`;
@@ -3252,6 +3299,7 @@ function renderNetBox(){
   renderRankBox();
   $('#join').onclick=()=>busy($('#join'),async()=>{const c=String($('#code').value||'').trim().toUpperCase();if(/^[A-Z0-9]{4}$/.test(c)&&await freshBeforeRoom(c))return;await joinRoom(c)});
   $('#code').onkeydown=e=>{if(e.key==='Enter')$('#join').click()};
+  $('#watch').onclick=()=>busy($('#watch'),async()=>{const c=String($('#code').value||'').trim().toUpperCase();if(/^[A-Z0-9]{4}$/.test(c)&&await freshBeforeRoom(c))return;await watchRoom(c)});
   if($('#rejoin'))$('#rejoin').onclick=()=>busy($('#rejoin'),async()=>{if(await freshBeforeRoom(last))return;await joinRoom(last)});
 }
 /* ---------- the ranked panel on the home page ---------- */
@@ -3369,7 +3417,7 @@ function openAcct(note,mode){
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
   }
 }
-function closeAcct(){const w=document.querySelector('.acctwrap');if(w)w.remove()}
+function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()}   // never the "stopped" boxes (#afkwrap, #gonewrap)
 async function openBoard(){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${TR('排位排行榜','Ranked leaderboard')}</span></h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
