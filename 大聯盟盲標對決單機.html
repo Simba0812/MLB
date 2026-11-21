@@ -2227,7 +2227,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='617cf33cdd';
+const BUILD='1f0a8bde75';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3457,7 +3457,7 @@ function renderRankBox(){
       <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="rankline"><span>${TR('積分','Rating')} <b class="r">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)} · ${TR('勝率','win')} ${played?rate+'%':'—'}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</span><span>${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier!')}</span></div>
       ${past?`<div class="row" style="margin-top:12px;gap:6px"><span class="eyebrow">${TR('歷屆賽季','Past seasons')}</span>${past}</div>`:''}
-      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="rkshare">📤 ${TR('分享段位','Share my tier')}</button><button id="acct">${TR('帳號','Account')}</button></div>
+      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="ttlbtn">🎖️ ${TR('稱號','Titles')} <span class="mono" style="font-size:13px">${TITLE_DEFS.filter(d=>d.ok(titleFacts(p))).length}/${TITLE_DEFS.length}</span></button><button id="rkshare">📤 ${TR('分享段位','Share my tier')}</button><button id="acct">${TR('帳號','Account')}</button></div>
       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50、輸一場 −38，連勝再加分，積分不會低於 1000；配不到人可以打電腦排位（±25','An even win is +50 and a loss −38, plus a streak bonus; your rating never drops below 1000. If nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
   if(PROF.live&&p&&p.pend===PROF.live)body=`<div class="livebar" role="alert"><p>⚠️ ${TR(`你有一場排位還沒打完（房號 ${esc(PROF.live)}）。對手會等你約 1～2 分鐘，超過就會判你棄賽，請馬上回去。`,`You have a ranked series in progress (room ${esc(PROF.live)}). Your opponent waits about 1–2 minutes before it counts as a forfeit: go back now.`)}</p><button class="solid" id="rklive">↩ ${TR('回到比賽','Back to the game')}</button></div>`+body;
@@ -3475,6 +3475,7 @@ function renderRankBox(){
   if($('#rkshare'))$('#rkshare').onclick=()=>{const q=PROF.doc;if(!q)return;const t=TIERS[tierIdx(q.rating)];
     shareImage($('#rkshare'),tierCard(q),TR(`我在大聯盟盲標對決排位到了 ${t[1]} ${t[2]}（${q.rating} 分），來挑戰我！`,`I'm ${t[1]} ${t[3]} (${q.rating}) in MLB Blind Auction ranked. Come take me on!`),'blind-auction-tier.png')};
   if($('#acct'))$('#acct').onclick=()=>openAcct();
+  if($('#ttlbtn'))$('#ttlbtn').onclick=openTitles;
   box.querySelectorAll('[data-rklg]').forEach(c=>c.onchange=()=>{const v=[...box.querySelectorAll('[data-rklg]')].filter(x=>x.checked).map(x=>x.dataset.rklg);
     if(!v.length){c.checked=true;return}RK_LG=v;saveRkLg()});
 }
@@ -3506,10 +3507,7 @@ function openAcct(note,mode){
    :`<h2>${TR('帳號','Account')}</h2><p style="color:#10261d">${esc(a.email||'')}${a.google?' · Google':''}</p>
     <label style="color:var(--chalk)">${TR('暱稱（排行榜和排位賽會顯示）','Nickname (shown in ranked games and on the leaderboard)')}<input id="an" maxlength="16" value="${esc(p?p.name:'')}" style="width:100%"></label>
     <div class="row"><button class="solid" id="anick">${TR('儲存暱稱','Save nickname')}</button><button class="ghost" id="aout">${TR('登出','Sign out')}</button></div>
-    ${p?(()=>{const own=ownedTitles(p),cur=shownTitle(p);return `<div style="border-top:1px solid #c9c2a8;margin:4px 0"></div>
-     <label style="color:var(--chalk)">${TR('稱號（顯示在暱稱旁邊，對手在比賽中也看得到）','Title (shown beside your nickname, also to opponents in a game)')}
-      <select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option ${t===cur?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
-     ${titleBook(p)}`})():''}`}
+`}
    <p id="amsg" role="alert" style="color:#a8441a;font-weight:700"></p></div>`;
   document.body.appendChild(w);
   const msg=t=>{$('#amsg').style.color='';$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
@@ -3525,9 +3523,23 @@ function openAcct(note,mode){
     if($('#arst'))$('#arst').onclick=()=>run($('#arst'),()=>NET.acct.reset($('#ae').value.trim()),()=>{$('#amsg').style.color='var(--navy)';$('#amsg').innerHTML=TR('✅ 重設密碼的信已經寄出。<br>收件匣找不到的話：在 Gmail 搜尋框輸入 <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code> 搜尋，連垃圾郵件也會找出來。<br>用 Google 登入的帳號沒有密碼，直接按「用 Google 登入」就好。','✅ The reset email is on its way.<br>Not in your inbox? In Gmail, search <code style="background:#fff;padding:1px 6px;border:1px solid var(--rule)">in:anywhere</code>: that includes spam.<br>Accounts made with Google have no password: just use "Continue with Google".')});
   }else{
     $('#anick').onclick=()=>run($('#anick'),()=>saveNick($('#an').value),()=>{closeAcct();renderNetBox()});
-    if($('#attl'))$('#attl').onchange=()=>run($('#attl'),()=>saveTitle($('#attl').value),()=>{$('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 稱號已更新。','✅ Title updated.');if(S.screen==='home')renderRankBox()});
     $('#aout').onclick=()=>run($('#aout'),()=>NET.acct.out());
   }
+}
+// titles: their own box, opened from the lobby. Pick one to show; the book lists every one and how to get it.
+function openTitles(){
+  closeAcct();const p=PROF.doc;if(!p)return;const own=ownedTitles(p),cur=shownTitle(p),w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('稱號','Titles')}" style="gap:10px">
+   <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>🎖️ ${TR('稱號','Titles')}</h2>
+   <p class="hint" style="color:var(--dim)">${TR('選一個顯示在暱稱旁邊：球員卡、排行榜和線上比賽中，對手都看得到。','Pick one to show beside your nickname: on your card, the leaderboard, and to opponents in online games.')}</p>
+   <label style="color:var(--chalk)">${TR('顯示的稱號','Title shown')}<select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option ${t===cur?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+   <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p>
+   ${titleBook(p).replace('<details class="tbook">','<details class="tbook" open>')}</div>`;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  $('#attl').onchange=async()=>{const sel=$('#attl');sel.disabled=true;$('#amsg').textContent='';
+    try{await saveTitle(sel.value);$('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 稱號已更新。','✅ Title updated.');if(S.screen==='home')renderRankBox()}
+    catch(e){$('#amsg').style.color='var(--red)';$('#amsg').textContent=e&&e.code==='invalid_argument'?TR('儲存失敗：網站的 Firestore 規則還不是最新版，請站長發布最新的 firestore.rules。','Could not save: the site\'s Firestore rules are out of date.'):TR('儲存失敗，請再試一次。','Could not save; try again.')}
+    sel.disabled=false};
 }
 function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()}   // never the "stopped" boxes (#afkwrap, #gonewrap)
 async function openBoard(){
