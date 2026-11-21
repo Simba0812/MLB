@@ -954,7 +954,7 @@ function teamPanel(i){
   const mr=minRemaining(t);
   return `<section class="panel teamcard ${i?'B':''}">
    <div class="eyebrow ${i?'tb':'ta'}">${S.ai?(S.ai.seat===i?TR('電腦','Computer'):TR('你','You')):TR('玩家 ','Player ')+(i?'B':'A')}${NET.on&&NET.seat===i?TR('（你）',' (you)'):''} · ${esc(parkOf(t.park).n)}</div>
-   <h2 style="margin-top:4px">${esc(t.name)}</h2>
+   <h2 style="margin-top:4px">${esc(t.name)}<span data-ttl="${i}"></span></h2>
    <div class="row" style="justify-content:space-between;margin-top:6px"><div class="money ${i?'tb':'ta'}">$${t.budget}</div>
    <div class="need">${TR(`還差 ${mr} 個必要位置`,`${mr} required spot${mr===1?'':'s'} left`)}${t.done?`<br><b>${TR('已宣布完成','Roster done')}</b>`:''}</div></div>
    <div class="slots">${rows}</div>
@@ -1035,7 +1035,7 @@ function renderTrade(){
   const online=NET.on&&!S.ai,myDone=online&&T.done[pi],oppDone=online&&T.done[oi];
   // both sides done and nobody waiting on an answer: on to pregame (the last one to act moves everyone)
   if(online&&T.done[0]&&T.done[1]&&!T.pending&&NET.seat!=null){S.screen='pregame';sync();return render()}
-  const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}</h2>
+  const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}<span data-ttl="${i}"></span></h2>
     <div role="radiogroup" aria-label="${esc(S.teams[i].name)} ${TR('球員','players')}" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]||!isMine(pi)||myDone?'disabled':''}><span class="mono" style="color:var(--dim);width:3.6em">${e.slot}${e.slot2?'+SP':''}</span><span class="spn">${esc(nm(e.p))}</span><span class="mono" style="color:var(--dim)">${TR('評價','Rating')} ${ovr(e.p)}</span>${e.traded?`<span style="color:var(--dim)">${TR('交易來','acquired')}</span>`:''}</label>`).join('')}</div></section>`;
   let status='';
   const both=T.sel[pi]!=null&&T.sel[oi]!=null;
@@ -2802,7 +2802,7 @@ function seatTitle(i){
 }
 function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{el.innerHTML=titleChip(seatTitle(+el.dataset.ttl))})}
 // every screen that names the two teams fills in their titles once it is drawn
-['renderGameShell','renderPick','renderRoom'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
+['renderGameShell','renderPick','renderRoom','renderDraft','renderTrade'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
 async function saveNick(name){
   name=String(name||'').trim().slice(0,16);if(name.length<2)throw new Error(TR('暱稱至少 2 個字。','A nickname needs at least 2 characters.'));
   if(PROF.doc)await profRef().update({name});
