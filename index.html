@@ -116,6 +116,7 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .tbook li b{color:var(--dim);min-width:8.5em}.tbook li.got b{color:var(--red)}
 .ttl{display:inline-block;vertical-align:middle;margin-left:8px;font-family:var(--body);font-size:12px;font-weight:900;letter-spacing:.04em;line-height:1.5;color:var(--red);background:var(--paper);border:1.5px solid var(--red);border-radius:2px;padding:0 7px;white-space:nowrap}
 .pcard .ttl{margin:6px 0 0}
+.ttl.gold{color:#5c3d00;background:linear-gradient(135deg,#fff3c4,#f2cf6b 45%,#fff0b8 60%,#e0b445);border:2px solid #b8860b;box-shadow:0 0 0 1px #fff8dc inset,0 1px 6px rgba(184,134,11,.55);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
 .thbtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #101010;background:#101010;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
@@ -2228,7 +2229,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='1f0a8bde75';
+const BUILD='55aa8136a9';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2774,7 +2775,10 @@ const TITLE_DEFS=[
 ];
 function ownedTitles(p){
   if(!p)return [];const t=[],hs=p.hist||{};
-  (Array.isArray(p.ctitles)?p.ctitles:[]).forEach(x=>{if(typeof x==='string'&&x.trim())t.push(x.trim().slice(0,TTL_MAX))});
+  (Array.isArray(p.ctitles)?p.ctitles:[]).forEach(x=>{if(typeof x!=='string'||!x.trim())return;x=x.trim();
+    // a gold frame: written "金:" in front in the console, or a creator's title
+    const g=/^金[:：]/.test(x);if(g)x=x.replace(/^金[:：]\s*/,'');
+    if(x)t.push((g||/創作者|開發者|創辦人/.test(x)?GOLD:'')+x.slice(0,TTL_MAX))});
   Object.keys(hs).filter(k=>+k>=1).sort((a,b)=>b-a).forEach(k=>{const i=tierIdx((hs[k]||{}).r||0);if(i>=3)t.push(`${TIERS[i][1]} S${k} ${TIERS[i][2]}`)});
   const x=titleFacts(p);TITLE_DEFS.forEach(d=>{if(d.ok(x))t.push(d.t)});
   return [...new Set(t)];
@@ -2786,7 +2790,9 @@ function titleBook(p){
     <li><b>🥇 S1 3A …</b><span>${TR('賽季結束時 3A 以上（每季一個）','Finish a season at Triple-A or higher (one per season)')}</span></li><li><b>🏆 ${TR('盃賽稱號','Cup titles')}</b><span>${TR('盃賽主辦頒發','Given by cup organizers')}</span></li></ul></details>`;
 }
 const shownTitle=p=>p&&p.title&&ownedTitles(p).includes(p.title)?p.title:'';
-const titleChip=t=>t?`<span class="ttl">${esc(t)}</span>`:'';
+// a title kept with this mark in front shows in a gold frame (only the site owner can hand those out)
+const GOLD='\u0001',ttlText=t=>String(t||'').replace(GOLD,'');
+const titleChip=t=>t?`<span class="ttl${t[0]===GOLD?' gold':''}">${esc(ttlText(t))}</span>`:'';
 async function saveTitle(t){await profRef().update({title:String(t||'').slice(0,40)});await loadProfile()}
 // the two seats' titles in an online room, read from their records (hidden while a ranked opponent is masked)
 const TTL_CACHE=new Map();
@@ -3533,7 +3539,7 @@ function openTitles(){
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('稱號','Titles')}" style="gap:10px">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>🎖️ ${TR('稱號','Titles')}</h2>
    <p class="hint" style="color:var(--dim)">${TR('選一個顯示在暱稱旁邊：球員卡、排行榜和線上比賽中，對手都看得到。','Pick one to show beside your nickname: on your card, the leaderboard, and to opponents in online games.')}</p>
-   <label style="color:var(--chalk)">${TR('顯示的稱號','Title shown')}<select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option ${t===cur?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+   <label style="color:var(--chalk)">${TR('顯示的稱號','Title shown')}<select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option value="${esc(t)}" ${t===cur?'selected':''}>${esc(ttlText(t))}${t[0]===GOLD?' ✨':''}</option>`).join('')}</select></label>
    <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p>
    ${titleBook(p).replace('<details class="tbook">','<details class="tbook" open>')}</div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
