@@ -2214,7 +2214,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='676f3d143c';
+const BUILD='11e7da2c0a';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3081,7 +3081,7 @@ function openCupMaker(){
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   $('#cgo').onclick=async()=>{const b=$('#cgo');b.disabled=true;$('#cmsg').textContent='';
     try{await createCupRoom({name:$('#cn').value,a:$('#ca').value,b:$('#cb').value,league:$('#clg').value,mode:$('#cmd').value});closeAcct()}
-    catch(e){$('#cmsg').textContent=e&&e.message||String(e);b.disabled=false}};
+    catch(e){$('#cmsg').textContent=e&&e.code==='invalid_argument'?TR('資料庫拒絕了建立盃賽房：網站的 Firestore 規則還不是最新版。請站長到 Firebase 主控台發布最新的 firestore.rules 後再試。','The database refused the cup room: the site\'s Firestore rules are out of date. The site owner needs to publish the latest firestore.rules in the Firebase console.'):(e&&e.message||String(e));b.disabled=false}};
 }
 // the organizer's rooms on this device, with how each stands
 async function cupStatus(code){

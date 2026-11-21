@@ -3081,7 +3081,7 @@ function openCupMaker(){
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   $('#cgo').onclick=async()=>{const b=$('#cgo');b.disabled=true;$('#cmsg').textContent='';
     try{await createCupRoom({name:$('#cn').value,a:$('#ca').value,b:$('#cb').value,league:$('#clg').value,mode:$('#cmd').value});closeAcct()}
-    catch(e){$('#cmsg').textContent=e&&e.message||String(e);b.disabled=false}};
+    catch(e){$('#cmsg').textContent=e&&e.code==='invalid_argument'?TR('資料庫拒絕了建立盃賽房：網站的 Firestore 規則還不是最新版。請站長到 Firebase 主控台發布最新的 firestore.rules 後再試。','The database refused the cup room: the site\'s Firestore rules are out of date. The site owner needs to publish the latest firestore.rules in the Firebase console.'):(e&&e.message||String(e));b.disabled=false}};
 }
 // the organizer's rooms on this device, with how each stands
 async function cupStatus(code){
