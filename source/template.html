@@ -1441,8 +1441,10 @@ function simGame(away,home,ctx){
         const B=nm(h), P=nm(p), spd=((h.spd||27)-27)/3, pb=pbox(dt);
         const before=R[bt];
         // where the ball goes, and whether the fielder there changes the outcome
-        let otype=null,fpos=null,flip='';
-        if(res==='s1'){const inf=rnd()<.3;fpos=inf?wpick(IFW):wpick(OFW);const d=defAt(dt,fpos);
+        let otype=null,fpos=null,flip='',ifHit=false;
+        // a single the infield touches: about 4 in 10 die in the infield (beaten out, the runners hold), the rest
+        // get through to the outfield and the runners move as on any single
+        if(res==='s1'){const inf=rnd()<.3;fpos=inf?wpick(IFW):wpick(OFW);ifHit=inf&&rnd()<.4;const d=defAt(dt,fpos);
           if(d>0&&rnd()<d/260){res='out';otype=inf?'g':'f';flip='rob'}}
         else if(res==='out'){const y=rnd(),g=clamp(.46*tf(to,'off','gb')*tf(tp,'pit','gb'),.25,.7),sc=(1-g)/.54;otype=y<g?'g':y<g+.32*sc?'f':y<g+.4*sc?'l':'p';
           fpos=otype==='g'?wpick(IFW):otype==='f'?wpick(OFW):otype==='l'?wpick([...IFW,...OFW].map(([k])=>[k,1/7])):wpick([...IFW,['C',.15]].map(([k,w])=>[k,w/1.15]));
@@ -1460,7 +1462,7 @@ function simGame(away,home,ctx){
           say(hbp?TR(`${P} 失投觸身，${B} 保送上一壘。`,`${P} hits ${B} with a pitch; he takes first.`):pick(TR([`${B} 選到四壞球保送。`,`${P} 控球不穩，保送 ${B}。`],[`${B} draws a walk.`,`${P} loses the zone and walks ${B}.`])));}
         else if(res==='s1'){bb.ab++;bb.hits++;pb.h++;H[bt]++;
           const send=ta(to,'run','send');let cut=false;
-          if(!DIRZH[fpos]&&flip!=='boot'){
+          if(ifHit&&flip!=='boot'){
             // an infield single: everyone forced moves up one base; a runner on third who isn't forced
             // scores only sometimes (two outs, running on contact), a runner on second stops at third
             const f1=!!bases[0],f2=f1&&!!bases[1],f3=f2&&!!bases[2];
@@ -1475,7 +1477,8 @@ function simGame(away,home,ctx){
           bases[0]=h;
           if(flip==='boot') say(TR(`😬 ${B} 的球飛向${fielder(dt,fpos)}，判斷失誤沒接到，形成一壘安打。`,`😬 ${B}'s ball heads toward ${fielder(dt,fpos)}, who misjudges it; it drops for a single.`),'err');
           else if(DIRZH[fpos]) say(pick(TR([`${B} 擊出${DIRZH[fpos]}方向的平飛球，一壘安打。`,`${B} 輕巧一推，${DIRZH[fpos]}前一壘安打。`],[`${B} lines a single to ${DIRZH[fpos]}.`,`${B} pokes a single into ${DIRZH[fpos]}.`])));
-          else say(pick(TR([`${B} 敲出穿越${fielder(dt,fpos)}身邊的滾地安打。`,`${B} 打成${POSZH[fpos]}前的內野高彈跳，跑出內野安打。`],[`${B} rips a grounder past ${fielder(dt,fpos)} for a single.`,`${B} chops a high bouncer in front of the ${POSZH[fpos]} and beats it out.`])));
+          else if(ifHit) say(pick(TR([`${B} 打成${POSZH[fpos]}前的內野高彈跳，跑出內野安打。`,`${B} 打成${POSZH[fpos]}方向的軟弱滾地球，全力衝刺跑出內野安打。`],[`${B} chops a high bouncer in front of the ${POSZH[fpos]} and beats it out.`,`${B} dribbles one toward the ${POSZH[fpos]} and legs out an infield hit.`])));
+          else say(TR(`${B} 敲出穿越${fielder(dt,fpos)}身邊的滾地安打，球滾進外野。`,`${B} rips a grounder past ${fielder(dt,fpos)} into the outfield for a single.`));
           if(cut){ev[ev.length-1].t+=TR(` 二壘跑者衝本壘，被傳殺出局！${outs}出局。`,` The runner from second is sent and thrown out at the plate! ${outs} out${outs>1?'s':''}.`);ev[ev.length-1].t3=outs>=3}}
         else if(res==='s2'){bb.ab++;bb.hits++;bb.d2++;pb.h++;H[bt]++;
           if(bases[2]){score(bases[2],bb);bases[2]=null}
