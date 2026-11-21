@@ -1235,7 +1235,8 @@ function paProbs(h,p,park,fat,cdef,to,tp){
 const IFW=[['3B',.25],['SS',.3],['2B',.28],['1B',.17]],OFW=[['LF',.33],['CF',.37],['RF',.3]];
 const wpick=ws=>{let x=rnd();for(const [k,w] of ws){if(x<w)return k;x-=w}return ws[ws.length-1][0]};
 const DIRZH=biMap({LF:'左外野',CF:'中外野',RF:'右外野'},{LF:'left field',CF:'center field',RF:'right field'});
-const STARTER_MAX=115;   // pitches: a starter never goes past this
+const STARTER_MAX=115,RELIEF_MAX=50;   // pitches: a starter, and a pitcher in relief, never go past these
+const pitchMax=c=>c.starter?STARTER_MAX:RELIEF_MAX;
 function curSta(c){return clamp(c.sta0-c.pc/c.E*100,0,100)}
 function autoWantsChange(c,inning,lead,mid,early){
   const sta=curSta(c);
@@ -1324,8 +1325,8 @@ function simGame(away,home,ctx){
     if(mid){const n=paAt.length;paAt.push(ev.length);
       const rq=(ctx.req||[]).find(r=>r[0]===s.tm.i&&n>=r[1]&&!reqUsed.has(r));if(rq){reqUsed.add(rq);forced=true}}
     if(!avail(s).length&&!spare(s).length) return;
-    // a starter is done at 115 pitches: whoever manages the team, he comes out at the next batter
-    const capped=c.starter&&c.pc>=STARTER_MAX;
+    // a starter is done at 115 pitches, a reliever at 50: whoever manages the team, he comes out at the next batter
+    const capped=c.pc>=pitchMax(c);
     const want=autoWantsChange(c,inning,lead,mid,s.hook==='early')||capped;
     const closer=!mid&&inning>=9&&lead>=1&&lead<=3&&c.p.pos!=='CL'&&avail(s).some(p=>p.pos==='CL'&&s.sta0(p)>=40);
     const sug=want||closer?pickReliever(s,inning,lead,sta<5):null;
@@ -1349,7 +1350,7 @@ function simGame(away,home,ctx){
     if(forced&&choice==='keep'){const r=pickReliever(s,inning,lead,true)||avail(s)[0]||spare(s)[0];choice=sid(r.id)}
     if(forced||(ctx.human[s.tm.i]&&ask)){
       if(capped&&choice==='keep'){const r=pickReliever(s,inning,lead,true)||avail(s)[0];if(r)choice=sid(r.id)}
-      choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,cap:capped,tac:tacStr(s.tac),
+      choice=decide({kind:'pitch',team:s.tm.i,inning,half,outs,bases:baseTxt(bases),lead,suggest:choice,req:forced,cap:capped?(c.starter?'sp':'rp'):'',tac:tacStr(s.tac),
         cur:{id:sid(c.p.id),name:nm(c.p),pc:c.pc,sta:Math.round(sta),runs:c.runs,era:c.p.era},
         opts:avail(s).concat(spare(s)).map(p=>({id:sid(p.id),name:nm(p),pos:p.pos,role:p.pos==='CL'?null:s.roles[sid(p.id)],era:p.era,sta:s.sta0(p),velo:p.velo}))});
       // the manager may change the pitching tactic along with the decision: the answer then reads "choice~tactics"
@@ -1883,7 +1884,7 @@ function showDecision(){
     body=`<h2>${esc(S.teams[q.team].name)}${TR('：要換投嗎？',': change pitchers?')}</h2>
      <p class="hint" style="margin-top:4px">${halfTxt}</p>
      ${q.tac?`<div style="margin-top:8px;padding:8px 12px;border:1.5px solid var(--rule);background:var(--panel2)"><div class="eyebrow">${TR('投球戰術（可以一起調整，再選投手）','Pitching approach (optional; set it, then pick the pitcher)')}</div>${tacticsPicker(G.tsel.t,'tq',q.team,['pit'])}</div>`:''}
-     <div class="optlist">${q.cap?`<p class="hint" style="font-weight:700;color:var(--red)">${TR(`${esc(c.name)} 已經投了 ${c.pc} 球，達到先發 ${STARTER_MAX} 球的上限，這一棒一定要換人。`,`${esc(c.name)} has thrown ${c.pc} pitches, the ${STARTER_MAX}-pitch limit for a starter: he has to come out now.`)}</p>`:''}<button class="opt" data-choose="keep" ${q.cap?'hidden':''}>${TR(`繼續由 ${esc(c.name)} 投球`,`Stay with ${esc(c.name)}`)} ${tag('keep')}<span class="hint">${TR(`已投 ${c.pc} 球 · 本場失 ${c.runs} 分`,`${c.pc} pitches · ${c.runs} R today`)} · ERA ${c.era}</span>${staBar(c.sta)}</button>
+     <div class="optlist">${q.cap?`<p class="hint" style="font-weight:700;color:var(--red)">${TR(`${esc(c.name)} 已經投了 ${c.pc} 球，達到${q.cap==='sp'?`先發 ${STARTER_MAX}`:`中繼 ${RELIEF_MAX}`} 球的上限，這一棒一定要換人。`,`${esc(c.name)} has thrown ${c.pc} pitches, the ${q.cap==='sp'?STARTER_MAX+'-pitch limit for a starter':RELIEF_MAX+'-pitch limit in relief'}: he has to come out now.`)}</p>`:''}<button class="opt" data-choose="keep" ${q.cap?'hidden':''}>${TR(`繼續由 ${esc(c.name)} 投球`,`Stay with ${esc(c.name)}`)} ${tag('keep')}<span class="hint">${TR(`已投 ${c.pc} 球 · 本場失 ${c.runs} 分`,`${c.pc} pitches · ${c.runs} R today`)} · ERA ${c.era}</span>${staBar(c.sta)}</button>
      ${q.opts.map(o=>`<button class="opt" data-choose="${esc(o.id)}">${TR('換上','Bring in')} ${o.role?ROLEL()[o.role]:o.pos} ${esc(o.name)} ${tag(o.id)}<span class="hint">ERA ${o.era}${o.velo?` · ${o.velo.toFixed(1)} mph`:''}</span>${staBar(o.sta)}</button>`).join('')}</div>`;
   }else{
     const c=q.cur;
@@ -2231,7 +2232,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='67a57c5cdc';
+const BUILD='a7d575114f';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
