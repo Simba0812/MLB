@@ -2223,7 +2223,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='0e75132051';
+const BUILD='676f3d143c';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2334,12 +2334,12 @@ function netBadge(){
 }
 function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=()=>rankedLive()?quitRanked():leaveRoom();const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;ff.textContent=TR('判定中…','Checking…');claimForfeit()};
   // ranked: once the opponent is gone, claim the win on its own (the rules accept it once they left, or after
-  // 3 minutes without a heartbeat; rankCheck retries each minute until then)
+  // 2 minutes without a heartbeat; rankCheck retries each minute until then)
   if(isRanked()&&rankedLive()&&oppGone()&&!NET.ffAuto){NET.ffAuto=true;claimForfeit()}
-  if(isCup()&&rankedLive()&&NET.opp&&!NET.ffAuto&&(oppGone()==='left'||Date.now()-NET.opp.seen>180000)){NET.ffAuto=true;claimCup()}
+  if(isCup()&&rankedLive()&&NET.opp&&!NET.ffAuto&&(oppGone()==='left'||Date.now()-NET.opp.seen>GONE_MS)){NET.ffAuto=true;claimCup()}
   goneBox();}
 // the opponent dropped out: say so in a box over the game, not only in the bar at the top. Ranked and cup games
-// count down to the win (3 minutes of silence, or a minute after they left) and then show the result; a friend's
+// count down to the win (2 minutes of silence, or a minute after they left) and then show the result; a friend's
 // game offers the computer to take their side.
 function goneBox(){
   const w=$('#gonewrap'),g=oppGone(),contest=isRanked()||isCup(),k=NET.rk&&NET.rk.state;
@@ -2355,11 +2355,11 @@ function goneBox(){
   if(!w){const x=document.createElement('div');x.id='gonewrap';x.className='acctwrap';
     x.innerHTML=`<div class="card" role="alertdialog" aria-modal="true" style="gap:10px;border:4px solid var(--red)"><h2 style="color:var(--red)" id="gonet"></h2><p id="goneb"></p><p class="hint" id="gones" style="font-weight:700"></p><div class="row" id="goner"></div></div>`;
     document.body.appendChild(x);NET.goneTick=setInterval(()=>{if(!$('#gonewrap'))return clearInterval(NET.goneTick);goneBox()},1000)}
-  const left=g==='left',wait=contest?Math.max(0,Math.ceil(((left?(NET.opp.leftAt||Date.now())+60000:NET.opp.seen+180000)-Date.now())/1000)):0;
+  const left=g==='left',wait=contest?Math.max(0,Math.ceil(((left?(NET.opp.leftAt||Date.now())+60000:NET.opp.seen+GONE_MS)-Date.now())/1000)):0;
   $('#gonet').textContent=left?TR(`⚠ ${(S.teams[1-NET.seat]||{}).name||'對手'} 離開了比賽`,`⚠ ${(S.teams[1-NET.seat]||{}).name||'Your opponent'} left the game`):TR(`⚠ ${(S.teams[1-NET.seat]||{}).name||'對手'} 已經離線`,`⚠ ${(S.teams[1-NET.seat]||{}).name||'Your opponent'} has gone offline`);
-  $('#goneb').innerHTML=contest?TR(`${name} 已經沒有回應。<b>${left?'對手已離開房間，':'對手離線滿 3 分鐘，'}系統會自動判你獲勝</b>，你不用做任何事，請留在這個畫面。對手在那之前回來的話，比賽照常繼續。`,`${name} is not responding. <b>${left?'They left the room, so':'Once they have been gone 3 minutes,'} the win is claimed for you automatically</b>; stay on this screen. If they come back first, the game carries on.`)
+  $('#goneb').innerHTML=contest?TR(`${name} 已經沒有回應。<b>${left?'對手已離開房間，':'對手離線滿 2 分鐘，'}系統會自動判你獲勝</b>，你不用做任何事，請留在這個畫面。對手在那之前回來的話，比賽照常繼續。`,`${name} is not responding. <b>${left?'They left the room, so':'Once they have been gone 2 minutes,'} the win is claimed for you automatically</b>; stay on this screen. If they come back first, the game carries on.`)
     :TR(`${name} 已經沒有回應。你可以等他回來，或改由電腦接手他的球隊，把比賽打完。`,`${name} is not responding. Wait for them, or let the computer take over their team and finish the game.`);
-  $('#gones').textContent=contest?(wait>0?TR(`約 ${Math.floor(wait/60)} 分 ${wait%60} 秒後自動判你獲勝`,`Win claimed automatically in about ${Math.floor(wait/60)}:${String(wait%60).padStart(2,'0')}`):TR('判定中…（伺服器確認對手離線滿 3 分鐘後成立）','Checking… (it stands once the server sees 3 minutes without them)')):'';
+  $('#gones').textContent=contest?(wait>0?TR(`約 ${Math.floor(wait/60)} 分 ${wait%60} 秒後自動判你獲勝`,`Win claimed automatically in about ${Math.floor(wait/60)}:${String(wait%60).padStart(2,'0')}`):TR('判定中…（伺服器確認對手離線滿 2 分鐘後成立）','Checking… (it stands once the server sees 3 minutes without them)')):'';
   // the countdown ran out while an earlier try was refused: try again now rather than at the next minute
   if(contest&&isRanked()&&wait===0&&k==='ffwait'&&Date.now()-(NET.rk.tried||0)>8000){NET.rk.tried=0;rankCheck()}
   const r=$('#goner');
@@ -2368,15 +2368,15 @@ function goneBox(){
   else if(!$('#gonetk')){r.innerHTML=`<button class="solid" id="gonetk">${TR('改由電腦接手','Let the computer take over')}</button><button class="ghost" id="gonewt">${TR('再等等','Keep waiting')}</button>`;
     $('#gonetk').onclick=()=>{$('#gonewrap').remove();clearInterval(NET.goneTick);takeOver()};$('#gonewt').onclick=()=>{NET.goneDismissed=true;$('#gonewrap').remove();clearInterval(NET.goneTick)}}
 }
-// a cup opponent gone 3 minutes (or left): the series is ours. Checked against the room on the server first.
+// a cup opponent gone 2 minutes (or left): the series is ours. Checked against the room on the server first.
 async function claimCup(){
   const me=NET.seat;if(me==null)return;
   try{const x=await NET.ref.get();if(x.exists){watchOpp(x.data());NET.doc={...NET.doc,...x.data()}}}catch(e){}
-  if(!(oppGone()==='left'||Date.now()-NET.opp.seen>180000)||(NET.doc.rep||{})[me]){NET.ffAuto=false;return}
+  if(!(oppGone()==='left'||Date.now()-NET.opp.seen>GONE_MS)||(NET.doc.rep||{})[me]){NET.ffAuto=false;return}
   const su=(NET.doc.setup||{})[1-me]||{};
   await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(me),ff:true,at:NET.now(),oh:su.hb||0,ol:!!su.left}}}).then(r,r)));
   clearDecTimers();clearTimeout(timer);NET.goneDone=true;{const gw=$('#gonewrap');if(gw)gw.remove()}
-  afkSign(TR('🏆 對手棄賽','🏆 Your opponent forfeited'),TR(`${esc((S.teams[1-me]||{}).name||'')} 離線超過 3 分鐘，判你獲勝，晉級！`,`${esc((S.teams[1-me]||{}).name||'')} has been gone over 3 minutes: the series is yours.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});
+  afkSign(TR('🏆 對手棄賽','🏆 Your opponent forfeited'),TR(`${esc((S.teams[1-me]||{}).name||'')} 離線超過 2 分鐘，判你獲勝，晉級！`,`${esc((S.teams[1-me]||{}).name||'')} has been gone over 3 minutes: the series is yours.`),TR('回大廳','Back to the lobby'),()=>{closeAfkSign();leaveRoom()});
 }
 // a cup series that ended on the field: each player notes the winner for the organizer's list
 function cupReport(){
@@ -2534,6 +2534,8 @@ function afkAct(){NET.timerAct=true;try{if(mustBid())bid(S.lot.price+1);else pas
 // every turn the clock plays for you (a bid or a manager's call) is a strike; anything you do yourself clears them.
 // A phone that is closed or asleep stops its heartbeat instead, and the 3-minute rule covers that.
 const AFK_MAX=3;
+// an opponent counts as gone after this long without a heartbeat (heartbeats come every 30 s; firestore.rules uses the same)
+const GONE_MS=120000;
 function strike(){
   if(!(isRanked()||isCup())||NET.seat==null||!NET.on||NET.ffDone)return;
   if(rankWinner()!=null)return;   // the series is decided: nothing can be forfeited any more
@@ -2554,7 +2556,7 @@ function afkSign(title,body,btn,onBtn){
 const rankedLive=()=>(isRanked()||isCup())&&NET.seat!=null&&S.screen!=='room'&&!(NET.rk&&['done','lostff'].includes(NET.rk.state))&&rankWinner()==null;
 // what leaving a live ranked or cup series means now: with the opponent already gone it is a claim, not a forfeit
 function leaveText(){
-  return oppGone()?TR('對手已經離線，現在離開不算你棄賽：系統會在對手離線滿 3 分鐘後把勝場算給你（你不在也會算）。','Your opponent is gone, so leaving is not a forfeit: the win is yours once they have been gone 3 minutes (even if you are not here).')
+  return oppGone()?TR('對手已經離線，現在離開不算你棄賽：系統會在對手離線滿 2 分鐘後把勝場算給你（你不在也會算）。','Your opponent is gone, so leaving is not a forfeit: the win is yours once they have been gone 2 minutes (even if you are not here).')
     :isCup()?TR('離開這場盃賽會算你棄賽，對手晉級。','Leaving this cup series counts as a forfeit; your opponent goes through.'):TR('離開這場排位會算你棄賽（輸一場），對手獲勝。','Leaving counts as a forfeit (a loss); your opponent wins.');
 }
 async function leaveLive(){
@@ -2654,7 +2656,7 @@ function oppWarn(){
   const g=oppGone();if(!g||(isRanked()&&NET.rk&&['done','lostff'].includes(NET.rk.state)))return '';
   if((isRanked()||isCup())&&rankWinner()!=null)return '';   // decided on the field: nothing to claim
   const playing=['draft','trade','pregame','pick','game'].includes(S.screen);
-  return `<span class="warn">⚠ ${g==='left'?TR('對手已離開房間。','Your opponent has left.'):TR('對手已超過 90 秒沒有回應，可能已經離線。','Your opponent has not responded for 90 s and may be offline.')}${isRanked()?TR('系統會自動判你獲勝（最多約 3 分鐘），請先不要離開。',' The win is being claimed for you (up to about 3 minutes); please stay.'):isCup()?TR('對手離線滿 3 分鐘會自動判你獲勝，請先不要離開。',' Once they have been gone 3 minutes the win is yours; please stay.'):''}</span>${isCup()?'':playing?(isRanked()?(NET.rk&&['wait','ffwait','disputed','lostff'].includes(NET.rk.state)||NET.rk&&NET.rk.busy?'':`<button class="solid" id="ffclaim" style="padding:4px 10px">${TR('判對手棄賽（我方勝）','Claim the win by forfeit')}</button>`):`<button class="solid" id="takeover" style="padding:4px 10px">${TR('改由電腦接手','Let the computer take over')}</button>`):''}`;
+  return `<span class="warn">⚠ ${g==='left'?TR('對手已離開房間。','Your opponent has left.'):TR('對手已超過 90 秒沒有回應，可能已經離線。','Your opponent has not responded for 90 s and may be offline.')}${isRanked()?TR('系統會自動判你獲勝（最多約 2 分鐘），請先不要離開。',' The win is being claimed for you (up to about 2 minutes); please stay.'):isCup()?TR('對手離線滿 2 分鐘會自動判你獲勝，請先不要離開。',' Once they have been gone 2 minutes the win is yours; please stay.'):''}</span>${isCup()?'':playing?(isRanked()?(NET.rk&&['wait','ffwait','disputed','lostff'].includes(NET.rk.state)||NET.rk&&NET.rk.busy?'':`<button class="solid" id="ffclaim" style="padding:4px 10px">${TR('判對手棄賽（我方勝）','Claim the win by forfeit')}</button>`):`<button class="solid" id="takeover" style="padding:4px 10px">${TR('改由電腦接手','Let the computer take over')}</button>`):''}`;
 }
 // the opponent is gone: finish the game on this device against the computer
 function takeOver(){
@@ -2807,12 +2809,22 @@ function rankWinner(){
 async function applyRanked(p,won){
   const bonus=streakBonus(p.streak);
   const gain=p.pendW!=null?p.pendW:ELO_K-p.pendD;
-  if(won)await profRef().update({rating:p.rating+p.pendD+gain+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0,streak:(p.streak||0)+1,best:Math.max(p.best||0,(p.streak||0)+1)});
+  if(won){const w={rating:p.rating+p.pendD+gain+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0,streak:(p.streak||0)+1};
+    // the best-streak field needs the newer firestore.rules: where the site still runs older ones, the win goes in without it
+    try{await profRef().update({...w,best:Math.max(p.best||0,(p.streak||0)+1)})}catch(e){await profRef().update(w)}}
   else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,streak:0});
   return bonus;
 }
 // a ranked series still pending on my record (I left before it was settled): read its room and settle it now.
 // A win counts when both reports agree, or when the opponent left without reporting (firestore.rules checks).
+// my forfeit claim was stamped before the opponent had been gone 2 minutes: stamp it again now that they have, so
+// the rules see the proof even if their phone sends a late heartbeat afterwards (only while it isn't credited)
+async function restampClaim(code,d,me){
+  const c=(d.rep||{})[me],su=(d.setup||{})[1-me]||{};
+  if(!c||!c.ff||c.w!==String(me)||claimStands(c))return false;
+  if(!(su.left||Date.now()-(su.hb||0)>=GONE_MS))return false;
+  try{await NET.db.doc('rooms/'+code).update({rep:{[me]:{w:String(me),ff:true,at:NET.now(),oh:su.hb||0,ol:!!su.left}}});return true}catch(e){return false}
+}
 async function settlePending(){
   const p=PROF.doc,a=acctUser();if(!p||!p.pend||!a)return null;
   if(p.pend==='ai')return settleAIres();
@@ -2824,6 +2836,7 @@ async function settlePending(){
   if(mine==null&&theirs!=null&&!rp[1-me].ff){try{await NET.db.doc('rooms/'+p.pend).update({rep:{[me]:{w:theirs}}});mine=theirs}catch(e){return null}}
   if(mine==null)return null;
   const won=mine===String(me);
+  if(won&&await restampClaim(p.pend,d,me)){try{const x=await NET.db.doc('rooms/'+p.pend).get();if(x.exists)d=x.data()}catch(e){}}
   // the reports disagree: nothing to add, unless theirs is a forfeit win they claimed for themselves that was
   // never credited, and they left (firestore.rules decides; a refusal just leaves it as it was)
   if(theirs!=null&&theirs!==mine&&!(won&&rp[1-me].ff&&theirs===String(1-me)))return null;
@@ -2835,9 +2848,9 @@ async function settlePending(){
   try{const before=p.rating+(won?0:p.pendD),bonus=await applyRanked(p,won);await loadProfile();return {won,before:p.rating+p.pendD,after:PROF.doc.rating,bonus}}
   catch(e){return null}
 }
-// a stamped forfeit claim stands when the other player had left or been silent 3 minutes at that moment
+// a stamped forfeit claim stands when the other player had left or been silent 2 minutes at that moment
 // (firestore.rules judges it the same way); an older unstamped one: null, nobody can tell from the room
-function claimStands(c){if(!c||c.at==null)return null;const at=typeof c.at==='number'?c.at:c.at.toMillis?c.at.toMillis():null;return at==null?null:!!c.ol||at-(c.oh||0)>=180000}
+function claimStands(c){if(!c||c.at==null)return null;const at=typeof c.at==='number'?c.at:c.at.toMillis?c.at.toMillis():null;return at==null?null:!!c.ol||at-(c.oh||0)>=GONE_MS}
 // has the opponent's record moved past this room (their forfeit claim was credited)? asked at most every 20 s
 async function oppCredited(){
   const c=NET.oppCred;if(c&&c.code===NET.code&&Date.now()-c.at<20000)return c.v;
@@ -2862,7 +2875,7 @@ async function rankCheck(){
     NET.rk={...NET.rk,state:'lostff'};return showRank()}
   if(!rp[me]){let w=rankWinner();if(w==null&&rp[o]&&rp[o].ff&&rp[o].w===String(me))w=me;if(w==null)return;NET.rk.state='wait';await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w)}}}).then(r,r)));return}
   // no report from the opponent: a series decided on the field is tried at once (the rules take it once they left,
-  // or after 3 minutes without them; until then each snapshot tries again); a forfeit claim once they are gone
+  // or after 2 minutes without them; until then each snapshot tries again); a forfeit claim once they are gone
   if(!rp[o]&&!rp[me].ff&&!oppGone()&&rankWinner()==null)return;
   if(rp[o]&&rp[o].w!==rp[me].w){
     // a forfeit win they claimed for themselves that was never credited: once they are gone it doesn't
@@ -2872,6 +2885,7 @@ async function rankCheck(){
   }
   if(NET.rk.busy)return;NET.rk.busy=true;
   try{
+    if(rp[me].ff&&rp[me].w===String(me)&&await restampClaim(NET.code,NET.doc,me)){const x=await NET.ref.get();if(x.exists)NET.doc={...NET.doc,...x.data()}}
     const p=await loadProfile(),won=rp[me].w===String(me);
     if(!p||p.pend!==NET.code)return;
     const bonus=await applyRanked(p,won);
@@ -2947,10 +2961,10 @@ function rankText(){
   if(k.state==='done'){const to=k.won?k.after:k.before-k.d,mv=tierIdx(to)-tierIdx(k.before);
     const line=k.won?TR(`🏆 排位積分 ${k.before} → ${to}（${sg(to-k.before)}）`,`🏆 Rating ${k.before} → ${to} (${sg(to-k.before)})`):TR(`排位積分 ${k.before} → ${to}（${sg(to-k.before)}）`,`Rating ${k.before} → ${to} (${sg(to-k.before)})`);
     return line+(k.bonus?TR(` · 🔥 ${k.streak} 連勝加 ${k.bonus} 分`,` · 🔥 ${k.streak}-game streak bonus +${k.bonus}`):'')+(mv>0?TR(` · 🎉 升上 ${tierName(to)}！`,` · 🎉 Promoted to ${tierName(to)}!`):mv<0?TR(` · 降到 ${tierName(to)}`,` · Down to ${tierName(to)}`):` · ${tierName(to)}`)}
-  if(k.state==='wait')return TR('結算中：等對手確認比賽結果（對手已離開的話會自動結算，最多約 3 分鐘）。你可以先回大廳，勝場不會不見。','Settling: waiting for your opponent to confirm (if they left it settles on its own, about 3 minutes at most). You can go back to the lobby; the win won\'t be lost.');
-  if(k.state==='lostff')return TR('你的手機有超過 3 分鐘沒有連線（例如螢幕關掉或切到別的 App），對手已經判你棄賽，這場算輸。','Your phone was offline for over 3 minutes (screen off or another app), so your opponent claimed the win by forfeit. This one counts as a loss.');
+  if(k.state==='wait')return TR('結算中：等對手確認比賽結果（對手已離開的話會自動結算，最多約 2 分鐘）。你可以先回大廳，勝場不會不見。','Settling: waiting for your opponent to confirm (if they left it settles on its own, about 3 minutes at most). You can go back to the lobby; the win won\'t be lost.');
+  if(k.state==='lostff')return TR('你的手機有超過 2 分鐘沒有連線（例如螢幕關掉或切到別的 App），對手已經判你棄賽，這場算輸。','Your phone was offline for over 3 minutes (screen off or another app), so your opponent claimed the win by forfeit. This one counts as a loss.');
   if(k.state==='disputed')return TR('雙方回報的結果不一致，這場不計勝場（已扣的積分不退）。','The two reports disagree, so this game does not count as a win.');
-  if(k.state==='ffwait')return TR('對手還沒離線夠久（3 分鐘），時間到會自動再試一次。','Your opponent has not been gone long enough (3 min); it will try again by itself.');
+  if(k.state==='ffwait')return TR('對手還沒離線夠久（2 分鐘），時間到會自動再試一次。','Your opponent has not been gone long enough (3 min); it will try again by itself.');
   if(k.state==='err')return TR('積分沒有更新成功：','The rating did not update: ')+esc(k.msg||'');
   return '';
 }
@@ -3356,8 +3370,14 @@ async function winPending(){
     const mine=me!=null&&(d.rep||{})[me];if(!mine||mine.w!==String(me))return false;   // a loss (or nothing decided): fine to drop
   }catch(e){return false}
   PROF.settling=true;renderRankBox();
-  alert(TR('上一場排位你贏了，正在等系統確認（對手的結果回報，或確認對手已離開，最多約 3 分鐘）。確認後積分會自動加回來，請稍後再開新的一場。','You won your last ranked series and it is still being confirmed (the other side\'s report, or their leaving: about 3 minutes at most). The rating comes back on its own; start a new game in a moment.'));
-  return true;
+  const key='mlbWait:'+PROF.doc.pend;let t0=0;try{t0=+localStorage.getItem(key)||0;if(!t0){t0=Date.now();localStorage.setItem(key,String(t0))}}catch(e){t0=Date.now()}
+  if(Date.now()-t0<5*60000){
+    alert(TR(`上一場排位你贏了，正在等系統確認（對手的結果回報，或確認對手已離開，最多約 2 分鐘）。確認後積分會自動加回來，請稍後再開新的一場。`,'You won your last ranked series and it is still being confirmed (the other side\'s report, or their leaving: about 2 minutes at most). The rating comes back on its own; start a new game in a moment.'));
+    return true}
+  // still not through after 5 minutes: something else is wrong; let the player choose rather than wait for good
+  if(confirm(TR('上一場的勝利已經 5 分鐘還無法結算。要繼續等嗎？\n按「確定」繼續等（不開新局）；按「取消」放棄等待並開始新的一場（上一場會算輸）。','Your last win still can\'t be settled after 5 minutes. Keep waiting?\nOK keeps waiting (no new game); Cancel gives up on it and starts a new game (the last one then counts as a loss).')))return true;
+  try{localStorage.removeItem(key)}catch(e){}
+  return false;
 }
 // a ranked series this account still sits in (the page closed or crashed mid-game): its room code, or ''
 async function findLive(){
@@ -3406,8 +3426,8 @@ function renderRankBox(){
       <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="rkshare">📤 ${TR('分享段位','Share my tier')}</button><button id="acct">${TR('帳號','Account')}</button></div>
       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50、輸一場 −38，連勝再加分，積分不會低於 1000；配不到人可以打電腦排位（±25','An even win is +50 and a loss −38, plus a streak bonus; your rating never drops below 1000. If nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
-  if(PROF.live&&p&&p.pend===PROF.live)body=`<div class="livebar" role="alert"><p>⚠️ ${TR(`你有一場排位還沒打完（房號 ${esc(PROF.live)}）。對手會等你約 1～3 分鐘，超過就會判你棄賽，請馬上回去。`,`You have a ranked series in progress (room ${esc(PROF.live)}). Your opponent waits about 1–3 minutes before it counts as a forfeit: go back now.`)}</p><button class="solid" id="rklive">↩ ${TR('回到比賽','Back to the game')}</button></div>`+body;
-  if(p&&p.pend&&p.pend!=='ai'&&PROF.settling&&PROF.live!==p.pend)body=`<div class="offday" id="rksettle" role="status" style="margin:0 0 12px">⏳ ${TR('上一場排位正在結算：等對手的結果回報，或確認對手已經離開（最多約 3 分鐘）。結算完成前顯示的積分是開打時先預扣的，贏的話會加回來。','Your last ranked series is over and being settled: waiting for the other side\'s report, or for them to have left (about 3 minutes at most). Until then the rating shown has the stake taken out; a win puts it back.')}</div>`+body;
+  if(PROF.live&&p&&p.pend===PROF.live)body=`<div class="livebar" role="alert"><p>⚠️ ${TR(`你有一場排位還沒打完（房號 ${esc(PROF.live)}）。對手會等你約 1～2 分鐘，超過就會判你棄賽，請馬上回去。`,`You have a ranked series in progress (room ${esc(PROF.live)}). Your opponent waits about 1–2 minutes before it counts as a forfeit: go back now.`)}</p><button class="solid" id="rklive">↩ ${TR('回到比賽','Back to the game')}</button></div>`+body;
+  if(p&&p.pend&&p.pend!=='ai'&&PROF.settling&&PROF.live!==p.pend)body=`<div class="offday" id="rksettle" role="status" style="margin:0 0 12px">⏳ ${TR('上一場排位正在結算：等對手的結果回報，或確認對手已經離開（最多約 2 分鐘）。結算完成前顯示的積分是開打時先預扣的，贏的話會加回來。','Your last ranked series is over and being settled: waiting for the other side\'s report, or for them to have left (about 3 minutes at most). Until then the rating shown has the stake taken out; a win puts it back.')}</div>`+body;
   const st=PROF.settled;PROF.settled=null;
   if(st)body=`<p style="font-weight:900;color:${st.won?'var(--good)':'var(--navy)'};margin:0 0 8px">${st.won?TR(`🏆 上一場排位已結算：${st.before} → ${st.after}（+${st.after-st.before}）`,`🏆 Your last ranked series is settled: ${st.before} → ${st.after} (+${st.after-st.before})`):TR('上一場排位已結算（輸）。','Your last ranked series is settled (a loss).')}</p>`+body;
   box.innerHTML=card+`<section class="rankpanel">${body}</section>`;
@@ -3527,7 +3547,7 @@ function renderRoom(){
    <div class="row" style="justify-content:space-between;margin-top:4px"><h2>${TR('房號','Room code')} <span class="mono ta" style="font-size:44px;letter-spacing:.08em">${NET.code}</span></h2><div class="row"><button class="solid" id="share">📤 ${TR('分享邀請','Share invite')}</button><button class="ghost" id="copy">${TR('複製房號','Copy code')}</button></div></div>
    <p class="hint">${TR('把這組房號傳給朋友。朋友打開同一個網頁，點「線上對戰」，輸入房號加入。','Send this code to your friend. They open the same page, choose "Online" and enter the code.')}${me==null?TR('這個房間已經滿了，你正在觀戰。',' This room is full; you are watching.'):''}</p></section>`}
   <div class="grid2">${seat(0)}${seat(1)}</div>
-  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${lgPend?TR('美國職棒大聯盟或中華職棒（配到對手後，從雙方都有勾的聯盟決定）','MLB or CPBL (settled from the leagues both players ticked once an opponent is found)'):S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')}</p>`
+  <section class="panel">${(d.cfg||{}).ranked?`<h2>🏆 ${TR('排位賽','Ranked game')}</h2><p class="hint" style="margin-top:6px">${lgPend?TR('美國職棒大聯盟或中華職棒（配到對手後，從雙方都有勾的聯盟決定）','MLB or CPBL (settled from the leagues both players ticked once an opponent is found)'):S.league==='CPBL'?TR('中華職棒','CPBL'):TR('美國職棒大聯盟','MLB')} · ${TR('固定規則：七戰四勝 · 先發 4・中繼 4・終結者 2・板凳 2 · 每隊 $200 · 50 支籤。雙方都按「準備開始」後開始選秀。','Fixed rules: best of seven · SP 4 · RP 4 · CL 2 · bench 2 · $200 each · 50 lots. The draft starts as soon as both players are in.')}</p><p class="hint">${TR('開始選秀時會先預扣這場的積分，贏了再加回來。排位進行中離開超過 2 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','Starting the draft books the loss; a win gives it back. Leaving a ranked series for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')}</p>`
     :me===0&&!(d.cfg||{}).cup?`<div><div><h2>${TR('規則設定','Settings')}</h2><p class="hint" style="margin-top:4px">${TR('由房主設定，對手會同步看到。','The host sets these; your opponent sees them live.')}</p><div class="row" style="margin-top:10px"><span class="eyebrow">${TR('聯盟','League')}</span>${leagueSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('賽制','Format')}</span>${modeSeg()}</div><div class="row" style="margin-top:8px"><span class="eyebrow">${TR('名額','Roster spots')}</span>${slotPickers()}</div></div>
      <div class="row" style="align-items:flex-end;margin-top:12px"><label style="width:150px">${TR('每隊預算（$）','Budget per team ($)')}<input id="bud" type="number" min="30" max="1000" value="${cfg.budget}"></label><label style="width:150px">${TR(`總籤數（最少 ${lotsNeeded()}）`,`Total lots (min ${lotsNeeded()})`)}<input id="lots" type="number" min="${lotsNeeded()}" max="200" value="${Math.max(cfg.lotMax,lotsNeeded())}"></label></div></div>
      <div class="row" style="margin-top:14px"><button class="solid" id="go">${TR('開始選秀','Start draft')}</button><span class="hint" id="gowhy"></span></div>`
@@ -3601,11 +3621,11 @@ function readyPanel(d){
   if(!NET.rdySince)NET.rdySince=Date.now();
   const me=NET.seat,su=d.setup||{},st=i=>(su[i]||{}).ready?'✅ '+TR('已準備','Ready'):'⌛ '+TR('還沒準備','Not ready');
   if(!$('#rdybtn')&&(d.cfg||{}).cup)el.innerHTML=`<h2>🏆 ${TR('兩位選手都到了！','Both players are here!')}</h2>
-    <p class="hint" style="margin-top:6px">${TR('⚠ 規則比照排位：進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。兩邊都按「準備開始」就開始選秀。','⚠ Ranked rules: leaving for over 3 minutes, or letting the clock run out 3 turns in a row, forfeits. The draft starts once both press "Ready".')}</p>
+    <p class="hint" style="margin-top:6px">${TR('⚠ 規則比照排位：進行中離開超過 2 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。兩邊都按「準備開始」就開始選秀。','⚠ Ranked rules: leaving for over 3 minutes, or letting the clock run out 3 turns in a row, forfeits. The draft starts once both press "Ready".')}</p>
     <div class="row" style="margin-top:10px;gap:8px 24px;font-weight:700"><span id="rdy0"></span><span id="rdy1"></span></div>
     <div class="row" style="margin-top:12px"><button class="solid rankgo" id="rdybtn">${TR('準備開始','Ready')}</button></div>`;
   if(!$('#rdybtn'))el.innerHTML=`<h2>🤝 ${TR('找到對手了！','Opponent found!')}</h2>
-    <p class="hint" style="margin-top:6px">${(d.cfg||{}).ranked?TR('⚠ 排位賽是七戰四勝。進行中離開超過 3 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','⚠ Ranked is best of seven. Leaving for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')+'<br>':''}${TR(`${(d.cfg||{}).ranked?'排位賽':'隨機配對'}：兩邊都按「準備開始」就開始選秀。<b id="rdyleft">60</b> 秒內沒按的人會回到大廳。`,`${(d.cfg||{}).ranked?'Ranked':'Random match'}: the draft starts once both press "Ready". Whoever hasn't within <b id="rdyleft">60</b> s goes back to the lobby.`)}</p>
+    <p class="hint" style="margin-top:6px">${(d.cfg||{}).ranked?TR('⚠ 排位賽是七戰四勝。進行中離開超過 2 分鐘，或連續 3 次時間到沒有動作，會被判棄賽。','⚠ Ranked is best of seven. Leaving for over 3 minutes, or letting the clock run out 3 turns in a row, counts as a forfeit.')+'<br>':''}${TR(`${(d.cfg||{}).ranked?'排位賽':'隨機配對'}：兩邊都按「準備開始」就開始選秀。<b id="rdyleft">60</b> 秒內沒按的人會回到大廳。`,`${(d.cfg||{}).ranked?'Ranked':'Random match'}: the draft starts once both press "Ready". Whoever hasn't within <b id="rdyleft">60</b> s goes back to the lobby.`)}</p>
     <div class="row" style="margin-top:10px;gap:8px 24px;font-weight:700"><span id="rdy0"></span><span id="rdy1"></span></div>
     <div class="row" style="margin-top:12px"><button class="solid rankgo" id="rdybtn">${TR('準備開始','Ready')}</button></div>`;
   [0,1].forEach(i=>{const x=$('#rdy'+i);if(x)x.textContent=`${i===me?TR('你','You'):TR('對手','Opponent')}（${oppMasked(d,i)?TR('神秘對手','mystery'):(su[i]||{}).name||'—'}）：${st(i)}`});

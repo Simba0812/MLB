@@ -248,8 +248,12 @@ service cloud.firestore {
         let c = rep.get(o, {});
         return theirs == o && c.get('ff', false) == true
           && ('at' in c
-              ? (c.ol != true && c.at.toMillis() - c.oh < 180000)
+              ? (c.ol != true && c.at.toMillis() - c.oh < 120000)
               : get(/databases/$(database)/documents/players/$(r.seats[o])).data.get('pend', '') == od().pend);
+      }
+      function provedGone(c, s) {
+        return c.get('ff', false) == true && c.get('w', '') == s && 'at' in c
+          && (c.get('ol', false) == true || c.at.toMillis() - c.get('oh', 0) >= 120000);
       }
       function winOK() {
         let r = room(od().pend);
@@ -259,8 +263,10 @@ service cloud.firestore {
         let mine = rep.get(s, {}).get('w', '');
         let theirs = rep.get(o, {}).get('w', '');
         let them = r.setup.get(o, {});
-        // a forfeit counts when the opponent left, or has sent no heartbeat for 3 minutes
-        let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 180000;
+        // a forfeit counts when the opponent left, or has sent no heartbeat for 2 minutes (heartbeats come every
+        // 30 s), now or when my own stamped claim was made (a phone in the background can send a late beat)
+        let gone = them.get('left', false) == true || them.get('hb', request.time.toMillis()) < request.time.toMillis() - 120000
+          || provedGone(rep.get(s, {}), s);
         return inRoom(r) && r.created == od().pendAt
           && mine == s && (theirs == s || ((theirs == '' || staleClaim(r, o, theirs, rep)) && gone))
           && nd().rating == od().rating + od().pendD + od().get('pendW', 100 - od().pendD) + (od().get('streak', 0) >= 3 ? 30 : od().get('streak', 0) * 10)
