@@ -110,6 +110,10 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .raterow .stars button{all:unset;cursor:pointer;font-size:28px;line-height:1;padding:0 2px;color:var(--amber)}
 .raterow .stars button:hover,.raterow .stars button:focus-visible{transform:scale(1.15)}
 .raterow .stars:hover button{color:var(--amber)}
+.tbook summary{cursor:pointer;font-weight:700;color:var(--navy)}
+.tbook ul{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr;gap:4px}
+.tbook li{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;font-size:14px;color:var(--dim);padding:3px 0;border-bottom:1px dashed var(--rule)}
+.tbook li b{color:var(--dim);min-width:8.5em}.tbook li.got b{color:var(--red)}
 .ttl{display:inline-block;vertical-align:middle;margin-left:8px;font-family:var(--body);font-size:12px;font-weight:900;letter-spacing:.04em;line-height:1.5;color:var(--red);background:var(--paper);border:1.5px solid var(--red);border-radius:2px;padding:0 7px;white-space:nowrap}
 .pcard .ttl{margin:6px 0 0}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
@@ -2224,7 +2228,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='11e7da2c0a';
+const BUILD='617cf33cdd';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2741,15 +2745,45 @@ async function loadProfile(){
 // each past season ended); cup titles are ones the site owner writes into the record's ctitles list by hand. A
 // player picks which one to show; every page works the list out again before showing it, so a forged pick shows nothing.
 const TTL_MAX=24;
+// the numbers titles are worked out from, all from the record (rules-protected fields only)
+function titleFacts(p){
+  const hs=p.hist||{},past=Object.values(hs);
+  const w=(p.wins||0)+past.reduce((a,h)=>a+((h&&h.w)||0),0),l=(p.losses||0)+past.reduce((a,h)=>a+((h&&h.l)||0),0);
+  const t0=hs[0];
+  return {w,l,g:w+l,sw:p.wins||0,sl:p.losses||0,streak:p.streak||0,best:Math.max(p.best||0,p.streak||0),
+    aiToday:p.aiDay===twDay()?(p.aiN||0):0,test:!!(t0&&(t0.w||0)+(t0.l||0)>0)||(seasonOf(p)===0&&(p.games||0)>0)};
+}
+// earned titles, best first; the everyday ones come last. how: [zh, en]
+const TITLE_DEFS=[
+  {t:'⚡ 十連勝',how:['最佳連勝 10 場','A best streak of 10'],ok:x=>x.best>=10},
+  {t:'🏆 百勝',how:['排位累計 100 勝','100 ranked wins'],ok:x=>x.w>=100},
+  {t:'🔥 五連勝',how:['最佳連勝 5 場','A best streak of 5'],ok:x=>x.best>=5},
+  {t:'🎖️ 五十勝',how:['排位累計 50 勝','50 ranked wins'],ok:x=>x.w>=50},
+  {t:'🏋️ 鐵人',how:['排位累計打 100 場','Play 100 ranked games'],ok:x=>x.g>=100},
+  {t:'🎯 常勝軍',how:['本季勝率 60% 以上（至少 20 場）','Win 60%+ this season (20+ games)'],ok:x=>x.sw+x.sl>=20&&x.sw/(x.sw+x.sl)>=.6},
+  {t:'✨ 三連勝',how:['最佳連勝 3 場','A best streak of 3'],ok:x=>x.best>=3},
+  {t:'🏅 十勝',how:['排位累計 10 勝','10 ranked wins'],ok:x=>x.w>=10},
+  {t:'😤 不服輸',how:['排位累計輸 30 場還在打','Lose 30 ranked games and keep at it'],ok:x=>x.l>=30},
+  {t:'💪 越挫越勇',how:['排位累計輸 10 場還在打','Lose 10 ranked games and keep at it'],ok:x=>x.l>=10},
+  {t:'⚖️ 五五波',how:['本季勝場剛好等於敗場（至少 10 場）','Exactly as many wins as losses this season (10+ games)'],ok:x=>x.sw===x.sl&&x.sw+x.sl>=10},
+  {t:'🧢 打卡上班',how:['排位累計打 20 場','Play 20 ranked games'],ok:x=>x.g>=20},
+  {t:'♨️ 手感正燙',how:['目前 3 連勝以上（連勝斷了就會消失）','On a 3+ win streak right now (gone when it ends)'],ok:x=>x.streak>=3},
+  {t:'🤖 今日全勤',how:['今天打滿 5 場電腦排位（每天重算）','All 5 ranked games vs the computer today (resets daily)'],ok:x=>x.aiToday>=5},
+  {t:'🏛️ 測試賽季元老',how:['測試賽季就來打過排位','Played ranked in the test season'],ok:x=>x.test},
+  {t:'🌱 新秀報到',how:['打完第 1 場排位','Finish your first ranked game'],ok:x=>x.g>=1},
+];
 function ownedTitles(p){
   if(!p)return [];const t=[],hs=p.hist||{};
   (Array.isArray(p.ctitles)?p.ctitles:[]).forEach(x=>{if(typeof x==='string'&&x.trim())t.push(x.trim().slice(0,TTL_MAX))});
   Object.keys(hs).filter(k=>+k>=1).sort((a,b)=>b-a).forEach(k=>{const i=tierIdx((hs[k]||{}).r||0);if(i>=3)t.push(`${TIERS[i][1]} S${k} ${TIERS[i][2]}`)});
-  const b=Math.max(p.best||0,p.streak||0);
-  if(b>=10)t.push('⚡ 十連勝');if(b>=5)t.push('🔥 五連勝');if(b>=3)t.push('✨ 三連勝');
-  const tw=(p.wins||0)+Object.values(hs).reduce((a,h)=>a+((h&&h.w)||0),0);
-  if(tw>=100)t.push('🏆 百勝');if(tw>=50)t.push('🎖️ 五十勝');if(tw>=10)t.push('🏅 十勝');
+  const x=titleFacts(p);TITLE_DEFS.forEach(d=>{if(d.ok(x))t.push(d.t)});
   return [...new Set(t)];
+}
+// the title book: every earned title, got or not, and how to get it
+function titleBook(p){
+  const x=titleFacts(p),got=TITLE_DEFS.filter(d=>d.ok(x)).length;
+  return `<details class="tbook"><summary>${TR(`📖 稱號圖鑑（已拿到 ${got}／${TITLE_DEFS.length}）`,`📖 All titles (${got} of ${TITLE_DEFS.length})`)}</summary><ul>${TITLE_DEFS.map(d=>{const ok=d.ok(x);return `<li class="${ok?'got':''}"><b>${ok?'':'🔒 '}${esc(d.t)}</b><span>${TR(d.how[0],d.how[1])}</span></li>`}).join('')}
+    <li><b>🥇 S1 3A …</b><span>${TR('賽季結束時 3A 以上（每季一個）','Finish a season at Triple-A or higher (one per season)')}</span></li><li><b>🏆 ${TR('盃賽稱號','Cup titles')}</b><span>${TR('盃賽主辦頒發','Given by cup organizers')}</span></li></ul></details>`;
 }
 const shownTitle=p=>p&&p.title&&ownedTitles(p).includes(p.title)?p.title:'';
 const titleChip=t=>t?`<span class="ttl">${esc(t)}</span>`:'';
@@ -3476,7 +3510,7 @@ function openAcct(note,mode){
     ${p?(()=>{const own=ownedTitles(p),cur=shownTitle(p);return `<div style="border-top:1px solid #c9c2a8;margin:4px 0"></div>
      <label style="color:var(--chalk)">${TR('稱號（顯示在暱稱旁邊，對手在比賽中也看得到）','Title (shown beside your nickname, also to opponents in a game)')}
       <select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option ${t===cur?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
-     <p class="hint" style="color:var(--dim)">${TR('怎麼拿：排位累積 10／50／100 勝；最佳連勝 3／5／10 場；賽季結束時 3A 以上；盃賽獎勵的特別稱號。','How to earn: 10 / 50 / 100 ranked wins; a best streak of 3 / 5 / 10; finishing a season at Triple-A or higher; special titles from cups.')}</p>`})():''}`}
+     ${titleBook(p)}`})():''}`}
    <p id="amsg" role="alert" style="color:#a8441a;font-weight:700"></p></div>`;
   document.body.appendChild(w);
   const msg=t=>{$('#amsg').style.color='';$('#amsg').textContent=t},run=async(btn,fn,ok)=>{btn.disabled=true;msg('');try{await fn();if(ok)ok()}catch(e){msg(authMsg(e))}btn.disabled=false};
