@@ -1576,6 +1576,7 @@ function renderPregame(){
   <div class="grid2">${tms.map((tm,i)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${esc(tm.park.n)}</div><h2>${esc(tm.name)}</h2>${lu(tm)}</section>`).join('')}</div>`;
   $('#play').onclick=()=>{
     const coin=rnd()<.5?0:1;
+    seriesNeed();   // ranked: puts the format back to best of seven before the schedule is drawn
     const sched=S.mode==='single'?[coin]:S.mode==='bo3'?[0,1,coin]:[coin,coin,1-coin,1-coin,1-coin,coin,coin];
     S.series={id:Math.random().toString(36).slice(2,8),sched,coin,games:[]};
     S.game={gnum:0};S.screen='pick';sync();render();window.scrollTo(0,0);
@@ -1991,11 +1992,16 @@ function seriesPanel(n,over){
 }
 // a stat line that fails to compute must not keep the result from showing
 const safe=(f,d='—')=>{try{return f()}catch(e){console.error(e);return d}};
+// wins that take the series. Ranked (people or the computer) is always four, whatever a page holds in S.mode.
+function seriesNeed(){
+  if(isRanked()||S.rankAI){if(S.mode!==RANKED.mode)S.mode=RANKED.mode;return 4}
+  return {single:1,bo3:2,bo7:4}[S.mode]||4;
+}
 function finish(){
   const G=S.game; if(G.finished) return; G.finished=true;
   const res=G.res, winTm=res.win?res.home:res.away, w=winsThrough(G.gnum+1);
   $('#ls').innerHTML=lineTable(res,{line:res.line,R:res.R,H:res.H,E:res.E});
-  const need={single:1,bo3:2,bo7:4}[S.mode];
+  const need=seriesNeed();
   const seriesOver=w[0]>=need||w[1]>=need;
   const champ=seriesOver?(w[0]>=need?0:1):null;
   if(seriesOver)try{saveHistory(champ,w)}catch(e){console.error(e)}   // never let the history keep the result from showing
@@ -2228,7 +2234,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='383edaa16f';
+const BUILD='aca41dd827';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2283,6 +2289,7 @@ function hydrate(o){
   if((o.league||'MLB')!==S.league)setLeague(o.league||'MLB');
   if(o.slots)S.slots={...o.slots};
   S.screen=o.screen;S.mode=o.mode;S.lotMax=o.lotMax;S.budget=o.budget;
+  if(((NET.doc&&NET.doc.cfg)||{}).ranked)S.mode=RANKED.mode;   // ranked is always best of seven, whatever a page sent
   S.teams=o.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:t.done,roster:t.roster.map(e=>({p:BYID.get(e.id),price:e.price,slot:e.slot,slot2:e.slot2||undefined,traded:e.traded}))}));
   S.deckKey=o.deckKey;S.tail=(o.deckTail||[]).slice();S.deck=deckFrom(o);S.lotNo=o.lotNo;S.lot=o.lot?{...o.lot,p:BYID.get(o.lot.p)}:null;
   S.log=o.log||[];S.trade=o.trade?{...o.trade,sel:prevSel||[null,null]}:null;
@@ -2842,7 +2849,7 @@ async function rankStart(){
 function rankWinner(){
   const n=S.series&&S.series.games.length;if(!n)return null;
   const r=gameResult(n-1);if(!r||r.paused)return null;
-  const w=winsThrough(n),need={single:1,bo3:2,bo7:4}[S.mode]||4;
+  const w=winsThrough(n),need=seriesNeed();
   return w[0]>=need?0:w[1]>=need?1:null;
 }
 // write a finished series to my record: a win adds K (plus the streak bonus) back, a loss just clears it
@@ -3733,6 +3740,9 @@ function startOnlineDraft(){
   const su=(NET.doc&&NET.doc.setup)||{},n=roomNames();
   const parks=[0,1].map(i=>Math.min(i===0&&$('#pk')?+$('#pk').value:((su[i]||{}).park??i),PARKS.length-1));
   const cf=(NET.doc&&NET.doc.cfg)||{},bud=clamp(parseInt($('#bud')?$('#bud').value:cf.budget)||200,30,1000);
+  // the format and roster come from the room, not from whatever this page last played: ranked is fixed
+  if(cf.ranked){S.mode=RANKED.mode;S.slots={...RANKED.slots}}
+  else{if(cf.mode)S.mode=cf.mode;if(cf.slots)S.slots={...cf.slots}}
   S.budget=bud;S.lotMax=Math.max(clamp(parseInt($('#lots')?$('#lots').value:cf.lotMax)||50,lotsNeeded(),200),lotsNeeded());
   S.teams=[0,1].map(i=>({name:n[i],park:parks[i],budget:bud,roster:[],done:false}));
   S.deck=POOL.slice();
