@@ -2235,7 +2235,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='3300b37890';
+const BUILD='5ee5d7f26d';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2759,7 +2759,7 @@ function titleFacts(p){
   const w=(p.wins||0)+past.reduce((a,h)=>a+((h&&h.w)||0),0),l=(p.losses||0)+past.reduce((a,h)=>a+((h&&h.l)||0),0);
   const t0=hs[0];
   return {w,l,g:w+l,sw:p.wins||0,sl:p.losses||0,streak:p.streak||0,best:Math.max(p.best||0,p.streak||0),
-    aiToday:p.aiDay===twDay()?(p.aiN||0):0,test:!!(t0&&(t0.w||0)+(t0.l||0)>0)||(seasonOf(p)===0&&(p.games||0)>0)};
+    aiToday:p.aiDay===twDay()?(p.aiN||0):0,sweeps:p.sweeps||0,test:!!(t0&&(t0.w||0)+(t0.l||0)>0)||(seasonOf(p)===0&&(p.games||0)>0)};
 }
 // earned titles, best first; the everyday ones come last. how: [zh, en]
 const TITLE_DEFS=[
@@ -2771,6 +2771,7 @@ const TITLE_DEFS=[
   {t:'🎯 常勝軍',how:['本季勝率 60% 以上（至少 20 場）','Win 60%+ this season (20+ games)'],ok:x=>x.sw+x.sl>=20&&x.sw/(x.sw+x.sl)>=.6},
   {t:'✨ 三連勝',how:['最佳連勝 3 場','A best streak of 3'],ok:x=>x.best>=3},
   {t:'🏅 十勝',how:['排位累計 10 勝','10 ranked wins'],ok:x=>x.w>=10},
+  {t:'🧹 掃地清潔工',how:['排位累計 10 次 4：0 橫掃對手','Sweep 10 ranked series 4-0'],ok:x=>x.sweeps>=10},
   {t:'😤 不服輸',how:['排位累計輸 30 場還在打','Lose 30 ranked games and keep at it'],ok:x=>x.l>=30},
   {t:'💪 越挫越勇',how:['排位累計輸 10 場還在打','Lose 10 ranked games and keep at it'],ok:x=>x.l>=10},
   {t:'⚖️ 五五波',how:['本季勝場剛好等於敗場（至少 10 場）','Exactly as many wins as losses this season (10+ games)'],ok:x=>x.sw===x.sl&&x.sw+x.sl>=10},
@@ -2847,6 +2848,8 @@ async function rankStart(){
 }
 // after the game: each side reports who won; when the reports agree the winner adds K back
 // the series winner once someone has four wins (the last game fully played), otherwise null
+// the series ended on the field 4-0
+function swept(){const n=S.series&&S.series.games.length;if(!n)return false;const w=winsThrough(n);return Math.min(w[0],w[1])===0&&Math.max(w[0],w[1])>=4}
 function rankWinner(){
   const n=S.series&&S.series.games.length;if(!n)return null;
   const r=gameResult(n-1);if(!r||r.paused)return null;
@@ -2854,11 +2857,18 @@ function rankWinner(){
   return w[0]>=need?0:w[1]>=need?1:null;
 }
 // write a finished series to my record: a win adds K (plus the streak bonus) back, a loss just clears it
+// a 4-0 sweep both players' reports agree on goes on the record once, after the win (firestore.rules checks it)
+async function creditSweep(code,d,me){
+  const p=PROF.doc,rp=(d&&d.rep)||{},m=rp[me],o=rp[1-me];
+  if(!p||!m||!o||m.w!==String(me)||o.w!==String(me)||!m.sw||!o.sw||!(d.created>(p.swAt||0)))return false;
+  try{await profRef().update({sweeps:(p.sweeps||0)+1,swAt:d.created,swRoom:code});await loadProfile();return true}catch(e){return false}
+}
 async function applyRanked(p,won){
   const bonus=streakBonus(p.streak);
   const gain=p.pendW!=null?p.pendW:ELO_K-p.pendD;
   if(won){const w={rating:p.rating+p.pendD+gain+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0,streak:(p.streak||0)+1};
-    // the best-streak field needs the newer firestore.rules: where the site still runs older ones, the win goes in without it
+    // the best-streak and sweep fields need the newer firestore.rules: where the site still runs older ones, the
+    // win goes in without them
     try{await profRef().update({...w,best:Math.max(p.best||0,(p.streak||0)+1)})}catch(e){await profRef().update(w)}}
   else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,streak:0});
   return bonus;
@@ -2881,7 +2891,7 @@ async function settlePending(){
   const st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;if(me==null)return null;
   const rp=d.rep||{},theirs=rp[1-me]&&rp[1-me].w;let mine=rp[me]&&rp[me].w;
   // my page closed before it noted the result, but the other one did (a plain report, not a forfeit claim): agree with it
-  if(mine==null&&theirs!=null&&!rp[1-me].ff){try{await NET.db.doc('rooms/'+p.pend).update({rep:{[me]:{w:theirs}}});mine=theirs}catch(e){return null}}
+  if(mine==null&&theirs!=null&&!rp[1-me].ff){const sw=theirs===String(me)&&!!rp[1-me].sw;try{await NET.db.doc('rooms/'+p.pend).update({rep:{[me]:{w:theirs,sw}}});mine=theirs;rp[me]={w:theirs,sw}}catch(e){return null}}
   if(mine==null)return null;
   const won=mine===String(me);
   if(won&&await restampClaim(p.pend,d,me)){try{const x=await NET.db.doc('rooms/'+p.pend).get();if(x.exists)d=x.data()}catch(e){}}
@@ -2893,7 +2903,7 @@ async function settlePending(){
     if(tp!==p.pend){try{await applyRanked(p,false);await loadProfile();return {won:false,before:p.rating+p.pendD,after:PROF.doc.rating,bonus:0}}catch(e){return null}}
   }
   if(!won&&theirs==null)return null;                   // a loss waits for their report (it changes nothing anyway)
-  try{const before=p.rating+(won?0:p.pendD),bonus=await applyRanked(p,won);await loadProfile();return {won,before:p.rating+p.pendD,after:PROF.doc.rating,bonus}}
+  try{const before=p.rating+(won?0:p.pendD),bonus=await applyRanked(p,won);if(won)creditSweep(p.pend,d,me);await loadProfile();return {won,before:p.rating+p.pendD,after:PROF.doc.rating,bonus}}
   catch(e){return null}
 }
 // a stamped forfeit claim stands when the other player had left or been silent 2 minutes at that moment
@@ -2906,6 +2916,8 @@ async function oppCredited(){
   NET.oppCred={code:NET.code,at:Date.now(),v};return v;
 }
 async function rankCheck(){
+  if(isRanked()&&NET.seat!=null&&NET.rk&&NET.rk.state==='done'&&NET.rk.won&&!NET.rk.swDone&&NET.doc){const rp=NET.doc.rep||{};
+    if(rp[0]&&rp[1]&&rp[0].sw&&rp[1].sw){NET.rk.swDone=true;creditSweep(NET.code,NET.doc,NET.seat)}}
   if(!isRanked()||NET.seat==null||!NET.rk||!['on','wait','ffwait'].includes(NET.rk.state))return;
   if(NET.rk.state==='ffwait'&&Date.now()-(NET.rk.tried||0)<60000)return;   // a forfeit the rules refused: try again in a minute
   NET.rk.tried=Date.now();
@@ -2921,7 +2933,7 @@ async function rankCheck(){
   if(selfClaim(o)&&!(rp[me]&&rp[me].w===String(o))&&(claimStands(rp[o])??await oppCredited())){
     try{const p=await loadProfile();if(p&&p.pend===NET.code)await applyRanked(p,false);await loadProfile()}catch(e){}
     NET.rk={...NET.rk,state:'lostff'};return showRank()}
-  if(!rp[me]){let w=rankWinner();if(w==null&&rp[o]&&rp[o].ff&&rp[o].w===String(me))w=me;if(w==null)return;NET.rk.state='wait';await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w)}}}).then(r,r)));return}
+  if(!rp[me]){let w=rankWinner();if(w==null&&rp[o]&&rp[o].ff&&rp[o].w===String(me))w=me;if(w==null)return;NET.rk.state='wait';const sw=rankWinner()!=null&&swept();await new Promise(r=>dbWrite(()=>NET.ref.update({rep:{[me]:{w:String(w),sw}}}).then(r,r)));return}
   // no report from the opponent: a series decided on the field is tried at once (the rules take it once they left,
   // or after 2 minutes without them; until then each snapshot tries again); a forfeit claim once they are gone
   if(!rp[o]&&!rp[me].ff&&!oppGone()&&rankWinner()==null)return;
@@ -2938,6 +2950,7 @@ async function rankCheck(){
     if(!p||p.pend!==NET.code)return;
     const bonus=await applyRanked(p,won);
     await loadProfile();NET.rk={...NET.rk,state:'done',won,after:PROF.doc.rating,bonus:won?bonus:0,streak:PROF.doc.streak||0};
+    if(won){try{const x=await NET.ref.get();if(x.exists){NET.doc={...NET.doc,...x.data()};const r2=NET.doc.rep||{};if(r2[0]&&r2[1]&&r2[0].sw&&r2[1].sw){NET.rk.swDone=true;await creditSweep(NET.code,NET.doc,me)}}}catch(e){}}
   }catch(e){NET.rk={...NET.rk,state:rp[me].ff?'ffwait':!rp[o]?'wait':'err',msg:String(e&&e.message||e)}}
   finally{NET.rk&&(NET.rk.busy=false)}
   showRank();
