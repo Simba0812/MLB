@@ -3492,7 +3492,10 @@ async function findLive(){
   const p=PROF.doc,a=acctUser();if(!p||!p.pend||p.pend==='ai'||!a)return '';
   try{const x=await NET.db.doc('rooms/'+p.pend).get();if(!x.exists)return '';
     const d=x.data(),st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;
-    if(me==null||roomExpired(d)||d.created!==p.pendAt||!d.state||(d.rep||{})[me])return '';
+    const mine=(d.rep||{})[me];
+    // a report of mine means the series is over for me, except a forfeit claim of my own win: my page claimed it while
+    // the opponent looked gone, and it isn't credited yet (pend still points here), so the series may well go on
+    if(me==null||roomExpired(d)||d.created!==p.pendAt||!d.state||(mine&&!(mine.ff&&mine.w===String(me))))return '';
     const hb=((d.setup||{})[me]||{}).hb;if(hb&&Date.now()-hb>20*60000)return '';   // long gone: nothing left to save
     return p.pend}catch(e){return ''}
 }
