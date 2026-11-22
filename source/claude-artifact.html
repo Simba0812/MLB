@@ -2224,7 +2224,7 @@ function roomDoc(code){
     const stillWaiting=NET.code===code&&waiting(NET.doc)&&!(d.cfg&&d.cfg.mm==='')&&!(d.seats&&d.seats[1]);
     return stillWaiting?WAIT_TTL:ROOM_TTL};
   const r=NET.db.doc('rooms/'+code),stamp=d=>({...d,exp:Date.now()+ttl(d)});
-  return {get:()=>r.get(),onSnapshot:(a,b)=>r.onSnapshot(a,b),acquire:o=>r.acquire(o),set:d=>r.set(stamp(d)),update:d=>r.update(stamp(d))};
+  return {get:()=>r.get(),getServer:()=>(r.getServer?r.getServer():r.get()),onSnapshot:(a,b)=>r.onSnapshot(a,b),acquire:o=>r.acquire(o),set:d=>r.set(stamp(d)),update:d=>r.update(stamp(d))};
 }
 // opening the online menu clears out expired rooms, so old games don't pile up
 async function sweepRooms(){
@@ -2235,7 +2235,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='d08a58c1d3';
+const BUILD='756c8d7a99';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2272,18 +2272,33 @@ function dbWrite(fn){
     .finally(()=>{NET.pend--;updateNetBadge()});
 }
 // a phone that locks or switches apps pauses the page; on return, fetch the room at once instead of waiting for the reconnect
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&NET.on&&NET.ref){oppGrace();NET.ref.get().then(onRoom).catch(()=>{})}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&NET.on&&NET.ref){oppGrace();NET.ref.getServer().then(onRoom).catch(()=>{})}});
 // while this page slept (screen off, another app) nothing from the opponent could arrive, so their silence
 // is counted again from now
 function oppGrace(){if(NET.opp)NET.opp.seen=Math.max(NET.opp.seen,Date.now())}
 function sync(){if(!NET.on||NET.seat==null)return;if(!NET.timerAct)unstrike();S.rev=Math.random().toString(36).slice(2);commitRaw()}
-function commitRaw(){const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.seat;NET.beatAt=Date.now();
-  dbWrite(()=>NET.ref.update({state:st,rev,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}))}
+// every state this page sends carries the next number. A state with a lower number than the one on screen is old
+// (a phone just back from the background is first handed its cached copy) and is ignored; firestore.rules refuses
+// a state that doesn't move the number up, so an old screen can never write over a newer game. A refused write
+// means someone else moved first: read the room from the server and carry on from there.
+function commitRaw(){if(NET.pending&&(NET.pending.seq||0)<=(S.seq||0)){NET.pending=null;const f=$('#follow');if(f)f.hidden=true}
+  S.seq=(S.seq||0)+1;const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.seat,seq=S.seq;NET.beatAt=Date.now();
+  dbWrite(()=>NET.ref.update({state:st,rev,seq,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}).catch(e=>{resync();throw e}))}
+let RESYNC=0;
+// the server's copy replaces this page's in one step (no gap for a late cached snapshot to slip into)
+// This page's own move was the one refused, so it takes the server's state straight away (no "catch up" banner):
+// the same game keeps playing on screen, anything else redraws.
+function resync(){if(Date.now()-RESYNC<1500||!NET.ref)return;RESYNC=Date.now();
+  NET.ref.getServer().then(x=>{if(!x.exists)return;const d=x.data();
+    if(d.state){const st=JSON.parse(d.state);NET.pending=null;const f=$('#follow');if(f)f.hidden=true;
+      if(S.screen==='game'&&S.game&&S.game.res&&st.screen==='game'&&st.gnum===S.game.gnum){const keep=S.game;hydrate(st);S.game=keep;S.screen='game'}
+      else{hydrate(st);render()}}
+    onRoom(x)}).catch(()=>{})}
 function dehydrate(){return {v:1,league:S.league,slots:S.slots,screen:S.screen,mode:S.mode,lotMax:S.lotMax,budget:S.budget,
   teams:S.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:!!t.done,roster:t.roster.map(e=>({id:e.p.id,price:e.price,slot:e.slot,slot2:e.slot2||null,traded:!!e.traded}))})),
   ...deckDiff(),lotNo:S.lotNo,lot:S.lot?{p:S.lot.p.id,price:S.lot.price,high:S.lot.high,turn:S.lot.turn,passed:S.lot.passed}:null,
   log:S.log.slice(0,20),trade:S.trade?{left:S.trade.left,prop:S.trade.prop,pending:S.trade.pending,t0:S.trade.t0||0,log:S.trade.log.slice(0,15),done:S.trade.done||[false,false]}:null,
-  series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev,ts:Date.now()}}
+  series:S.series||null,gnum:S.game?S.game.gnum:0,rev:S.rev,seq:S.seq||0,ts:Date.now()}}
 function hydrate(o){
   const prevSel=S.trade&&S.trade.sel;
   // rebuilding the league tables takes a phone tens of milliseconds, so only when the league actually changes
@@ -2294,7 +2309,7 @@ function hydrate(o){
   S.teams=o.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:t.done,roster:t.roster.map(e=>({p:BYID.get(e.id),price:e.price,slot:e.slot,slot2:e.slot2||undefined,traded:e.traded}))}));
   S.deckKey=o.deckKey;S.tail=(o.deckTail||[]).slice();S.deck=deckFrom(o);S.lotNo=o.lotNo;S.lot=o.lot?{...o.lot,p:BYID.get(o.lot.p)}:null;
   S.log=o.log||[];S.trade=o.trade?{...o.trade,sel:prevSel||[null,null]}:null;
-  S.series=o.series;S.game={gnum:o.gnum||0};S.rev=o.rev;
+  S.series=o.series;S.game={gnum:o.gnum||0};S.rev=o.rev;S.seq=o.seq||0;
 }
 function onRoom(snap){
   if(!snap.exists){NET.err=TR('這個房間已經不存在。','This room no longer exists.');updateNetBadge();return}
@@ -2313,7 +2328,7 @@ function onRoom(snap){
   // a snapshot that arrives while one of our own writes is still in flight carries the other player's move too.
   // Firestore won't send it again once our write lands, so skipping it froze this screen until the next change.
   // Our own unsent state shows up here with our own rev, and the rev check already skips that.
-  if(d.state&&d.rev!==S.rev){
+  if(d.state&&d.rev!==S.rev&&!((d.seq||0)<(S.seq||0))){
     const st=JSON.parse(d.state);
     // how long the other player's move took to reach this screen (their clock to ours, so roughly).
     // Skip the first snapshot after joining or a reload, and any that waited while this page was hidden.
@@ -2343,7 +2358,10 @@ function onRoom(snap){
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)NET.shownAt=Date.now()});
 function showFollow(){const f=$('#follow');f.hidden=false;document.querySelectorAll('#endbtns button').forEach(b=>b.disabled=true)}
-$('#followbtn').onclick=()=>{const d=NET.pending;NET.pending=null;$('#follow').hidden=true;if(!d)return;hydrate(JSON.parse(d.state));render();window.scrollTo(0,0)};
+// "catch up" takes the room as the opponent left it, but never one older than this page (it may have moved on since)
+$('#followbtn').onclick=()=>{const d=NET.pending;NET.pending=null;$('#follow').hidden=true;if(!d)return;
+  if((d.seq||0)<(S.seq||0)){resync();return}
+  hydrate(JSON.parse(d.state));render();window.scrollTo(0,0)};
 function netBadge(){
   if(!NET.on) return '';
   const me=NET.seat==null?TR('你正在觀戰','You are watching'):`${TR('你是 玩家 ','You are Player ')}${NET.seat?'B':'A'}${S.teams[NET.seat]&&S.teams[NET.seat].name&&S.screen!=='room'?' ('+esc(S.teams[NET.seat].name)+')':''}`;
@@ -3293,7 +3311,7 @@ function enterRoom(code,seat,mm){
   clearTimeout(NET.lgWait);
   Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
-  S.rev=null;S.screen='room';render();
+  S.rev=null;S.seq=0;S.screen='room';render();
   if(NET.unsub)NET.unsub();
   NET.unsub=NET.ref.onSnapshot(onRoom,()=>{NET.err=TR('連線中斷，請重新整理頁面。','Connection lost. Reload the page.');updateNetBadge()});
   NET.verSince=0;NET.opp=null;NET.mm=mm||null;NET.mmStart=Date.now();
@@ -3339,6 +3357,7 @@ async function firebaseBackend(cfg){
   const query=q=>({where:(f,o,v)=>query(q.where(f,o,v)),orderBy:(f,d)=>query(q.orderBy(f,d)),limit:n=>query(q.limit(n)),get:()=>q.get().then(x=>({docs:x.docs.map(wrap),size:x.size,empty:x.empty}),e=>{throw err(e)})});
   const db={collection:path=>query(fs.collection(path)),doc:path=>{const r=fs.doc(path);return {path,
     get:()=>r.get().then(wrap,e=>{throw err(e)}),
+    getServer:()=>r.get({source:'server'}).then(wrap,e=>{throw err(e)}),   // never this phone's cached copy
     set:d=>r.set(ttl(d)).catch(e=>{throw err(e)}),
     update:d=>r.set(ttl(d),{merge:true}).catch(e=>{throw err(e)}), // deep-merges nested maps like the claude.ai store
     delete:()=>r.delete().catch(e=>{throw err(e)}),
