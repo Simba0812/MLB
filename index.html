@@ -2245,7 +2245,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='756c8d7a99';
+const BUILD='7231445c7d';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3316,6 +3316,22 @@ function inviteFromLink(){
   try{history.replaceState(null,'',location.pathname)}catch(e){}
   freshBeforeRoom(code).then(r=>r?null:joinRoom(code)).catch(e=>{renderNetBox();const el=$('#neterr');if(el)el.textContent=e&&e.message&&!e.code?e.message:TR('連線失敗，請再試一次。','Connection failed. Try again.')});
 }
+/* ---------- one tab per seat ---------- */
+// The same game open in two tabs or windows of this browser: both would play the same seat, the older one writing
+// back old states and letting its clock run out (strikes, then a forfeit) while nobody looks at it. The tab that
+// last entered the room takes the seat; any other one stops at once (no writes, no clocks) and says so.
+const TAB_ID=Math.random().toString(36).slice(2);
+const TAB_CH=(()=>{try{return new BroadcastChannel('mlb-seat')}catch(e){return null}})();
+function claimSeatTab(){if(TAB_CH&&NET.on&&NET.seat!=null)try{TAB_CH.postMessage({code:NET.code,seat:NET.seat,uid:NET.uid,id:TAB_ID})}catch(e){}}
+if(TAB_CH)TAB_CH.onmessage=e=>{const m=e.data||{};
+  if(m.id===TAB_ID||!NET.on||NET.seat==null||m.code!==NET.code||m.seat!==NET.seat||m.uid!==NET.uid)return;
+  const code=NET.code;
+  // stand down without telling the room anything (the other tab is playing this seat)
+  if(NET.unsub)NET.unsub();clearInterval(NET.beat);clearDecTimers();clearTimeout(timer);clearInterval(NET.afkTick);clearTimeout(NET.lgWait);
+  Object.assign(NET,{on:false,code:null,seat:null,doc:null,ref:null,pending:null,unsub:null,beat:null,afk:null});
+  S.screen='home';render();
+  afkSign(TR('🗂️ 這場比賽已在另一個分頁開啟','🗂️ This game is open in another tab'),TR('同一場比賽只能在一個分頁或視窗操作，這個分頁已經停止。要在這裡繼續的話，按下面的按鈕（另一個分頁會改為停止）。','A game can be played in one tab or window only, so this one has stopped. To carry on here, press the button (the other tab stops instead).'),TR('在這裡繼續','Continue here'),()=>{closeAfkSign();joinRoom(code).catch(()=>{})});
+};
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
   clearTimeout(NET.lgWait);
@@ -3328,7 +3344,7 @@ function enterRoom(code,seat,mm){
   const nick=mm==='ranked'&&PROF.doc?{name:PROF.doc.name,elo:PROF.doc.rating,lgs:RK_LG.slice()}:mm?{name:randomName()}:{};
   NET.rk=null;
   if(seat!=null)dbWrite(()=>NET.ref.update({setup:{[seat]:{ver:BUILD,auto:!!AUTO[seat],...nick,...(mm?{park:Math.floor(Math.random()*PARKS.length)}:{})}}}));
-  startBeat();
+  startBeat();claimSeatTab();
 }
 (async()=>{
   try{
