@@ -2235,7 +2235,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='55849698bb';
+const BUILD='bb94f941df';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3480,19 +3480,24 @@ function settleLoop(){
 }
 // before a new ranked game: an earlier series this account won but that isn't written yet must not be dropped
 // (dropping a pending series counts it as lost). Try once more; if it still waits, say so and don't start.
+const WAIT0={};
 async function winPending(){
   const p=PROF.doc,a=acctUser();if(!p||!p.pend||p.pend==='ai'||!a)return false;
   const r=await settlePending();if(r){PROF.settled=r;renderRankBox();return false}
+  let conflict=false;
   try{const x=await NET.db.doc('rooms/'+PROF.doc.pend).get();if(!x.exists)return false;const d=x.data(),st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;
     const mine=me!=null&&(d.rep||{})[me];if(!mine||mine.w!==String(me))return false;   // a loss (or nothing decided): fine to drop
+    // the two pages disagree on the winner (both plain reports): no wait will settle that, ask at once
+    const th=(d.rep||{})[1-me];if(th&&!th.ff&&th.w!==mine.w)conflict=true;
   }catch(e){return false}
   PROF.settling=true;renderRankBox();
-  const key='mlbWait:'+PROF.doc.pend;let t0=0;try{t0=+localStorage.getItem(key)||0;if(!t0){t0=Date.now();localStorage.setItem(key,String(t0))}}catch(e){t0=Date.now()}
-  if(Date.now()-t0<5*60000){
+  const key='mlbWait:'+PROF.doc.pend;let t0=0;try{t0=+localStorage.getItem(key)||0;if(!t0){t0=Date.now();localStorage.setItem(key,String(t0))}}catch(e){t0=WAIT0[key]||(WAIT0[key]=Date.now())}   // no storage (private window): remember it for this page
+  if(!conflict&&Date.now()-t0<5*60000){
     alert(TR(`上一場排位你贏了，正在等系統確認（對手的結果回報，或確認對手已離開，最多約 2 分鐘）。確認後積分會自動加回來，請稍後再開新的一場。`,'You won your last ranked series and it is still being confirmed (the other side\'s report, or their leaving: about 2 minutes at most). The rating comes back on its own; start a new game in a moment.'));
     return true}
   // still not through after 5 minutes: something else is wrong; let the player choose rather than wait for good
-  if(confirm(TR('上一場的勝利已經 5 分鐘還無法結算。要繼續等嗎？\n按「確定」繼續等（不開新局）；按「取消」放棄等待並開始新的一場（上一場會算輸）。','Your last win still can\'t be settled after 5 minutes. Keep waiting?\nOK keeps waiting (no new game); Cancel gives up on it and starts a new game (the last one then counts as a loss).')))return true;
+  if(!confirm(conflict?TR(`上一場你和對手的網頁算出的勝方不一樣（房號 ${PROF.doc.pend}），系統無法自動結算。\n按「確定」放棄上一場、開始新的一場（上一場算輸）；按「取消」先不開。\n覺得結果有誤請把房號告訴管理員。`,`Your page and your opponent's disagree on who won the last series (room ${PROF.doc.pend}), so it can't be settled on its own.\nOK gives it up and starts a new game (it counts as a loss); Cancel waits.\nTell the admin the room code if the result looks wrong.`)
+    :TR(`上一場的勝利已經 5 分鐘還無法結算（房號 ${PROF.doc.pend}）。\n按「確定」放棄上一場、開始新的一場（上一場算輸）；按「取消」繼續等。`,`Your last win still can't be settled after 5 minutes (room ${PROF.doc.pend}).\nOK gives it up and starts a new game (it counts as a loss); Cancel keeps waiting.`)))return true;
   try{localStorage.removeItem(key)}catch(e){}
   return false;
 }
