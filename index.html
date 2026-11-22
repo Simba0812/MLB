@@ -2245,7 +2245,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='5ee5d7f26d';
+const BUILD='d08a58c1d3';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2313,9 +2313,13 @@ function onRoom(snap){
     const g=(d.setup||{})[1]||{};
     if(!d.cfg.ranked)NET.mmClosing=true,dbWrite(()=>NET.ref.update({cfg:{mm:''}}));
     // ranked: wait for the joiner's list of leagues (it lands a moment after the seat), then pick one both ticked
-    else if(g.lgs||g.ver){const both=roomLgs(d.cfg).filter(l=>!g.lgs||g.lgs.includes(l)),lg=both.length?both[Math.floor(Math.random()*both.length)]:d.cfg.league;
-      NET.mmClosing=true;dbWrite(()=>NET.ref.update({cfg:{mm:'',league:lg}}))}
+    else if(g.lgs||g.ver){NET.mmClosing=true;dbWrite(()=>NET.ref.update({cfg:{mm:'',league:rankLeague(d,g.lgs)}}))}
   }
+  // the joiner settles the league too when the host's page doesn't (asleep in the background): the pick is the
+  // same on both pages, so whichever write lands is the same league
+  if(NET.seat===1&&d.cfg&&d.cfg.ranked&&d.cfg.mm&&(d.seats||{})[1]===NET.uid&&!NET.mmClosing){
+    if(!NET.lgWait)NET.lgWait=setTimeout(()=>{const d2=NET.doc;if(!NET.on||NET.seat!==1||!d2||!d2.cfg||!d2.cfg.mm)return;
+      NET.mmClosing=true;dbWrite(()=>NET.ref.update({cfg:{mm:'',league:rankLeague(d2,RK_LG)}}))},2500)}
   // a snapshot that arrives while one of our own writes is still in flight carries the other player's move too.
   // Firestore won't send it again once our write lands, so skipping it froze this screen until the next change.
   // Our own unsent state shows up here with our own rev, and the rev check already skips that.
@@ -3052,6 +3056,12 @@ async function claimSeat(code){
   await ref.update({seats:{1:NET.uid}});return true;
 }
 // a ranked room still waiting for an opponent, open to more than one league
+// a ranked room's league once both players are in: one both ticked, picked the same way on either page (from the
+// room code), so the host and the joiner can each settle it and always agree
+function rankLeague(d,theirs){
+  const both=roomLgs(d.cfg).filter(l=>!theirs||theirs.includes(l));if(!both.length)return d.cfg.league;
+  let h=0;for(const ch of String(NET.code||''))h=(h*31+ch.charCodeAt(0))>>>0;return both[h%both.length];
+}
 const lgPending=d=>!!(d&&d.cfg&&d.cfg.ranked&&d.cfg.mm&&roomLgs(d.cfg).length>1);
 // the leagues a ranked room's host is happy with (older rooms only carry the one league)
 const roomLgs=c=>(c&&Array.isArray(c.lgs)&&c.lgs.length?c.lgs:[c&&c.league||'MLB']);
@@ -3290,7 +3300,8 @@ function inviteFromLink(){
 }
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  clearTimeout(NET.lgWait);
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -3621,7 +3632,7 @@ function renderRoom(){
   const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}<span data-ttl="${i}"></span></div>
      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <label for="tn">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:-8px"><input id="tn" maxlength="18" style="flex:1" placeholder="${TR('例：高雄海神','e.g. Kaohsiung Sea Kings')}" value="${esc(mine.name)}" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'readonly':''}><button type="button" class="ghost" id="rn" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'hidden':''}>🎲 ${TR('隨機取名','Random name')}</button></div>
-      <label>${TR('主場','Home park')}<select id="pk" ${lgPend?'disabled':''}>${opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
+      <label>${TR('主場','Home park')}<select id="pk" ${lgPend?'disabled':''}>${lgPend?`<option value="">${TR('（聯盟決定後抽選）','(drawn once the league is set)')}</option>`:opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel" id="mmwait" hidden></section>
@@ -3638,7 +3649,7 @@ function renderRoom(){
   if($('#share'))$('#share').onclick=()=>shareIt($('#share'),TR('大聯盟盲標對決','MLB Blind Auction'),TR(`來玩大聯盟盲標對決！點連結直接加入房間，房號 ${NET.code}`,`Come play MLB Blind Auction! The link takes you straight into room ${NET.code}`),pageUrl()+'?room='+NET.code);
   if($('#copy'))$('#copy').onclick=()=>{navigator.clipboard.writeText(NET.code).then(()=>{$('#copy').textContent=TR('已複製','Copied')},()=>{$('#copy').textContent=TR('房號：','Code: ')+NET.code})};
   if(me!=null){
-    const pf=()=>{const p=PARKS[+$('#pk').value];$('#pkf').textContent=TR(`球場係數：得分 ${p.r}、全壘打 ${p.hr}（100 為聯盟平均）`,`Park factors: runs ${p.r}, home runs ${p.hr} (100 = league average)`)};pf();
+    const pf=()=>{const p=PARKS[+$('#pk').value];if(!p||$('#pk').value===''){$('#pkf').textContent='';return}$('#pkf').textContent=TR(`球場係數：得分 ${p.r}、全壘打 ${p.hr}（100 為聯盟平均）`,`Park factors: runs ${p.r}, home runs ${p.hr} (100 = league average)`)};pf();
     const save=()=>{clearTimeout(setupTimer);setupTimer=setTimeout(()=>dbWrite(()=>NET.ref.update({setup:{[me]:{name:$('#tn').value.trim(),park:+$('#pk').value}}})),400)};
     $('#tn').oninput=save;$('#pk').onchange=()=>{pf();save()};
     $('#rn').onclick=()=>{const other=((NET.doc&&NET.doc.setup&&NET.doc.setup[1-me])||{}).name;let n;do{n=randomName()}while(n===other);$('#tn').value=n;save()};
@@ -3739,7 +3750,7 @@ function updateRoom(){
   if(want!==S.league||settled){if(want!==S.league)setLeague(want);return renderRoom()}
   // keep my park menu on what the room holds (a late snapshot can redraw it with an older pick)
   {const pk=$('#pk'),v=NET.seat!=null?(su[NET.seat]||{}).park:null;
-   if(pk&&v!=null&&v<PARKS.length&&document.activeElement!==pk&&pk.value!==String(v)){pk.value=String(v);const f=$('#pkf'),q=PARKS[v];if(f)f.textContent=TR(`球場係數：得分 ${q.r}、全壘打 ${q.hr}（100 為聯盟平均）`,`Park factors: runs ${q.r}, home runs ${q.hr} (100 = league average)`)}}
+   if(pk&&v!=null&&v<PARKS.length&&!lgPending(d)&&document.activeElement!==pk&&pk.value!==String(v)){pk.value=String(v);const f=$('#pkf'),q=PARKS[v];if(f)f.textContent=TR(`球場係數：得分 ${q.r}、全壘打 ${q.hr}（100 為聯盟平均）`,`Park factors: runs ${q.r}, home runs ${q.hr} (100 = league average)`)}}
   if((cfg.mode||'single')!==S.mode){S.mode=cfg.mode||'single';return renderRoom()}
   if(cfg.slots&&JSON.stringify(cfg.slots)!==JSON.stringify(S.slots)){S.slots={...cfg.slots};return renderRoom()}
   [0,1].forEach(i=>{const el=$('#seat'+i);if(!el)return;const s=su[i]||{},joined=!!seats[i];
@@ -3753,7 +3764,7 @@ function updateRoom(){
       el.querySelectorAll('[data-ckick]').forEach(b=>b.onclick=()=>cupKick(+b.dataset.ckick).catch(e=>alert(e.message||e)));
       el.querySelectorAll('[data-copen]').forEach(b=>b.onclick=()=>cupOpen(+b.dataset.copen).catch(e=>alert(e.message||e)));
       el.querySelectorAll('[data-cswap]').forEach(b=>b.onclick=()=>cupSwap(+b.dataset.cswap))}
-    el.querySelector('p').textContent=joined?TR('主場：','Home park: ')+PARKS[Math.min(s.park??i,PARKS.length-1)].n:TR('把房號傳給朋友。','Send the code to your friend.')});
+    el.querySelector('p').textContent=joined?TR('主場：','Home park: ')+(lgPending(d)?TR('（聯盟決定後抽選）','(drawn once the league is set)'):PARKS[Math.min(s.park??i,PARKS.length-1)].n):TR('把房號傳給朋友。','Send the code to your friend.')});
   mmWait(d);readyPanel(d);paintTitles();
   const n=roomNames();
   const why=!seats[1]?TR('等待玩家 B 加入。','Waiting for Player B to join.'):(!n[0]||!n[1])?TR('兩隊都要先取好隊名。','Both teams need a name.'):n[0]===n[1]?TR('兩隊隊名不能相同。','The two teams need different names.'):'';
