@@ -2245,7 +2245,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='7231445c7d';
+const BUILD='0703dc9e73';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2293,7 +2293,8 @@ function sync(){if(!NET.on||NET.seat==null)return;if(!NET.timerAct)unstrike();S.
 // means someone else moved first: read the room from the server and carry on from there.
 function commitRaw(){if(NET.pending&&(NET.pending.seq||0)<=(S.seq||0)){NET.pending=null;const f=$('#follow');if(f)f.hidden=true}
   S.seq=(S.seq||0)+1;const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.seat,seq=S.seq;NET.beatAt=Date.now();
-  dbWrite(()=>NET.ref.update({state:st,rev,seq,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}).catch(e=>{resync();throw e}))}
+  // a refusal here is the numbering at work (the other player moved at the same moment), not a fault: catch up quietly
+  dbWrite(()=>NET.ref.update({state:st,rev,seq,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}).catch(e=>{resync();if(!(e&&e.code==='invalid_argument'))throw e}))}
 let RESYNC=0;
 // the server's copy replaces this page's in one step (no gap for a late cached snapshot to slip into)
 // This page's own move was the one refused, so it takes the server's state straight away (no "catch up" banner):
