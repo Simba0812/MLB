@@ -2245,7 +2245,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='bb94f941df';
+const BUILD='c6c1350fc9';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2354,7 +2354,8 @@ function onRoom(snap){
   if(S.screen==='pick'){maybeFinalizePick();if(S.screen==='pick'){const sig=S.rev+'|'+JSON.stringify((d.picks||{})[pickKey()]||null);if(sig!==NET.pickSig){NET.pickSig=sig;renderPick()}}}
   if(S.screen==='game'&&S.game&&S.game.res&&S.game.res.paused&&S.game.pos>=S.game.res.ev.length&&decList(S.game.gnum).length>S.game.res.paused.di) resumeGame();
   if(S.screen==='room'&&NET.seat===0&&((d.cfg||{}).rnd||(d.cfg||{}).cup)&&!(d.cfg||{}).mm&&bothReady(d)&&!d.state&&!NET.autoGo&&roomNames().every(Boolean)){NET.autoGo=true;closeReady();startOnlineDraft()}
-  if(isRanked()&&NET.seat!=null&&S.screen!=='room')rankStart().then(rankCheck);
+  // the stake is booked once the server holds the started draft (a refused first write must not cost a game that never began)
+  if(isRanked()&&NET.seat!=null&&S.screen!=='room'&&d.state&&!(snap.metadata&&snap.metadata.hasPendingWrites))rankStart().then(rankCheck);
   seatTitles();
   // a cup room watcher: note presence; sit down when the organizer gives this account a seat (or one opens up)
   if(NET.seat==null&&(d.cfg||{}).cup){cupWatch();const k=((d.cfg.cup.allow)||[]).indexOf(NET.uid);
@@ -2933,6 +2934,8 @@ async function settlePending(){
     if(theirs===String(1-me)&&rp[1-me].ff){if(claimStands(rp[1-me]))return lost();
       let tp=p.pend;try{const x=await NET.db.doc('players/'+st[1-me]).get();tp=x.exists?(x.data().pend||''):''}catch(e){return null}
       if(tp!==p.pend)return lost()}
+    // the draft never reached the server (nothing was played) and I have left it: nothing to wait for
+    if(!d.state&&(((d.setup||{})[me]||{}).left||Date.now()-(((d.setup||{})[me]||{}).hb||0)>GONE_MS))return lost();
     // nobody noted a result and this account has been away 20 minutes (or the room ran out): abandoned
     const hb=((d.setup||{})[me]||{}).hb;if(roomExpired(d)||!hb||Date.now()-hb>20*60000)return lost();
     return null}
