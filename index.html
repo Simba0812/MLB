@@ -2245,7 +2245,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='c9f10821b1';
+const BUILD='55849698bb';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2920,12 +2920,22 @@ async function settlePending(){
   const p=PROF.doc,a=acctUser();if(!p||!p.pend||!a)return null;
   if(p.pend==='ai')return settleAIres();
   let d=null;try{const x=await NET.db.doc('rooms/'+p.pend).get();d=x.exists?x.data():null}catch(e){return null}
-  if(!d||d.created!==p.pendAt)return null;
-  const st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;if(me==null)return null;
+  // a series that can no longer be won from here ends as the loss booked when it started (nothing else changes,
+  // the "being settled" note goes away)
+  const lost=async()=>{try{await applyRanked(p,false);await loadProfile();return {won:false,before:p.rating+p.pendD,after:PROF.doc.rating,bonus:0}}catch(e){return null}};
+  if(!d||d.created!==p.pendAt)return lost();   // the room is gone (or its code went to a new room)
+  const st=d.seats||{},me=st[0]===a.uid?0:st[1]===a.uid?1:null;if(me==null)return lost();
   const rp=d.rep||{},theirs=rp[1-me]&&rp[1-me].w;let mine=rp[me]&&rp[me].w;
   // my page closed before it noted the result, but the other one did (a plain report, not a forfeit claim): agree with it
   if(mine==null&&theirs!=null&&!rp[1-me].ff){const sw=theirs===String(me)&&!!rp[1-me].sw;try{await NET.db.doc('rooms/'+p.pend).update({rep:{[me]:{w:theirs,sw}}});mine=theirs;rp[me]={w:theirs,sw}}catch(e){return null}}
-  if(mine==null)return null;
+  if(mine==null){
+    // the opponent's forfeit claim against me went through (it stands, or their record moved on): final
+    if(theirs===String(1-me)&&rp[1-me].ff){if(claimStands(rp[1-me]))return lost();
+      let tp=p.pend;try{const x=await NET.db.doc('players/'+st[1-me]).get();tp=x.exists?(x.data().pend||''):''}catch(e){return null}
+      if(tp!==p.pend)return lost()}
+    // nobody noted a result and this account has been away 20 minutes (or the room ran out): abandoned
+    const hb=((d.setup||{})[me]||{}).hb;if(roomExpired(d)||!hb||Date.now()-hb>20*60000)return lost();
+    return null}
   const won=mine===String(me);
   if(won&&await restampClaim(p.pend,d,me)){try{const x=await NET.db.doc('rooms/'+p.pend).get();if(x.exists)d=x.data()}catch(e){}}
   // the reports disagree: nothing to add, unless theirs is a forfeit win they claimed for themselves that was
@@ -2935,7 +2945,6 @@ async function settlePending(){
     let tp='';try{const x=await NET.db.doc('players/'+st[1-me]).get();tp=x.exists?(x.data().pend||''):''}catch(e){return null}
     if(tp!==p.pend){try{await applyRanked(p,false);await loadProfile();return {won:false,before:p.rating+p.pendD,after:PROF.doc.rating,bonus:0}}catch(e){return null}}
   }
-  if(!won&&theirs==null)return null;                   // a loss waits for their report (it changes nothing anyway)
   try{const before=p.rating+(won?0:p.pendD),bonus=await applyRanked(p,won);if(won)creditSweep(p.pend,d,me);await loadProfile();return {won,before:p.rating+p.pendD,after:PROF.doc.rating,bonus}}
   catch(e){return null}
 }
