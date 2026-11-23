@@ -116,6 +116,7 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .tbook li b{color:var(--dim);min-width:8.5em}.tbook li.got b{color:var(--red)}
 .ttl{display:inline-block;vertical-align:middle;margin-left:8px;font-family:var(--body);font-size:12px;font-weight:900;letter-spacing:.04em;line-height:1.5;color:var(--red);background:var(--paper);border:1.5px solid var(--red);border-radius:2px;padding:0 7px;white-space:nowrap}
 .pcard .ttl{margin:6px 0 0}
+.ttl.tier{color:var(--tc);border-color:var(--tc)}
 .ttl.gold{color:#5c3d00;background:linear-gradient(135deg,#fff3c4,#f2cf6b 45%,#fff0b8 60%,#e0b445);border:2px solid #b8860b;box-shadow:0 0 0 1px #fff8dc inset,0 1px 6px rgba(184,134,11,.55);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
@@ -2245,7 +2246,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='add68d42b5';
+const BUILD='0dd6d3f056';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2862,20 +2863,27 @@ async function saveTitle(t){await profRef().update({title:String(t||'').slice(0,
 // the two seats' titles in an online room, read from their records (hidden while a ranked opponent is masked)
 const TTL_CACHE=new Map();
 async function titleOf(uid){
-  const c=TTL_CACHE.get(uid);if(c&&Date.now()-c.at<120000)return c.t;
-  let t='';try{const x=await NET.db.doc('players/'+uid).get();t=x.exists?shownTitle(x.data()):''}catch(e){}
-  TTL_CACHE.set(uid,{t,at:Date.now()});return t;
+  const c=TTL_CACHE.get(uid);if(c&&Date.now()-c.at<120000)return c;
+  let t='',r=null;try{const x=await NET.db.doc('players/'+uid).get();if(x.exists){const p=x.data();t=shownTitle(p);r=preRating(p)}}catch(e){}
+  const v={t,r,at:Date.now()};TTL_CACHE.set(uid,v);return v;
 }
 function seatTitles(){
   const d=NET.doc;if(!d||!NET.db)return;const seats=d.seats||{};NET.ttl=NET.ttl||{};NET.ttlUid=NET.ttlUid||{};
   [0,1].forEach(i=>{const uid=seats[i];if(!uid||oppMasked(d,i)||NET.ttlUid[i]===uid)return;
-    NET.ttlUid[i]=uid;titleOf(uid).then(t=>{if(NET.ttlUid&&NET.ttlUid[i]===uid){NET.ttl[i]=t;paintTitles()}})});
+    NET.ttlUid[i]=uid;titleOf(uid).then(v=>{if(NET.ttlUid&&NET.ttlUid[i]===uid){NET.ttl[i]=v.t;NET.tr=NET.tr||{};NET.tr[i]=v.r;paintTitles()}})});
 }
 function seatTitle(i){
   if(NET.on){const d=NET.doc;return !d||oppMasked(d,i)?'':((NET.ttl||{})[i]||'')}
   return S.ai&&i!==S.ai.seat?shownTitle(PROF.doc):'';   // against the computer: the signed-in player's own team
 }
-function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{el.innerHTML=titleChip(seatTitle(+el.dataset.ttl))})}
+// the tier a player had going into this game: a ranked game's stake is taken out at its start, so it goes back on
+const preRating=p=>p&&typeof p.rating==='number'?p.rating+(p.pend?(p.pendD||0):0):null;
+function seatTier(i){
+  if(NET.on){const d=NET.doc;return !d||oppMasked(d,i)?null:((NET.tr||{})[i]??null)}
+  return S.ai&&i!==S.ai.seat?preRating(PROF.doc):null;
+}
+const tierChip=r=>{if(r==null)return '';const T=TIERS[tierIdx(r)];return `<span class="ttl tier" style="--tc:${T[4]}" title="${TR('排位段位','Ranked tier')}">${T[1]} ${TR(T[2],T[3])}</span>`};
+function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{const i=+el.dataset.ttl;el.innerHTML=tierChip(seatTier(i))+titleChip(seatTitle(i))})}
 // every screen that names the two teams fills in their titles once it is drawn
 ['renderGameShell','renderPick','renderRoom','renderDraft','renderTrade'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
 async function saveNick(name){
@@ -3371,7 +3379,7 @@ if(TAB_CH)TAB_CH.onmessage=e=>{const m=e.data||{};
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
   clearTimeout(NET.lgWait);
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},tr:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.seq=0;S.screen='room';render();
   if(NET.unsub)NET.unsub();
