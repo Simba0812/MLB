@@ -111,6 +111,7 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .ttl{display:inline-block;vertical-align:middle;margin-left:8px;font-family:var(--body);font-size:12px;font-weight:900;letter-spacing:.04em;line-height:1.5;color:var(--red);background:var(--paper);border:1.5px solid var(--red);border-radius:2px;padding:0 7px;white-space:nowrap}
 .pcard .ttl{margin:6px 0 0}
 .ttl.tier{color:var(--tc);border-color:var(--tc)}
+.ttl.pk{color:#1f5a3a;border-color:#2f7d52;background:#eef6ef}
 .ttl.gold{color:#5c3d00;background:linear-gradient(135deg,#fff3c4,#f2cf6b 45%,#fff0b8 60%,#e0b445);border:2px solid #b8860b;box-shadow:0 0 0 1px #fff8dc inset,0 1px 6px rgba(184,134,11,.55);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
@@ -424,8 +425,8 @@ const PARK_EN={"Coors Field（科羅拉多）":"Coors Field (Colorado)","Great A
  "Nationals Park（華盛頓）":"Nationals Park (Washington)","Petco Park（聖地牙哥）":"Petco Park (San Diego)","Oracle Park（舊金山）":"Oracle Park (San Francisco)","T-Mobile Park（西雅圖）":"T-Mobile Park (Seattle)",
  "Angel Stadium（洛杉磯天使）":"Angel Stadium (LA Angels)","Daikin Park（休士頓）":"Daikin Park (Houston)","Globe Life Field（德州）":"Globe Life Field (Texas)","Tropicana Field（坦帕灣）":"Tropicana Field (Tampa Bay)",
  "臺北大巨蛋（台北）":"Taipei Dome (Taipei)","天母棒球場（味全龍）":"Tianmu Stadium (Wei Chuan Dragons)","新莊棒球場（富邦悍將）":"Xinzhuang Stadium (Fubon Guardians)",
- "樂天桃園棒球場（樂天桃猿）":"Rakuten Taoyuan Stadium (Rakuten Monkeys)","洲際棒球場（中信兄弟）":"Taichung Intercontinental Stadium (CTBC Brothers)","台南市立棒球場（統一獅）":"Tainan Municipal Stadium (Uni-Lions)",
- "澄清湖棒球場（台鋼雄鷹）":"Chengcing Lake Stadium (TSG Hawks)","亞太國際棒球場（台南）":"Asia-Pacific Stadium (Tainan)","德興棒球場（花蓮）":"Dexing Stadium (Hualien)","嘉義市立棒球場（嘉義）":"Chiayi Municipal Stadium (Chiayi)"};
+ "樂天桃園棒球場（樂天桃猿）":"Rakuten Taoyuan Stadium (Rakuten Monkeys)","洲際棒球場（中信兄弟）":"Taichung Intercontinental Stadium (CTBC Brothers)","台南市立棒球場（台南）":"Tainan Municipal Stadium (Tainan)",
+ "澄清湖棒球場（台鋼雄鷹）":"Chengcing Lake Stadium (TSG Hawks)","亞太國際棒球場（統一獅）":"Asia-Pacific Stadium (Uni-Lions)","德興棒球場（花蓮）":"Dexing Stadium (Hualien)","嘉義市立棒球場（嘉義）":"Chiayi Municipal Stadium (Chiayi)"};
 const parkObj=(n,r,hr)=>({get n(){return LANG==='en'?(PARK_EN[n]||n):n},r,hr});
 const TEAM_EN={"中信兄弟":"CTBC Brothers","統一7-ELEVEn獅":"Uni-President 7-Eleven Lions","樂天桃猿":"Rakuten Monkeys","富邦悍將":"Fubon Guardians","味全龍":"Wei Chuan Dragons","台鋼雄鷹":"TSG Hawks"};
 const PARKS_MLB = [
@@ -442,7 +443,7 @@ const PARKS_MLB = [
 // CPBL park factors are rough estimates from field dimensions and recent scoring, not an official table
 const PARKS_CPBL = [
  ["臺北大巨蛋（台北）",98,97],["天母棒球場（味全龍）",103,112],["新莊棒球場（富邦悍將）",100,98],["樂天桃園棒球場（樂天桃猿）",104,110],
- ["洲際棒球場（中信兄弟）",101,104],["台南市立棒球場（統一獅）",102,106],["澄清湖棒球場（台鋼雄鷹）",97,92],["亞太國際棒球場（台南）",97,94],
+ ["洲際棒球場（中信兄弟）",101,104],["台南市立棒球場（台南）",102,106],["澄清湖棒球場（台鋼雄鷹）",97,92],["亞太國際棒球場（統一獅）",97,94],
  ["德興棒球場（花蓮）",100,102],["嘉義市立棒球場（嘉義）",101,103]
 ].map(([n,r,hr])=>parkObj(n,r,hr));
 const PARKSETS = {MLB:PARKS_MLB, CPBL:PARKS_CPBL};
@@ -2236,7 +2237,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='0fb8cda363';
+const BUILD='31a71d4fe2';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2848,19 +2849,49 @@ function titleBook(p){
 const shownTitle=p=>p&&p.title&&ownedTitles(p).includes(p.title)?p.title:'';
 // a title kept with this mark in front shows in a gold frame (only the site owner can hand those out)
 const GOLD='\u0001',ttlText=t=>String(t||'').replace(GOLD,'');
+/* ---------- home parks: each player sets one MLB and one CPBL home park; ranked series won there earn its titles ---------- */
+// [10-win title, 30-win title], in the order of PARKS_MLB / PARKS_CPBL (null: no titles, not offered as a home)
+const PARK_TTL={
+  M:[['高山攀登者','高山之王'],['紅色齒輪','紅色機器'],['綠牆挑戰者','芬威王者'],['開國志士','開國元勳'],['條紋騎士','條紋帝國'],['藍色火花','藍色閃電'],
+     ['魔球門徒','魔球始祖'],['沙漠幼蛇','沙漠毒蛇'],['皇家侍從','皇家衛兵'],['破咒學徒','魔咒剋星'],['斧頭幫打手','斧頭幫掌門'],['18K金鳥','24K金鳥'],
+     ['楓葉騎士','楓葉君主'],['汽車城幼虎','汽車城猛虎'],['北境守望者','北境之王'],['南區小霸王','風城南霸天'],['見習守衛','鋼鐵守衛'],['啤酒酒保','啤酒大亨'],
+     ['紅雀雛鳥','紅雀巢主'],['海盜大副','海盜船長'],['南灘小魚','南灘魚王'],['大蘋果新星','大蘋果新王'],['首都議員','首都總統'],['聖城信徒','聖城教團'],
+     ['金門小巨人','金門巨人'],['西北水手','西北掌舵人'],['小天使','天堂使者'],['太空學員','太空指揮官'],['德州牛仔','德州牛仔王'],['魔鬼魚新兵','魔鬼魚軍團']],
+  C:[['巨蛋挑戰者','巨蛋之王'],['天龍國民','天龍國王'],['北方戰士','北方王者'],['桃園小勝','桃園大勝'],['黃衫小兵','黃衫軍團長'],null,
+     ['港都雛鷹','港都雄鷹'],['府城幼獅','府城獅王'],['洄瀾少年','職棒之鄉'],['嘉農精神','天下嘉農']]};
+const PW_NEED=[10,30];
+const pkKey=(lg,i)=>(lg==='CPBL'?'C':'M')+i;
+const homeOK=(lg,i)=>Number.isInteger(i)&&!!(PARK_TTL[lg==='CPBL'?'C':'M']||[])[i];
+// this player's home park for a league, or null when not set (or not offered)
+const homeOf=(p,lg)=>{const i=p&&p.home&&p.home[lg];return homeOK(lg,i)?i:null};
+const parkWins=(p,lg,i)=>(p&&p.pw&&p.pw[pkKey(lg,i)])||0;
+// the park titles this player can wear now: only those of their current home parks
+function ownedParkTitles(p){
+  const out=[];for(const lg of ['MLB','CPBL']){const i=homeOf(p,lg);if(i==null)continue;const t=PARK_TTL[lg==='CPBL'?'C':'M'][i],w=parkWins(p,lg,i);
+    PW_NEED.forEach((n,l)=>{if(w>=n)out.push({id:pkKey(lg,i)+':'+l,text:t[l],lg,i,l})})}
+  return out;
+}
+// the one on show: the player's pick if it still belongs to a home park, else (no pick) the best they have; '-' hides it
+function shownParkTitle(p){
+  const own=ownedParkTitles(p);if(!own.length||(p&&p.ptitle==='-'))return '';
+  const pick=p&&p.ptitle&&own.find(o=>o.id===p.ptitle);if(pick)return pick.text;
+  if(p&&p.ptitle)return '';   // picked one whose park is no longer home: it can't be worn
+  return own.slice().sort((a,b)=>b.l-a.l)[0].text;
+}
+const parkChip=t=>t?`<span class="ttl pk" title="${TR('球場稱號','Home-park title')}">🏟️ ${esc(t)}</span>`:'';
 const titleChip=t=>t?`<span class="ttl${t[0]===GOLD?' gold':''}">${esc(ttlText(t))}</span>`:'';
 async function saveTitle(t){await profRef().update({title:String(t||'').slice(0,40)});await loadProfile()}
 // the two seats' titles in an online room, read from their records (hidden while a ranked opponent is masked)
 const TTL_CACHE=new Map();
 async function titleOf(uid){
   const c=TTL_CACHE.get(uid);if(c&&Date.now()-c.at<120000)return c;
-  let t='',r=null;try{const x=await NET.db.doc('players/'+uid).get();if(x.exists){const p=x.data();t=shownTitle(p);r=preRating(p)}}catch(e){}
-  const v={t,r,at:Date.now()};TTL_CACHE.set(uid,v);return v;
+  let t='',r=null,pt='';try{const x=await NET.db.doc('players/'+uid).get();if(x.exists){const p=x.data();t=shownTitle(p);r=preRating(p);pt=shownParkTitle(p)}}catch(e){}
+  const v={t,r,pt,at:Date.now()};TTL_CACHE.set(uid,v);return v;
 }
 function seatTitles(){
   const d=NET.doc;if(!d||!NET.db)return;const seats=d.seats||{};NET.ttl=NET.ttl||{};NET.ttlUid=NET.ttlUid||{};
   [0,1].forEach(i=>{const uid=seats[i];if(!uid||oppMasked(d,i)||NET.ttlUid[i]===uid)return;
-    NET.ttlUid[i]=uid;titleOf(uid).then(v=>{if(NET.ttlUid&&NET.ttlUid[i]===uid){NET.ttl[i]=v.t;NET.tr=NET.tr||{};NET.tr[i]=v.r;paintTitles()}})});
+    NET.ttlUid[i]=uid;titleOf(uid).then(v=>{if(NET.ttlUid&&NET.ttlUid[i]===uid){NET.ttl[i]=v.t;NET.tr=NET.tr||{};NET.tr[i]=v.r;NET.pt=NET.pt||{};NET.pt[i]=v.pt;paintTitles()}})});
 }
 function seatTitle(i){
   if(NET.on){const d=NET.doc;return !d||oppMasked(d,i)?'':((NET.ttl||{})[i]||'')}
@@ -2873,7 +2904,11 @@ function seatTier(i){
   return S.ai&&i!==S.ai.seat?preRating(PROF.doc):null;
 }
 const tierChip=r=>{if(r==null)return '';const T=TIERS[tierIdx(r)];return `<span class="ttl tier" style="--tc:${T[4]}" title="${TR('排位段位','Ranked tier')}">${T[1]} ${TR(T[2],T[3])}</span>`};
-function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{const i=+el.dataset.ttl;el.innerHTML=tierChip(seatTier(i))+titleChip(seatTitle(i))})}
+function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{const i=+el.dataset.ttl;el.innerHTML=tierChip(seatTier(i))+titleChip(seatTitle(i))+parkChip(seatParkTitle(i))})}
+function seatParkTitle(i){
+  if(NET.on){const d=NET.doc;return !d||oppMasked(d,i)?'':((NET.pt||{})[i]||'')}
+  return S.ai&&i!==S.ai.seat?shownParkTitle(PROF.doc):'';
+}
 // every screen that names the two teams fills in their titles once it is drawn
 ['renderGameShell','renderPick','renderRoom','renderDraft','renderTrade'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
 async function saveNick(name){
@@ -2924,7 +2959,11 @@ async function applyRanked(p,won){
   if(won){const w={rating:p.rating+p.pendD+gain+bonus,wins:p.wins+1,losses:p.losses-1,pend:'',pendAt:0,pendD:0,pendW:0,streak:(p.streak||0)+1};
     // the best-streak and sweep fields need the newer firestore.rules: where the site still runs older ones, the
     // win goes in without them
-    try{await profRef().update({...w,best:Math.max(p.best||0,(p.streak||0)+1)})}catch(e){await profRef().update(w)}}
+    // a win at my home park for the room's league counts toward that park's titles (needs the newest rules too)
+    let pw=null;try{let lg;if(NET.doc&&NET.code===p.pend&&NET.doc.cfg)lg=NET.doc.cfg.league;else{const x=await NET.db.doc('rooms/'+p.pend).get();lg=x.exists?(x.data().cfg||{}).league:null}
+      lg=lg||'MLB';const h=homeOf(p,lg);if(h!=null){const k=pkKey(lg,h);pw={...(p.pw||{}),[k]:((p.pw||{})[k]||0)+1}}}catch(e){}
+    const best=Math.max(p.best||0,(p.streak||0)+1),tries=[...(pw?[{...w,best,pw}]:[]),{...w,best},w];
+    for(let i=0;i<tries.length;i++){try{await profRef().update(tries[i]);break}catch(e){if(i===tries.length-1)throw e}}}
   else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,streak:0});
   return bonus;
 }
@@ -3369,7 +3408,7 @@ if(TAB_CH)TAB_CH.onmessage=e=>{const m=e.data||{};
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
   clearTimeout(NET.lgWait);
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},tr:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},tr:{},pt:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.seq=0;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -3568,7 +3607,7 @@ function renderRankBox(){
     :`<p class="hint" style="margin-top:4px">${TR(`S${SN} 賽季到 ${fmtDay(seasonEnd(SN))}，還剩 ${seasonDaysLeft()} 天。新賽季積分會往 1000 回落一半。`,`Season ${SN} ends ${fmtDay(seasonEnd(SN))} (${seasonDaysLeft()} days left). A new season brings ratings halfway back to 1000.`)}</p>`;
   const past=p&&p.hist?Object.keys(p.hist).sort((a,b)=>a-b).map(k=>{const h=p.hist[k],t=TIERS[tierIdx(h.r)];return `<span class="pastsz" title="${TR(`${szName(+k)} 最終積分 ${h.r}，${h.w} 勝 ${h.l} 敗`,`${szName(+k)}: ${h.r}, ${h.w}-${h.l}`)}">${szName(+k)} ${t[1]} ${TR(t[2],t[3])}</span>`}).join(''):'';
   const played=p?p.wins+p.losses:0,rate=played?Math.round(p.wins/played*100):0;
-  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">${SN<1?TR('測試','TEST'):'S'+SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}${shownTitle(p)?`<br>${titleChip(shownTitle(p))}`:''}</div>
+  const card=p?`<div class="pcard"><div class="in"><span class="no">No. ${p.rating}</span><span class="szc">${SN<1?TR('測試','TEST'):'S'+SN}</span><div class="em">${T[1]}</div><div class="tn" ${T[2].length>2?'style="font-size:40px"':''}>${TR(T[2],T[3])}</div><div class="nm">${esc(p.name)}${shownTitle(p)||shownParkTitle(p)?`<br>${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}`:''}</div>
       <div class="st"><div><b>${p.wins}</b><span>${TR('勝','W')}</span></div><div><b>${p.losses}</b><span>${TR('敗','L')}</span></div><div><b>${played?rate+'%':'—'}</b><span>${TR('勝率','Win %')}</span></div><div><b>${p.streak>=2?'🔥'+p.streak:p.streak||0}</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`
     :`<div class="pcard"><div class="in"><span class="no">No. ????</span><div class="em" style="opacity:.35">⚾</div><div class="tn" style="font-size:40px">${TR('你的球員卡','Your card')}</div><div class="nm" style="font-size:15px;font-weight:700;color:var(--dim)">${!a||a.anon?TR('登入後就會發一張給你','Sign in to get yours'):TR('取個暱稱就能拿到','Pick a nickname to get it')}</div>
       <div class="st"><div><b>—</b><span>${TR('勝','W')}</span></div><div><b>—</b><span>${TR('敗','L')}</span></div><div><b>—</b><span>${TR('勝率','Win %')}</span></div><div><b>—</b><span>${TR('連勝','Streak')}</span></div></div></div></div>`;
@@ -3582,7 +3621,7 @@ function renderRankBox(){
       <div class="tierbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="rankline"><span>${TR('積分','Rating')} <b class="r">${p.rating}</b> · ${TR(`${p.wins} 勝 ${p.losses} 敗`,`${p.wins}-${p.losses}`)} · ${TR('勝率','win')} ${played?rate+'%':'—'}${p.streak>=2?` · 🔥 ${TR(`${p.streak} 連勝`,`${p.streak} straight`)}`:''}</span><span>${next?TR(`再 ${next[0]-p.rating} 分升上 ${next[1]} ${next[2]}`,`${next[0]-p.rating} to ${next[1]} ${next[3]}`):TR('已經是最高牌位！','Top tier!')}</span></div>
       ${past?`<div class="row" style="margin-top:12px;gap:6px"><span class="eyebrow">${TR('歷屆賽季','Past seasons')}</span>${past}</div>`:''}
-      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="ttlbtn">🎖️ ${TR('稱號','Titles')} <span class="mono" style="font-size:13px">${TITLE_DEFS.filter(d=>d.ok(titleFacts(p))).length}/${TITLE_DEFS.length}</span></button><button id="rkshare">📤 ${TR('分享段位','Share my tier')}</button><button id="acct">${TR('帳號','Account')}</button></div>
+      <div class="row" style="margin-top:auto;padding-top:18px;gap:12px 14px"><button class="solid rankgo" id="rkgo">${TR('開始排位','Play ranked')}</button>${leagues}<button id="lb">📊 ${TR('排行榜','Leaderboard')}</button><button id="ttlbtn">🎖️ ${TR('稱號','Titles')} <span class="mono" style="font-size:13px">${TITLE_DEFS.filter(d=>d.ok(titleFacts(p))).length}/${TITLE_DEFS.length}</span></button><button id="rkhome">🏟️ ${TR('主場','Home parks')}</button><button id="rkshare">📤 ${TR('分享段位','Share my tier')}</button><button id="acct">${TR('帳號','Account')}</button></div>
       <p class="hint" style="margin-top:10px">${TR('勢均力敵贏一場 +50、輸一場 −38，連勝再加分，積分不會低於 1000；配不到人可以打電腦排位（±25','An even win is +50 and a loss −38, plus a streak bonus; your rating never drops below 1000. If nobody is around, play the computer (±25')}${p.rating<AI_RK.cap?TR(`，今天還剩 ${left} 場）。`,`, ${left} left today).`):TR('，大聯盟以上只能打真人）。',', people only from the major-league tier).')}</p>`;
   }
   if(PROF.live&&p&&p.pend===PROF.live)body=`<div class="livebar" role="alert"><p>⚠️ ${TR(`你有一場排位還沒打完（房號 ${esc(PROF.live)}）。對手會等你約 90 秒～2 分鐘，超過就會判你棄賽，請馬上回去。`,`You have a ranked series in progress (room ${esc(PROF.live)}). Your opponent waits about 90 s–2 minutes before it counts as a forfeit: go back now.`)}</p><button class="solid" id="rklive">↩ ${TR('回到比賽','Back to the game')}</button></div>`+body;
@@ -3595,6 +3634,7 @@ function renderRankBox(){
   $('#rkgo').onclick=()=>{const a2=acctUser();if(!a2||a2.anon||!PROF.doc)return openAcct(TR('排位賽要先登入並取暱稱，積分才會記在你的帳號。','Sign in and pick a nickname first, so your rating is saved to your account.'));
     if(PROF.live&&PROF.doc.pend===PROF.live&&!confirm(TR('你還有一場排位沒打完，開新的一場會放棄那場（算輸）。確定要開新的嗎？','You still have a ranked series in progress. Starting a new one gives that one up (a loss). Start anyway?')))return;
     PROF.live='';busy($('#rkgo'),async()=>{if(await winPending())return;await quickMatch('ranked')})};
+  if($('#rkhome'))$('#rkhome').onclick=openHome;
   if($('#rklive'))$('#rklive').onclick=()=>busy($('#rklive'),()=>rejoinLive(PROF.live));
   if($('#lb'))$('#lb').onclick=openBoard;
   if($('#rkshare'))$('#rkshare').onclick=()=>{const q=PROF.doc;if(!q)return;const t=TIERS[tierIdx(q.rating)];
@@ -3666,6 +3706,35 @@ function openTitles(){
     catch(e){$('#amsg').style.color='var(--red)';$('#amsg').textContent=e&&e.code==='invalid_argument'?TR('儲存失敗：網站的 Firestore 規則還不是最新版，請站長發布最新的 firestore.rules。','Could not save: the site\'s Firestore rules are out of date.'):TR('儲存失敗，請再試一次。','Could not save; try again.')}
     sel.disabled=false};
 }
+// home parks: one per league, used in every ranked series; series won there earn that park's titles
+function openHome(){
+  closeAcct();const p=PROF.doc;if(!p)return;const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
+  const sel=lg=>{const L=PARKSETS[lg],T=PARK_TTL[lg==='CPBL'?'C':'M'],h=homeOf(p,lg);
+    return `<option value="" ${h==null?'selected':''}>${TR('不設定（每場隨機）','Not set (random each series)')}</option>`+L.map((q,i)=>T[i]?`<option value="${i}" ${h===i?'selected':''}>${esc(q.n)}（${parkWins(p,lg,i)} ${TR('勝','W')}）</option>`:'').join('')};
+  const prog=lg=>{const h=homeOf(p,lg);if(h==null)return `<p class="hint">${TR('還沒設定主場：排位球場隨機，勝場不計入任何球場。','No home park yet: ranked parks are random and wins count for no park.')}</p>`;
+    const T=PARK_TTL[lg==='CPBL'?'C':'M'][h],n=parkWins(p,lg,h);
+    // the first title is public; the final one stays "???" until it is earned, with how far there is to go
+    const one=(k,l)=>n>=k?`✅ ${esc(T[l])}`:l===PW_NEED.length-1?`🔒 ？？？（${TR(`再贏 ${k-n} 場解鎖`,`${k-n} more wins to unlock`)}）`:`🔒 ${esc(T[l])}（${TR(`再贏 ${k-n} 場`,`${k-n} more wins`)}）`;
+    return `<p class="hint">${TR(`主場勝場 <b>${n}</b>：`,`Wins here: <b>${n}</b> · `)}${PW_NEED.map(one).join(' · ')}</p>`};
+  const titles=()=>{const own=ownedParkTitles(p),cur=p.ptitle||'';
+    return `<option value="" ${!cur?'selected':''}>${TR('自動（主場最高的稱號）','Automatic (best at a home park)')}</option><option value="-" ${cur==='-'?'selected':''}>${TR('不顯示','None')}</option>`+own.map(o=>`<option value="${o.id}" ${cur===o.id?'selected':''}>${esc(o.text)}</option>`).join('')};
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('主場','Home parks')}" style="gap:10px">
+   <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>🏟️ ${TR('主場','Home parks')}</h2>
+   <p class="hint" style="color:var(--dim)">${TR('大聯盟、中職各設一個主場，排位賽就在你的主場開打。在主場贏下 10 場系列賽（七戰四勝算一場）得到中間稱號，30 場得到最終稱號。換主場不會清掉已經累積的勝場，但球場稱號只能掛目前主場的。打電腦的排位不計入。','Set one home park for MLB and one for CPBL: your ranked series are played there. Win 10 series there for its first title and 30 for its final one. Changing home keeps the wins, but you can only wear titles of your current home parks. Ranked games against the computer do not count.')}</p>
+   <label style="color:var(--chalk)">⚾ ${TR('大聯盟主場','MLB home park')}<select id="hmM" style="width:100%">${sel('MLB')}</select></label><div id="hpM">${prog('MLB')}</div>
+   <label style="color:var(--chalk)">🇹🇼 ${TR('中職主場','CPBL home park')}<select id="hmC" style="width:100%">${sel('CPBL')}</select></label><div id="hpC">${prog('CPBL')}</div>
+   <label style="color:var(--chalk)">🏟️ ${TR('顯示的球場稱號','Home-park title shown')}<select id="hmT" style="width:100%">${titles()}</select></label>
+   <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p></div>`;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  const save=async()=>{const m=$('#hmM').value,c=$('#hmC').value,home={};if(m!=='')home.MLB=+m;if(c!=='')home.CPBL=+c;
+    w.querySelectorAll('select').forEach(x=>x.disabled=true);$('#amsg').textContent='';
+    try{await profRef().update({home,ptitle:$('#hmT').value});await loadProfile();Object.assign(p,PROF.doc);
+      $('#hpM').innerHTML=prog('MLB');$('#hpC').innerHTML=prog('CPBL');$('#hmT').innerHTML=titles();
+      $('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 已儲存。','✅ Saved.');if(S.screen==='home')renderRankBox()}
+    catch(e){$('#amsg').style.color='var(--red)';$('#amsg').textContent=e&&e.code==='invalid_argument'?TR('儲存失敗：網站的 Firestore 規則還不是最新版，請站長發布最新的 firestore.rules。','Could not save: the site\'s Firestore rules are out of date.'):TR('儲存失敗，請再試一次。','Could not save; try again.')}
+    w.querySelectorAll('select').forEach(x=>x.disabled=false)};
+  $('#hmM').onchange=save;$('#hmC').onchange=save;$('#hmT').onchange=save;
+}
 function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()}   // never the "stopped" boxes (#afkwrap, #gonewrap)
 async function openBoard(){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
@@ -3681,7 +3750,7 @@ async function openBoard(){
     if(!q)q=await P.orderBy('rating','desc').limit(100).get();
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN).slice(0,50);
     $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}${titleChip(shownTitle(p))}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
@@ -3709,7 +3778,7 @@ function renderRoom(){
   const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}<span data-ttl="${i}"></span></div>
      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <label for="tn">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:-8px"><input id="tn" maxlength="18" style="flex:1" placeholder="${TR('例：高雄海神','e.g. Kaohsiung Sea Kings')}" value="${esc(mine.name)}" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'readonly':''}><button type="button" class="ghost" id="rn" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'hidden':''}>🎲 ${TR('隨機取名','Random name')}</button></div>
-      <label>${TR('主場','Home park')}<select id="pk" ${lgPend?'disabled':''}>${lgPend?`<option value="">${TR('（聯盟決定後抽選）','(drawn once the league is set)')}</option>`:opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
+      <label>${TR('主場','Home park')}<select id="pk" ${lgPend||((d.cfg||{}).ranked&&homeOf(PROF.doc,(d.cfg||{}).league||S.league)!=null)?'disabled':''}>${lgPend?`<option value="">${TR('（聯盟決定後套用：有設主場就用主場，沒有就抽選）','(set once the league is known: your home park, or a random one)')}</option>`:opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel" id="mmwait" hidden></section>
@@ -3822,7 +3891,9 @@ function updateRoom(){
   const settled=NET.lgPend&&!lgPending(d);
   // a park picked before the room's league was known can point past the end of this league's list
   const myPk=NET.seat!=null?(su[NET.seat]||{}).park:null,badPk=myPk!=null&&myPk>=PARKSETS[want].length;
-  if((settled||badPk)&&NET.seat!=null){const pk=Math.floor(Math.random()*PARKSETS[want].length),me=NET.seat;
+  // ranked: my park is the home park I set for this league (drawn at random when I haven't set one)
+  const myHome=cfg.ranked&&!lgPending(d)?homeOf(PROF.doc,want):null;
+  if(NET.seat!=null&&(myHome!=null?myPk!==myHome:(settled||badPk))){const pk=myHome!=null?myHome:Math.floor(Math.random()*PARKSETS[want].length),me=NET.seat;
     NET.doc={...d,setup:{...su,[me]:{...(su[me]||{}),park:pk}}};dbWrite(()=>NET.ref.update({setup:{[me]:{park:pk}}}))}
   if(want!==S.league||settled){if(want!==S.league)setLeague(want);return renderRoom()}
   // keep my park menu on what the room holds (a late snapshot can redraw it with an older pick)
