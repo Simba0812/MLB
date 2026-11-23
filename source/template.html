@@ -2747,7 +2747,7 @@ const streakBonus=st=>Math.min(st||0,3)*10;
 const twDay=()=>Math.floor((Date.now()+8*3600000)/86400000);   // a day in Taiwan time; firestore.rules counts the same way
 const aiLeft=p=>!p?0:AI_RK.perDay-((p.aiDay||0)===twDay()?(p.aiN||0):0);
 const aiLevelFor=r=>'r'+tierIdx(r);
-const ELO_K=100,ELO_SCALE=1250;   // Elo with bigger steps: an even game is worth 50; 1250 keeps the odds of the usual 400 at this scale
+const ELO_K=100,ELO_SCALE=3000;   // Elo with bigger steps: an even game is worth 50. 3000 (was 1250): ratings here predict results weakly (a 400+ gap still won only ~55%), so a gap moves the stakes gently
 // Elo: a game starts by booking the loss (K × the expected score); a confirmed win adds K back.
 // So leaving a lost game early saves nothing, and firestore.rules can check every step.
 const eloLoss=(me,opp)=>Math.round(ELO_K/(1+Math.pow(10,(opp-me)/ELO_SCALE)));
