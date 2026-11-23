@@ -170,8 +170,14 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 /* phones: 100vh is taller than what Safari shows (its bars), so the card ran off both ends; dvh is the visible height */
 #pvwrap .card,#afkwrap .card,#gonewrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #pvwrap .card>*,#afkwrap .card>*,#gonewrap .card>*{flex-shrink:0}   /* a scrolling card must not squash its rows (the sign-in tabs were cut in half) */
-#pvwrap .card.lbcard{width:min(780px,100%)}
-.lbn{display:flex;flex-wrap:wrap;align-items:center;gap:3px 0}
+#pvwrap .card.lbcard{width:min(640px,100%)}
+/* the leaderboard: titles as a quiet line under the name (framed chips stay for the card and the game screens) */
+.lbn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
+.lbn .lbt{display:flex;flex-wrap:wrap;align-items:center}
+.lbn .ttl{border:0;background:none;padding:0;margin:0;font-size:12px;font-weight:700;color:var(--dim);box-shadow:none;text-shadow:none}
+.lbn .ttl.gold{color:#9a6b00}.lbn .ttl.pk{color:#2f7d52}
+.lbn .ttl+.ttl::before{content:'·';margin:0 6px;color:var(--dim)}
+.lbcard #lbl tr:nth-child(even){background:rgba(16,38,29,.045)}
 .lbwl2{display:none}
 @media (max-width:560px){.lbcard .lbwl{display:none}.lbwl2{display:block;font-size:12px;color:var(--dim);white-space:nowrap}}
 .lbn .lbnm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2242,7 +2248,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='12dbd9e69d';
+const BUILD='c1af2caa32';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3788,7 +3794,7 @@ async function openBoard(){
     if(!q)q=await P.orderBy('rating','desc').limit(100).get();
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN).slice(0,50);
     $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px"><div class="lbn"><span class="lbnm" title="${esc(p.name)}">${esc(p.name)}</span>${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div></td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}<span class="lbwl2">${p.wins}-${p.losses}</span></td><td class="mono lbwl" style="padding:4px 6px;text-align:right;color:var(--dim);white-space:nowrap">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px"><div class="lbn"><span class="lbnm" title="${esc(p.name)}">${esc(p.name)}</span>${shownTitle(p)||shownParkTitle(p)?`<div class="lbt">${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div>`:''}</div></td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}<span class="lbwl2">${p.wins}-${p.losses}</span></td><td class="mono lbwl" style="padding:4px 6px;text-align:right;color:var(--dim);white-space:nowrap">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
