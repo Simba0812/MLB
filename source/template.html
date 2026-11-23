@@ -2850,16 +2850,16 @@ const shownTitle=p=>p&&p.title&&ownedTitles(p).includes(p.title)?p.title:'';
 // a title kept with this mark in front shows in a gold frame (only the site owner can hand those out)
 const GOLD='\u0001',ttlText=t=>String(t||'').replace(GOLD,'');
 /* ---------- home parks: each player sets one MLB and one CPBL home park; ranked series won there earn its titles ---------- */
-// [10-win title, 30-win title], in the order of PARKS_MLB / PARKS_CPBL (null: no titles, not offered as a home)
+// [3-win, 15-win, 30-win titles], in the order of PARKS_MLB / PARKS_CPBL (null: no titles, not offered as a home)
 const PARK_TTL={
-  M:[['高山攀登者','高山之王'],['紅色齒輪','紅色機器'],['綠牆挑戰者','芬威王者'],['開國志士','開國元勳'],['條紋騎士','條紋帝國'],['藍色火花','藍色閃電'],
-     ['魔球門徒','魔球始祖'],['沙漠幼蛇','沙漠毒蛇'],['皇家侍從','皇家衛兵'],['破咒學徒','魔咒剋星'],['斧頭幫打手','斧頭幫掌門'],['18K金鳥','24K金鳥'],
-     ['楓葉騎士','楓葉君主'],['汽車城幼虎','汽車城猛虎'],['北境守望者','北境之王'],['南區小霸王','風城南霸天'],['見習守衛','鋼鐵守衛'],['啤酒酒保','啤酒大亨'],
-     ['紅雀雛鳥','紅雀巢主'],['海盜大副','海盜船長'],['南灘小魚','南灘魚王'],['大蘋果新星','大蘋果新王'],['首都議員','首都總統'],['聖城信徒','聖城教團'],
-     ['金門小巨人','金門巨人'],['西北水手','西北掌舵人'],['小天使','天堂使者'],['太空學員','太空指揮官'],['德州牛仔','德州牛仔王'],['魔鬼魚新兵','魔鬼魚軍團']],
-  C:[['巨蛋挑戰者','巨蛋之王'],['天龍國民','天龍國王'],['北方戰士','北方王者'],['桃園小勝','桃園大勝'],['黃衫小兵','黃衫軍團長'],null,
-     ['港都雛鷹','港都雄鷹'],['府城幼獅','府城獅王'],['洄瀾少年','職棒之鄉'],['嘉農精神','天下嘉農']]};
-const PW_NEED=[10,30];
+  M:[['高山健行者','高山攀登者','高山之王'],['紅色螺絲','紅色齒輪','紅色機器'],['紅襪國民','綠牆挑戰者','芬威王者'],['費城市民','開國志士','開國元勳'],['條紋球迷','條紋騎士','條紋帝國'],['藍色微光','藍色火花','藍色閃電'],
+     ['魔球讀者','魔球門徒','魔球始祖'],['沙漠蛇蛋','沙漠幼蛇','沙漠毒蛇'],['皇家子民','皇家侍從','皇家衛兵'],['魔咒受害者','破咒學徒','魔咒剋星'],['斧頭幫小弟','斧頭幫打手','斧頭幫掌門'],['9K金鳥','18K金鳥','24K金鳥'],
+     ['楓葉平民','楓葉騎士','楓葉君主'],['汽車城小貓','汽車城幼虎','汽車城猛虎'],['北境居民','北境守望者','北境之王'],['南區居民','南區小霸王','風城南霸天'],['守衛候選人','見習守衛','鋼鐵守衛'],['啤酒客','啤酒酒保','啤酒大亨'],
+     ['紅雀鳥蛋','紅雀雛鳥','紅雀巢主'],['海盜船員','海盜大副','海盜船長'],['南灘魚苗','南灘小魚','南灘魚王'],['大蘋果遊客','大蘋果新星','大蘋果新王'],['首都選民','首都議員','首都總統'],['聖城朝聖者','聖城信徒','聖城教團'],
+     ['金門居民','金門小巨人','金門巨人'],['西北乘客','西北水手','西北掌舵人'],['天使粉絲','小天使','天堂使者'],['太空迷','太空學員','太空指揮官'],['德州小牛','德州牛仔','德州牛仔王'],['魔鬼魚役男','魔鬼魚新兵','魔鬼魚軍團']],
+  C:[['巨蛋觀眾','巨蛋挑戰者','巨蛋之王'],['天龍國遊客','天龍國民','天龍國王'],['北方新兵','北方戰士','北方王者'],['桃園小猴','桃園小勝','桃園大勝'],['黃衫球迷','黃衫小兵','黃衫軍團長'],null,
+     ['港都鷹蛋','港都雛鷹','港都雄鷹'],['府城獅迷','府城幼獅','府城獅王'],['洄瀾球迷','洄瀾少年','職棒之鄉'],['嘉農球迷','嘉農精神','天下嘉農']]};
+const PW_NEED=[3,15,30],PW_ID=['b','0','1'];   // ids kept stable: '0'/'1' were the 10/30-win titles before the 3-win one came
 const pkKey=(lg,i)=>(lg==='CPBL'?'C':'M')+i;
 const homeOK=(lg,i)=>Number.isInteger(i)&&!!(PARK_TTL[lg==='CPBL'?'C':'M']||[])[i];
 // this player's home park for a league, or null when not set (or not offered)
@@ -2868,7 +2868,7 @@ const parkWins=(p,lg,i)=>(p&&p.pw&&p.pw[pkKey(lg,i)])||0;
 // the park titles this player can wear now: only those of their current home parks
 function ownedParkTitles(p){
   const out=[];for(const lg of ['MLB','CPBL']){const i=homeOf(p,lg);if(i==null)continue;const t=PARK_TTL[lg==='CPBL'?'C':'M'][i],w=parkWins(p,lg,i);
-    PW_NEED.forEach((n,l)=>{if(w>=n)out.push({id:pkKey(lg,i)+':'+l,text:t[l],lg,i,l})})}
+    PW_NEED.forEach((n,l)=>{if(w>=n)out.push({id:pkKey(lg,i)+':'+PW_ID[l],text:t[l],lg,i,l})})}
   return out;
 }
 // the one on show: the player's pick if it still belongs to a home park, else (no pick) the best they have; '-' hides it
@@ -3735,7 +3735,7 @@ function parkTitleOpts(p){const own=ownedParkTitles(p),cur=p.ptitle||'';
 function parkBook(p){
   const row=(lg,i)=>{const n=parkWins(p,lg,i),home=homeOf(p,lg)===i;return `<li class="${n>=PW_NEED[0]?'got':''}"><b>${home?'🏠 ':''}${esc(PARKSETS[lg][i].n)}${n?`（${n} ${TR('勝','W')}）`:''}</b><span>${parkTitleLine(p,lg,i)}</span></li>`};
   const list=lg=>PARK_TTL[lg==='CPBL'?'C':'M'].map((t,i)=>t?i:null).filter(i=>i!=null).sort((a,b)=>(homeOf(p,lg)===b)-(homeOf(p,lg)===a)).map(i=>row(lg,i)).join('');
-  return `<details class="tbook"><summary>${TR('🏟️ 球場稱號圖鑑（主場贏 10 場系列得中間稱號、30 場得最終稱號）','🏟️ Home-park titles (10 series won at home, then 30)')}</summary><ul><li><b>⚾ ${TR('大聯盟','MLB')}</b><span></span></li>${list('MLB')}<li><b>🇹🇼 ${TR('中職','CPBL')}</b><span></span></li>${list('CPBL')}</ul></details>`;
+  return `<details class="tbook"><summary>${TR('🏟️ 球場稱號圖鑑（在主場贏 3、15、30 場系列賽，三段升級）','🏟️ Home-park titles (3, 15 and 30 series won at home)')}</summary><ul><li><b>⚾ ${TR('大聯盟','MLB')}</b><span></span></li>${list('MLB')}<li><b>🇹🇼 ${TR('中職','CPBL')}</b><span></span></li>${list('CPBL')}</ul></details>`;
 }
 function openHome(){
   closeAcct();const p=PROF.doc;if(!p)return;const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
@@ -3744,7 +3744,7 @@ function openHome(){
   const prog=lg=>parkProg(p,lg);
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('主場','Home parks')}" style="gap:10px">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>🏟️ ${TR('主場','Home parks')}</h2>
-   <p class="hint" style="color:var(--dim)">${TR('大聯盟、中職各設一個主場，排位賽就在你的主場開打。在主場贏下 10 場系列賽（七戰四勝算一場）得到中間稱號，30 場得到最終稱號。換主場不會清掉已經累積的勝場，但球場稱號只能掛目前主場的。打電腦的排位不計入。','Set one home park for MLB and one for CPBL: your ranked series are played there. Win 10 series there for its first title and 30 for its final one. Changing home keeps the wins, but you can only wear titles of your current home parks. Ranked games against the computer do not count.')}</p>
+   <p class="hint" style="color:var(--dim)">${TR('大聯盟、中職各設一個主場，排位賽就在你的主場開打。在主場贏下 3、15、30 場系列賽（七戰四勝算一場），依序得到三段球場稱號。換主場不會清掉已經累積的勝場，但球場稱號只能掛目前主場的。打電腦的排位不計入。','Set one home park for MLB and one for CPBL: your ranked series are played there. Win 3, 15 and 30 series there for its three titles. Changing home keeps the wins, but you can only wear titles of your current home parks. Ranked games against the computer do not count.')}</p>
    <label style="color:var(--chalk)">⚾ ${TR('大聯盟主場','MLB home park')}<select id="hmM" style="width:100%">${sel('MLB')}</select></label><div id="hpM">${prog('MLB')}</div>
    <label style="color:var(--chalk)">🇹🇼 ${TR('中職主場','CPBL home park')}<select id="hmC" style="width:100%">${sel('CPBL')}</select></label><div id="hpC">${prog('CPBL')}</div>
    <label style="color:var(--chalk)">🏟️ ${TR('顯示的球場稱號','Home-park title shown')}<select id="hmT" style="width:100%">${parkTitleOpts(p)}</select></label>
