@@ -176,7 +176,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 /* phones: 100vh is taller than what Safari shows (its bars), so the card ran off both ends; dvh is the visible height */
 #pvwrap .card,#afkwrap .card,#gonewrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #pvwrap .card>*,#afkwrap .card>*,#gonewrap .card>*{flex-shrink:0}   /* a scrolling card must not squash its rows (the sign-in tabs were cut in half) */
-#pvwrap .card.lbcard{width:min(540px,100%)}
+#pvwrap .card.lbcard{width:min(460px,100%)}
 /* the leaderboard: the name on its own line, its titles as small framed chips under it */
 .lbn{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
 .lbn .lbt{display:flex;flex-wrap:wrap;align-items:center}
@@ -2257,7 +2257,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='791a511209';
+const BUILD='3b05aaf81b';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
