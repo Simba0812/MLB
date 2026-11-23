@@ -2246,7 +2246,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='79b8067975';
+const BUILD='02217f94dc';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3705,17 +3705,22 @@ function openTitles(){
   closeAcct();const p=PROF.doc;if(!p)return;const own=ownedTitles(p),cur=shownTitle(p),w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('稱號','Titles')}" style="gap:10px">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>🎖️ ${TR('稱號','Titles')}</h2>
+   <div class="row ttabs" role="tablist" style="gap:6px"><button role="tab" id="ttA" class="solid" aria-selected="true">🎖️ ${TR('稱號','Titles')}</button><button role="tab" id="ttB" class="ghost" aria-selected="false">🏟️ ${TR('球場稱號','Home-park titles')}</button></div>
+   <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p>
+   <div id="tabA" style="display:flex;flex-direction:column;gap:10px">
    <p class="hint" style="color:var(--dim)">${TR('選一個顯示在暱稱旁邊：球員卡、排行榜和線上比賽中，對手都看得到。','Pick one to show beside your nickname: on your card, the leaderboard, and to opponents in online games.')}</p>
    <label style="color:var(--chalk)">${TR('顯示的稱號','Title shown')}<select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option value="${esc(t)}" ${t===cur?'selected':''}>${esc(ttlText(t))}${t[0]===GOLD?' ✨':''}</option>`).join('')}</select></label>
-   <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p>
    ${titleBook(p).replace('<details class="tbook">','<details class="tbook" open>')}
-   <h3 style="margin:8px 0 0">🏟️ ${TR('球場稱號','Home-park titles')}</h3>
+   </div><div id="tabB" style="display:none;flex-direction:column;gap:10px">
    <p class="hint" style="color:var(--dim)">${TR('在主場贏排位系列賽得到的稱號，會顯示在你選的稱號旁邊。只能掛目前主場的。','Earned by winning ranked series at your home parks; shown beside your title. Only your current home parks\' titles can be worn.')}</p>
    <label style="color:var(--chalk)">${TR('顯示的球場稱號','Home-park title shown')}<select id="attlP" style="width:100%">${parkTitleOpts(p)}</select></label>
    ${parkProg(p,'MLB')}${parkProg(p,'CPBL')}
    <button class="ghost" id="attlH" style="align-self:flex-start">🏟️ ${TR('設定主場','Set home parks')}</button>
-   ${parkBook(p)}</div>`;
+   ${parkBook(p).replace('<details class="tbook">','<details class="tbook" open>')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  const tab=b=>{$('#tabA').style.display=b?'none':'flex';$('#tabB').style.display=b?'flex':'none';
+    [['#ttA',!b],['#ttB',b]].forEach(([id,on])=>{const x=$(id);x.className=on?'solid':'ghost';x.setAttribute('aria-selected',on)});$('#amsg').textContent=''};
+  $('#ttA').onclick=()=>tab(false);$('#ttB').onclick=()=>tab(true);if(openTitles.park){openTitles.park=false;tab(true)}
   $('#attlH').onclick=openHome;
   $('#attlP').onchange=async()=>{const sel=$('#attlP');sel.disabled=true;$('#amsg').textContent='';
     try{await profRef().update({ptitle:sel.value});await loadProfile();$('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 球場稱號已更新。','✅ Home-park title updated.');if(S.screen==='home')renderRankBox()}
@@ -3751,17 +3756,23 @@ function openHome(){
    <p class="hint" style="color:var(--dim)">${TR('大聯盟、中職各設一個主場，排位賽就在你的主場開打。在主場贏下 10 場系列賽（七戰四勝算一場）得到中間稱號，30 場得到最終稱號。換主場不會清掉已經累積的勝場，但球場稱號只能掛目前主場的。打電腦的排位不計入。','Set one home park for MLB and one for CPBL: your ranked series are played there. Win 10 series there for its first title and 30 for its final one. Changing home keeps the wins, but you can only wear titles of your current home parks. Ranked games against the computer do not count.')}</p>
    <label style="color:var(--chalk)">⚾ ${TR('大聯盟主場','MLB home park')}<select id="hmM" style="width:100%">${sel('MLB')}</select></label><div id="hpM">${prog('MLB')}</div>
    <label style="color:var(--chalk)">🇹🇼 ${TR('中職主場','CPBL home park')}<select id="hmC" style="width:100%">${sel('CPBL')}</select></label><div id="hpC">${prog('CPBL')}</div>
-   <p class="hint">${TR('要掛哪個球場稱號，請到「🎖️ 稱號」裡選。','Pick which home-park title to wear under 🎖️ Titles.')}</p>
+   <label style="color:var(--chalk)">🏟️ ${TR('顯示的球場稱號','Home-park title shown')}<select id="hmT" style="width:100%">${parkTitleOpts(p)}</select></label>
+   <button class="ghost" id="hmB" style="align-self:flex-start">📖 ${TR('球場稱號圖鑑','All home-park titles')}</button>
    <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   const save=async()=>{const m=$('#hmM').value,c=$('#hmC').value,home={};if(m!=='')home.MLB=+m;if(c!=='')home.CPBL=+c;
     w.querySelectorAll('select').forEach(x=>x.disabled=true);$('#amsg').textContent='';
     try{await profRef().update({home});await loadProfile();Object.assign(p,PROF.doc);
-      $('#hpM').innerHTML=prog('MLB');$('#hpC').innerHTML=prog('CPBL');
+      $('#hpM').innerHTML=prog('MLB');$('#hpC').innerHTML=prog('CPBL');$('#hmT').innerHTML=parkTitleOpts(PROF.doc);
       $('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 已儲存。','✅ Saved.');if(S.screen==='home')renderRankBox()}
     catch(e){$('#amsg').style.color='var(--red)';$('#amsg').textContent=e&&e.code==='invalid_argument'?TR('儲存失敗：網站的 Firestore 規則還不是最新版，請站長發布最新的 firestore.rules。','Could not save: the site\'s Firestore rules are out of date.'):TR('儲存失敗，請再試一次。','Could not save; try again.')}
     w.querySelectorAll('select').forEach(x=>x.disabled=false)};
   $('#hmM').onchange=save;$('#hmC').onchange=save;
+  $('#hmB').onclick=()=>{openTitles.park=true;openTitles()};
+  $('#hmT').onchange=async()=>{const x=$('#hmT');x.disabled=true;$('#amsg').textContent='';
+    try{await profRef().update({ptitle:x.value});await loadProfile();$('#amsg').style.color='var(--good)';$('#amsg').textContent=TR('✅ 球場稱號已更新。','✅ Home-park title updated.');if(S.screen==='home')renderRankBox()}
+    catch(e){$('#amsg').style.color='var(--red)';$('#amsg').textContent=TR('儲存失敗，請再試一次。','Could not save; try again.')}
+    x.disabled=false};
 }
 function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()}   // never the "stopped" boxes (#afkwrap, #gonewrap)
 async function openBoard(){
