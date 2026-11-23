@@ -2314,7 +2314,7 @@ function hydrate(o){
 }
 function onRoom(snap){
   if(!snap.exists){NET.err=TR('這個房間已經不存在。','This room no longer exists.');updateNetBadge();return}
-  const d=snap.data();NET.doc=d;watchOpp(d);watchEmo(d);oppForfeitSign(d);
+  const d=snap.data();NET.doc=d;watchOpp(d);watchSeen(d);watchEmo(d);oppForfeitSign(d);
   if(NET.seat===0&&d.cfg&&d.cfg.mm&&(d.seats||{})[1]&&!NET.mmClosing){
     const g=(d.setup||{})[1]||{};
     if(!d.cfg.ranked)NET.mmClosing=true,dbWrite(()=>NET.ref.update({cfg:{mm:''}}));
@@ -2367,7 +2367,7 @@ $('#followbtn').onclick=()=>{const d=NET.pending;NET.pending=null;$('#follow').h
 function netBadge(){
   if(!NET.on) return '';
   const me=NET.seat==null?TR('你正在觀戰','You are watching'):`${TR('你是 玩家 ','You are Player ')}${NET.seat?'B':'A'}${S.teams[NET.seat]&&S.teams[NET.seat].name&&S.screen!=='room'?' ('+esc(S.teams[NET.seat].name)+')':''}`;
-  return `<span class="dot" aria-hidden="true"></span><span>${TR('線上房間','Room')} <b class="mono">${NET.code}</b></span><span>${me}</span>${NET.pend?`<span class="sync">${TR('傳送中…','Sending…')}</span>`:NET.lag!=null?`<span class="sync ok">${TR(`已同步 · 送出 ${(NET.lag/1000).toFixed(1)} 秒`,`Synced · sent in ${(NET.lag/1000).toFixed(1)}s`)}</span>`:''}${NET.rx!=null?`<span class="sync ${NET.rx>=1500?'slow':'ok'}" title="${TR('對手出手到你看到的時間（兩台裝置的時鐘可能有些微誤差）','From the other player\'s move to your screen (the two clocks may differ slightly)')}">${TR(`收到對手動作 ${(NET.rx/1000).toFixed(1)} 秒`,`Their move arrived in ${(NET.rx/1000).toFixed(1)}s`)}</span>`:''}${NET.err?`<span class="warn">⚠ ${esc(NET.err)}</span>`:''}${verWarn()}${oppWarn()}${isRanked()&&NET.rk&&rankText()&&!(S.screen==='game'&&S.game&&S.game.res&&S.game.pos<S.game.res.ev.length)?`<span class="sync">${rankText()}</span>`:''}<button class="ghost" id="leave" style="margin-left:auto;padding:4px 10px">${TR('離開房間','Leave room')}</button>`;
+  return `<span class="dot" aria-hidden="true"></span><span>${TR('線上房間','Room')} <b class="mono">${NET.code}</b></span><span>${me}</span>${NET.pend?`<span class="sync">${TR('傳送中…','Sending…')}</span>`:NET.lag!=null?`<span class="sync ok">${TR(`已同步 · 送出 ${(NET.lag/1000).toFixed(1)} 秒`,`Synced · sent in ${(NET.lag/1000).toFixed(1)}s`)}</span>`:''}${NET.rx!=null?`<span class="sync ${NET.rx>=1500?'slow':'ok'}" title="${TR('對手出手到你看到的時間（兩台裝置的時鐘可能有些微誤差）','From the other player\'s move to your screen (the two clocks may differ slightly)')}">${TR(`收到對手動作 ${(NET.rx/1000).toFixed(1)} 秒`,`Their move arrived in ${(NET.rx/1000).toFixed(1)}s`)}</span>`:''}${NET.err?`<span class="warn">⚠ ${esc(NET.err)}</span>`:''}${verWarn()}${oppWarn()}${watchWarn()}${isRanked()&&NET.rk&&rankText()&&!(S.screen==='game'&&S.game&&S.game.res&&S.game.pos<S.game.res.ev.length)?`<span class="sync">${rankText()}</span>`:''}<button class="ghost" id="leave" style="margin-left:auto;padding:4px 10px">${TR('離開房間','Leave room')}</button>`;
 }
 function updateNetBadge(){emoUI();const b=$('#netbar');if(!b)return;b.innerHTML=netBadge();b.hidden=!NET.on;const l=$('#leave');if(l)l.onclick=()=>rankedLive()?quitRanked():leaveRoom();const t=$('#takeover');if(t)t.onclick=takeOver;const ff=$('#ffclaim');if(ff)ff.onclick=()=>{ff.disabled=true;ff.textContent=TR('判定中…','Checking…');claimForfeit()};
   // ranked: once the opponent is gone, claim the win on its own (the rules accept it once they left, or after
@@ -2689,6 +2689,29 @@ function oppGone(){
   if(NET.opp.left){const lw=isRanked()||isCup()?LEFT_MS:15000;if(Date.now()-NET.opp.leftAt>lw)return 'left';setTimeout(updateNetBadge,lw+500)}
   return Date.now()-NET.opp.seen>90000?'quiet':'';
 }
+// a watcher (no seat) is told when a player walks out: left the room, gone quiet, or a forfeit in the reports
+function watchSeen(d){
+  if(NET.seat!=null)return;NET.wseen=NET.wseen||{};
+  for(const i of [0,1]){const su=(d.setup||{})[i]||{},w=NET.wseen[i];
+    if(!w||w.hb!==su.hb)NET.wseen[i]={hb:su.hb,seen:Date.now()};
+    NET.wseen[i].left=!!su.left;NET.wseen[i].leftAt=su.left?(w&&w.leftAt||Date.now()):0}
+  if(!NET.wTick)NET.wTick=setInterval(()=>{if(!NET.on||NET.seat!=null){clearInterval(NET.wTick);NET.wTick=null;return}updateNetBadge()},10000);
+  const ev=watchEvent(d);
+  if(ev&&ev.final&&NET.wShown!==ev.key){NET.wShown=ev.key;afkSign(ev.title,ev.text,TR('知道了','OK'),closeAfkSign)}
+}
+function watchName(i){const d=NET.doc||{};return esc((S.teams&&S.teams[i]&&S.teams[i].name)||((d.setup||{})[i]||{}).name||(i?TR('玩家 B','Player B'):TR('玩家 A','Player A')))}
+// what a watcher should know right now: a forfeit (final) or a player gone (may still come back)
+function watchEvent(d){
+  const rp=d.rep||{};
+  for(const i of [0,1]){const r=rp[i];if(!r||!r.ff)continue;
+    if(r.w===String(1-i))return {final:true,key:'ff'+i,title:TR('🏳️ 有玩家棄權','🏳️ A player forfeited'),text:TR(`${watchName(i)} 放棄了這場比賽，${watchName(1-i)} 獲勝。`,`${watchName(i)} gave up the series; ${watchName(1-i)} wins.`)};
+    if(r.w===String(i))return {final:true,key:'gone'+i,title:TR('🏳️ 有玩家離線棄權','🏳️ A player dropped out'),text:TR(`${watchName(1-i)} 離線太久，判 ${watchName(i)} 獲勝。`,`${watchName(1-i)} was gone too long; ${watchName(i)} wins.`)}}
+  if(['draft','trade','pregame','pick','game'].includes(S.screen)&&NET.wseen)for(const i of [0,1]){const w=NET.wseen[i];if(!w||!(d.seats||{})[i])continue;
+    if(w.left&&Date.now()-w.leftAt>15000)return {key:'left'+i,text:TR(`${watchName(i)} 已離開房間${isCup()?'，離開滿 90 秒會判棄權':'，比賽可能不會再繼續'}。`,`${watchName(i)} has left the room${isCup()?'; 90 s away counts as a forfeit':'; the game may not go on'}.`)};
+    if(w.hb&&Date.now()-w.seen>90000)return {key:'quiet'+i,text:TR(`${watchName(i)} 已超過 90 秒沒有回應，可能已經離線。`,`${watchName(i)} has not responded for 90 s and may be offline.`)}}
+  return null;
+}
+function watchWarn(){if(!NET.on||NET.seat!=null||!NET.doc)return '';const ev=watchEvent(NET.doc);return ev?`<span class="warn">⚠ ${ev.text}</span>`:''}
 function oppWarn(){
   const g=oppGone();if(!g||(isRanked()&&NET.rk&&['done','lostff'].includes(NET.rk.state)))return '';
   if((isRanked()||isCup())&&rankWinner()!=null)return '';   // decided on the field: nothing to claim
