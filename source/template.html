@@ -170,6 +170,11 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 /* phones: 100vh is taller than what Safari shows (its bars), so the card ran off both ends; dvh is the visible height */
 #pvwrap .card,#afkwrap .card,#gonewrap .card{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 #pvwrap .card>*,#afkwrap .card>*,#gonewrap .card>*{flex-shrink:0}   /* a scrolling card must not squash its rows (the sign-in tabs were cut in half) */
+#pvwrap .card.lbcard{width:min(780px,100%)}
+.lbn{display:flex;flex-wrap:wrap;align-items:center;gap:3px 0}
+.lbwl2{display:none}
+@media (max-width:560px){.lbcard .lbwl{display:none}.lbwl2{display:block;font-size:12px;color:var(--dim);white-space:nowrap}}
+.lbn .lbnm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pvwrap .pvx{position:sticky;top:0;z-index:2;box-shadow:0 2px 0 var(--paper);align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
 .lot{position:relative;perspective:1200px}
@@ -2911,8 +2916,11 @@ function seatParkTitle(i){
 }
 // every screen that names the two teams fills in their titles once it is drawn
 ['renderGameShell','renderPick','renderRoom','renderDraft','renderTrade'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
+// a nickname's width: CJK and other wide characters count 2, the rest 1 (so 8 Chinese characters or 16 letters fit)
+const NAME_W=16,nameWidth=t=>[...String(t||'')].reduce((n,c)=>n+(/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|[\u{20000}-\u{3fffd}]/u.test(c)?2:1),0);
 async function saveNick(name){
   name=String(name||'').trim().slice(0,16);if(name.length<2)throw new Error(TR('暱稱至少 2 個字。','A nickname needs at least 2 characters.'));
+  if(nameWidth(name)>NAME_W)throw new Error(TR('暱稱太長：最多 8 個中文字，或 16 個英文字母／數字（中文算 2 格）。','That nickname is too long: up to 16 letters or digits (a Chinese character counts as 2).'));
   if(PROF.doc)await profRef().update({name});
   else await profRef().set({name,rating:1000,games:0,wins:0,losses:0,pend:'',pendAt:0,pendD:0,created:Date.now(),season:curSeason()});
   await loadProfile();
@@ -3768,7 +3776,7 @@ function openHome(){
 function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()}   // never the "stopped" boxes (#afkwrap, #gonewrap)
 async function openBoard(){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
-  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${TR('排位排行榜','Ranked leaderboard')}</span></h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
+  w.innerHTML=`<div class="card lbcard" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${TR('排位排行榜','Ranked leaderboard')}</span></h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   try{
     const me=(acctUser()||{}).uid,SN=curSeason(),P=NET.db.collection('players');
@@ -3780,7 +3788,7 @@ async function openBoard(){
     if(!q)q=await P.orderBy('rating','desc').limit(100).get();
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN).slice(0,50);
     $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px">${esc(p.name)}${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}</td><td class="mono" style="padding:4px 6px;text-align:right;color:var(--dim)">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px"><div class="lbn"><span class="lbnm" title="${esc(p.name)}">${esc(p.name)}</span>${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div></td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}<span class="lbwl2">${p.wins}-${p.losses}</span></td><td class="mono lbwl" style="padding:4px 6px;text-align:right;color:var(--dim);white-space:nowrap">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
