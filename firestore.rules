@@ -172,7 +172,7 @@ service cloud.firestore {
     // One record per account for ranked play. Only its owner writes it, and only in these steps:
     // pick or change a nickname; start a ranked game (book the loss: K x expected score, Elo);
     // a confirmed win (add K back); or drop a pending game (the booked loss stays).
-    // Elo with K = 100 on a 1250 scale (an even game is worth 50); a win streak against people adds
+    // Elo with K = 100 on a 3000 scale (an even game is worth 50); a win streak against people adds
     // 10 / 20 / 30 from the 2nd win in a row. Ranked games against the computer can't be checked here,
     // so they are worth half (-25 booked, +50 for a win), five a day, below 2100 (the major-league
     // tier), and leave the streak alone.
@@ -198,7 +198,13 @@ service cloud.firestore {
       function inRoom(r) { return r.seats['0'] == uid || r.seats.get('1', '') == uid; }
       // the opponent's rating before this game (their record may already have booked its loss)
       function preRating(p, r) { return p.pend == nd().pend && p.pendAt == r.created ? p.rating + p.pendD : p.rating; }
-      function lossFor(mine, theirs) { return math.round(100.0 / (1.0 + math.pow(10.0, (theirs - mine) / 1250.0))); }
+      function lossFor(mine, theirs, scale) { return math.round(100.0 / (1.0 + math.pow(10.0, (theirs - mine) / scale))); }
+      // the booked loss and the win on top of it for one Elo scale
+      function stakeOK(mine, theirs, scale) {
+        let full = lossFor(mine, theirs, scale);
+        let d = floored(mine, math.round(full * 0.75));
+        return nd().pendD == d && nd().get('pendW', 0) == 100 - full && nd().rating == mine - d;
+      }
       // what a loss may book: d, but never below 1000
       function floored(r, d) { return r - 1000 <= 0 ? 0 : (d < r - 1000 ? d : r - 1000); }
 
@@ -242,11 +248,12 @@ service cloud.firestore {
       function startOK() {
         let r = room(nd().pend);
         let opp = get(/databases/$(database)/documents/players/$(r.seats[other(seatOf(r))])).data;
-        let full = lossFor(od().rating, preRating(opp, r));
-        let d = floored(od().rating, math.round(full * 0.75));
+        let theirs = preRating(opp, r);
+        // the scale went from 1250 to 3000 (ratings predicted results far less than 1250 assumed); pages
+        // still open from before keep 1250 until they reload, so both are taken for now
         return r.cfg.get('ranked', false) == true && inRoom(r) && ('1' in r.seats)
-          && nd().pendAt == r.created && nd().pendD == d && nd().get('pendW', 0) == 100 - full
-          && nd().rating == od().rating - d
+          && nd().pendAt == r.created
+          && (stakeOK(od().rating, theirs, 3000.0) || stakeOK(od().rating, theirs, 1250.0))
           && nd().games == od().games + 1 && nd().losses == od().losses + 1;
       }
       // the opponent claimed a forfeit win of their own that doesn't stand: made while I was still here (my last
