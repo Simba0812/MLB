@@ -2271,7 +2271,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='dfa620bd56';
+const BUILD='2e9a1a13a2';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3544,6 +3544,10 @@ async function firebaseBackend(cfg){
    fields: id (change it to show the pop-up again), title, body, link (https only), linkText, until (when it stops showing:
    a timestamp, or text like "2026-12-01 23:59", Taiwan time), on (false hides it at once) */
 let ANN=null;
+// the announcement built into the page, used while config/announce doesn't exist (or can't be read)
+const ANN_DEFAULT={id:'cup-2026-11-28',title:'MLB 盃賽報名中！',linkText:'前往報名',until:'2026-11-27 20:00',
+  link:'https://docs.google.com/forms/d/e/1FAIpQLSfAGTiyUFAGSeMZVs8k17c5X1K1chTAfCjN4_BgbteR2R9Mmg/viewform?usp=header',
+  body:'❗ 此為大聯盟 MLB 賽事，非中職，請玩家注意\n⚾ 比賽時間：2026/11/28（六）20:00（台灣時間 UTC+8）\n⏰ 報到時間：19:00–19:45 在 OpenChat 報到，逾時未報到視同棄權\n📝 報名截止：2026/11/27（五）20:00（台灣時間）\n🏆 賽制：單淘汰，每場 7 戰 4 勝，比照排位賽規則；對戰表截止後於 OpenChat 公布'};
 function annUntil(u){if(u==null||u==='')return Infinity;if(typeof u==='number')return u;if(u.toMillis)return u.toMillis();
   const t=String(u).trim(),m=t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/);
   if(m)return Date.UTC(+m[1],m[2]-1,+m[3],m[4]!=null?+m[4]:23,m[5]!=null?+m[5]:59)-8*3600000;   // Taiwan time; a date alone runs to 23:59
@@ -3551,7 +3555,7 @@ function annUntil(u){if(u==null||u==='')return Infinity;if(typeof u==='number')r
 const annLive=a=>!!(a&&a.on!==false&&a.title&&Date.now()<annUntil(a.until));
 const annLink=a=>/^https:\/\//.test(String(a.link||''))?String(a.link):'';
 async function loadAnnounce(){
-  try{const x=await NET.db.doc('config/announce').get();ANN=x.exists?x.data():null}catch(e){ANN=null}
+  try{const x=await NET.db.doc('config/announce').get();ANN=x.exists?x.data():ANN_DEFAULT}catch(e){ANN=ANN_DEFAULT}
   paintAnnounce();
   if(!annLive(ANN)||S.screen!=='home')return;
   let hide=false;try{hide=localStorage.getItem('mlbAnnHide')===String(ANN.id||ANN.title)}catch(e){}
