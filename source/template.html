@@ -176,7 +176,9 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .lbn .lbt{display:flex;flex-wrap:wrap;align-items:center}
 .lbn .lbt{gap:4px;margin-top:2px}
 .lbn .ttl{margin:0;font-size:11px;padding:0 6px}
-.lbcard #lbl tr:nth-child(even){background:rgba(16,38,29,.045)}
+.lbcard #lbl tbody tr:nth-child(even){background:rgba(16,38,29,.045)}
+.lbcard .lbhd th{padding:2px 6px 6px;font-size:12px;font-weight:700;color:var(--dim);white-space:nowrap;border-bottom:2px solid #c9c2a8}
+.lbcard .lbhd th .lbwl2{font-weight:700}
 .lbwl2{display:none}
 @media (max-width:560px){.lbcard .lbwl{display:none}.lbwl2{display:block;font-size:12px;color:var(--dim);white-space:nowrap}}
 .lbn .lbnm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3793,7 +3795,7 @@ async function openBoard(){
     if(!q)q=await P.orderBy('rating','desc').limit(100).get();
     const rows=q.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.games>0&&seasonOf(p)===SN).slice(0,50);
     $('#lbt').textContent=TR(`${szName(SN)} 排行榜`,`${szName(SN)} leaderboard`);
-    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px"><div class="lbn"><span class="lbnm" title="${esc(p.name)}">${esc(p.name)}</span>${shownTitle(p)||shownParkTitle(p)?`<div class="lbt">${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div>`:''}</div></td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}<span class="lbwl2">${p.wins}-${p.losses}</span></td><td class="mono lbwl" style="padding:4px 6px;text-align:right;color:var(--dim);white-space:nowrap">${p.wins}-${p.losses}</td></tr>`).join('')}</table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
+    $('#lbl').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr class="lbhd"><th>#</th><th style="text-align:left">${TR('玩家','Player')}</th><th style="text-align:left">${TR('段位','Tier')}</th><th style="text-align:right">${TR('積分','Rating')}<span class="lbwl2">${TR('勝-敗','W-L')}</span></th><th class="lbwl" style="text-align:right">${TR('勝-敗','W-L')}</th></tr></thead><tbody>${rows.map((p,k)=>`<tr style="border-top:1px solid #c9c2a8;${p.id===me?'font-weight:900':''}"><td class="mono" style="padding:4px 6px">${k+1}</td><td style="padding:4px 6px"><div class="lbn"><span class="lbnm" title="${esc(p.name)}">${esc(p.name)}</span>${shownTitle(p)||shownParkTitle(p)?`<div class="lbt">${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div>`:''}</div></td><td style="padding:4px 6px;white-space:nowrap">${tierName(p.rating)}</td><td class="mono" style="padding:4px 6px;text-align:right">${p.rating}<span class="lbwl2">${p.wins}-${p.losses}</span></td><td class="mono lbwl" style="padding:4px 6px;text-align:right;color:var(--dim);white-space:nowrap">${p.wins}-${p.losses}</td></tr>`).join('')}</tbody></table>`:TR('還沒有人打過排位賽。','Nobody has played a ranked game yet.');
   }catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}
 }
 
