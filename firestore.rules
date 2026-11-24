@@ -201,13 +201,18 @@ service cloud.firestore {
           && (!('MLB' in h) || (h.MLB is int && h.MLB >= 0 && h.MLB <= 29))
           && (!('CPBL' in h) || (h.CPBL is int && h.CPBL >= 0 && h.CPBL <= 9 && h.CPBL != 5));
       }
-      // a credited win may add one to the count of the home park this player set for the room's league
+      // a credited win may add one to the count of the park this player used in that room (their seat's park);
+      // pages from before the change counted the home park they had set, which the room also used then
       function pwOK() {
         let a = od().get('pw', {});
         let b = nd().get('pw', {});
-        let lg = room(od().pend).cfg.get('league', 'MLB');
-        let k = (lg == 'CPBL' ? 'C' : 'M') + string(od().get('home', {}).get(lg, -1));
-        return b == a || (od().get('home', {}).get(lg, -1) >= 0 && b.diff(a).affectedKeys().hasOnly([k]) && b[k] == a.get(k, 0) + 1);
+        let r = room(od().pend);
+        let lg = r.cfg.get('league', 'MLB');
+        let pre = lg == 'CPBL' ? 'C' : 'M';
+        let kp = pre + string(r.setup.get(seatOf(r), {}).get('park', -1));
+        let kh = pre + string(od().get('home', {}).get(lg, -1));
+        return b == a || ((b.diff(a).affectedKeys().hasOnly([kp]) && b[kp] == a.get(kp, 0) + 1)
+          || (od().get('home', {}).get(lg, -1) >= 0 && b.diff(a).affectedKeys().hasOnly([kh]) && b[kh] == a.get(kh, 0) + 1));
       }
       function room(c) { return get(/databases/$(database)/documents/rooms/$(c)).data; }
       function seatOf(r) { return r.seats['0'] == uid ? '0' : '1'; }

@@ -2267,7 +2267,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='413f2e6bbf';
+const BUILD='2da4edc3a1';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2316,7 +2316,10 @@ function sync(){if(!NET.on||NET.seat==null)return;if(!NET.timerAct)unstrike();S.
 function commitRaw(){if(NET.pending&&(NET.pending.seq||0)<=(S.seq||0)){NET.pending=null;const f=$('#follow');if(f)f.hidden=true}
   S.seq=(S.seq||0)+1;const st=JSON.stringify(dehydrate()),rev=S.rev,seat=NET.seat,seq=S.seq;NET.beatAt=Date.now();
   // a refusal here is the numbering at work (the other player moved at the same moment), not a fault: catch up quietly
-  dbWrite(()=>NET.ref.update({state:st,rev,seq,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})}).catch(e=>{resync();if(!(e&&e.code==='invalid_argument'))throw e}))}
+  dbWrite(()=>NET.ref.update({state:st,rev,seq,...(seat!=null?{setup:{[seat]:{hb:Date.now(),left:false}}}:{})})
+    // the server now holds a started game: book the ranked stake (a snapshot may never come if the other side left)
+    .then(()=>{if(isRanked()&&NET.seat!=null&&!NET.rk&&S.screen!=='room')rankStart().then(rankCheck)})
+    .catch(e=>{resync();if(!(e&&e.code==='invalid_argument'))throw e}))}
 let RESYNC=0;
 // the server's copy replaces this page's in one step (no gap for a late cached snapshot to slip into)
 // This page's own move was the one refused, so it takes the server's state straight away (no "catch up" banner):
@@ -2997,8 +3000,10 @@ async function applyRanked(p,won){
     // the best-streak and sweep fields need the newer firestore.rules: where the site still runs older ones, the
     // win goes in without them
     // a win at my home park for the room's league counts toward that park's titles (needs the newest rules too)
-    let pw=null;try{let lg;if(NET.doc&&NET.code===p.pend&&NET.doc.cfg)lg=NET.doc.cfg.league;else{const x=await NET.db.doc('rooms/'+p.pend).get();lg=x.exists?(x.data().cfg||{}).league:null}
-      lg=lg||'MLB';const h=homeOf(p,lg);if(h!=null){const k=pkKey(lg,h);pw={...(p.pw||{}),[k]:((p.pw||{})[k]||0)+1}}}catch(e){}
+    // the win counts for the park I played this series at (my home park unless I picked another in the room)
+    let pw=null;try{let rd=null;if(NET.doc&&NET.code===p.pend&&NET.doc.cfg)rd=NET.doc;else{const x=await NET.db.doc('rooms/'+p.pend).get();rd=x.exists?x.data():null}
+      const lg=((rd&&rd.cfg)||{}).league||'MLB',st=(rd&&rd.seats)||{},me=st[0]===acctUser().uid?0:st[1]===acctUser().uid?1:null;
+      const h=me!=null?(((rd.setup||{})[me]||{}).park):null;if(homeOK(lg,h)){const k=pkKey(lg,h);pw={...(p.pw||{}),[k]:((p.pw||{})[k]||0)+1}}}catch(e){}
     const best=Math.max(p.best||0,(p.streak||0)+1),tries=[...(pw?[{...w,best,pw}]:[]),{...w,best},w];
     for(let i=0;i<tries.length;i++){try{await profRef().update(tries[i]);break}catch(e){if(i===tries.length-1)throw e}}}
   else await profRef().update({pend:'',pendAt:0,pendD:0,pendW:0,streak:0});
@@ -3445,7 +3450,7 @@ if(TAB_CH)TAB_CH.onmessage=e=>{const m=e.data||{};
 function enterRoom(code,seat,mm){
   S.ai=null;S.rankAI=null;
   clearTimeout(NET.lgWait);
-  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},tr:{},pt:{},ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
+  Object.assign(NET,{on:true,code,seat,ref:roomDoc(code),err:'',mmClosing:false,lgWait:null,mmScanAt:Date.now(),strikes:0,ffDone:false,ffAuto:false,oppFfShown:false,ttl:{},tr:{},pt:{},homeDone:false,ttlUid:{},goneShown:false,goneDone:false,goneDismissed:false,timerAct:false,pending:null,doc:null,drawn:false,autoGo:false,emoSeen:undefined,afk:null,myAfk:0,oppAfk:0,rdySince:0});closeReady();
   try{localStorage.setItem('mlbRoom',code)}catch(e){}
   S.rev=null;S.seq=0;S.screen='room';render();
   if(NET.unsub)NET.unsub();
@@ -3781,7 +3786,7 @@ function openHome(){
   const prog=lg=>parkProg(p,lg);
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('主場','Home parks')}" style="gap:10px">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>🏟️ ${TR('主場','Home parks')}</h2>
-   <p class="hint" style="color:var(--dim)">${TR('大聯盟、中職各設一個主場，排位賽就在你的主場開打。在主場贏下 3、15、30 場系列賽（七戰四勝算一場），依序得到三段球場稱號。換主場不會清掉已經累積的勝場，但球場稱號只能掛目前主場的。<b>打電腦的排位不計入。</b>','Set one home park for MLB and one for CPBL: your ranked series are played there. Win 3, 15 and 30 series there for its three titles. Changing home keeps the wins, but you can only wear titles of your current home parks. Ranked games against the computer do not count.')}</p>
+   <p class="hint" style="color:var(--dim)">${TR('大聯盟、中職各設一個主場，排位配對後會先幫你選好這座球場（開打前在房間裡還是可以換）。在一座球場贏下 3、15、30 場系列賽（七戰四勝算一場，以那場你實際用的球場計），依序得到它的三段稱號。換主場不會清掉已經累積的勝場，但球場稱號只能掛目前主場的。<b>打電腦的排位不計入。</b>','Set one home park for MLB and one for CPBL: ranked rooms start you there (you can still change it in the room). Win 3, 15 and 30 series at a park (the one you actually played at) for its three titles. Changing home keeps the wins, but you can only wear titles of your current home parks. Ranked games against the computer do not count.')}</p>
    <label style="color:var(--chalk)">⚾ ${TR('大聯盟主場','MLB home park')}<select id="hmM" style="width:100%">${sel('MLB')}</select></label><div id="hpM">${prog('MLB')}</div>
    <label style="color:var(--chalk)">🇹🇼 ${TR('中職主場','CPBL home park')}<select id="hmC" style="width:100%">${sel('CPBL')}</select></label><div id="hpC">${prog('CPBL')}</div>
    <label style="color:var(--chalk)">🏟️ ${TR('顯示的球場稱號','Home-park title shown')}<select id="hmT" style="width:100%">${parkTitleOpts(p)}</select></label>
@@ -3845,7 +3850,7 @@ function renderRoom(){
   const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}<span data-ttl="${i}" data-row></span></div>
      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <label for="tn">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:-8px"><input id="tn" maxlength="18" style="flex:1" placeholder="${TR('例：高雄海神','e.g. Kaohsiung Sea Kings')}" value="${esc(mine.name)}" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'readonly':''}><button type="button" class="ghost" id="rn" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'hidden':''}>🎲 ${TR('隨機取名','Random name')}</button></div>
-      <label>${TR('主場','Home park')}<select id="pk" ${lgPend||((d.cfg||{}).ranked&&homeOf(PROF.doc,(d.cfg||{}).league||S.league)!=null)?'disabled':''}>${lgPend?`<option value="">${TR('（聯盟決定後套用：有設主場就用主場，沒有就抽選）','(set once the league is known: your home park, or a random one)')}</option>`:opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
+      <label>${TR('主場','Home park')}<select id="pk" ${lgPend?'disabled':''}>${lgPend?`<option value="">${TR('（聯盟決定後套用：有設主場就用主場，沒有就抽選）','(set once the league is known: your home park, or a random one)')}</option>`:opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
     :`<section class="panel teamcard ${i?'B':''}" id="seat${i}"></section>`;
   $('#app').innerHTML=`${header()}
   <section class="panel" id="mmwait" hidden></section>
@@ -3958,8 +3963,9 @@ function updateRoom(){
   const settled=NET.lgPend&&!lgPending(d);
   // a park picked before the room's league was known can point past the end of this league's list
   const myPk=NET.seat!=null?(su[NET.seat]||{}).park:null,badPk=myPk!=null&&myPk>=PARKSETS[want].length;
-  // ranked: my park is the home park I set for this league (drawn at random when I haven't set one)
-  const myHome=cfg.ranked&&!lgPending(d)?homeOf(PROF.doc,want):null;
+  // ranked: once the league is known, start me at the home park I set for it (a default only: the menu stays open,
+  // and wins count for whichever park I actually play at); no home set: a random park as before
+  let myHome=null;if(cfg.ranked&&!lgPending(d)&&NET.seat!=null&&!NET.homeDone){NET.homeDone=true;myHome=homeOf(PROF.doc,want)}
   if(NET.seat!=null&&(myHome!=null?myPk!==myHome:(settled||badPk))){const pk=myHome!=null?myHome:Math.floor(Math.random()*PARKSETS[want].length),me=NET.seat;
     NET.doc={...d,setup:{...su,[me]:{...(su[me]||{}),park:pk}}};dbWrite(()=>NET.ref.update({setup:{[me]:{park:pk}}}))}
   if(want!==S.league||settled){if(want!==S.league)setLeague(want);return renderRoom()}
