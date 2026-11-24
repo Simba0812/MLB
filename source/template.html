@@ -3087,7 +3087,7 @@ async function startAIRanked(){
   setLeague(pickLg());S.mode=RANKED.mode;S.slots={...RANKED.slots};
   S.ai={seat:1,level:lv};S.rankAI={state:'on',d:ad,before:p.rating,ai:true};
   S.budget=RANKED.budget;S.lotMax=RANKED.lotMax;
-  S.teams.forEach((t,i)=>{t.name=i?TR(`電腦（${TIERS[tierIdx(p.rating)][2]}）`,`Computer (${TIERS[tierIdx(p.rating)][3]})`):p.name;t.park=Math.floor(Math.random()*PARKS.length);t.budget=RANKED.budget;t.roster=[];t.done=false});
+  S.teams.forEach((t,i)=>{t.name=i?TR(`電腦（${TIERS[tierIdx(p.rating)][2]}）`,`Computer (${TIERS[tierIdx(p.rating)][3]})`):p.name;t.park=i?Math.floor(Math.random()*PARKS.length):(homeOf(p,S.league)??Math.floor(Math.random()*PARKS.length));t.budget=RANKED.budget;t.roster=[];t.done=false});   // my home park when I set one
   S.deck=POOL.slice();
   for(let i=S.deck.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]]}
   newDeckOrder();S.lotNo=0;S.log=[];S.lot=null;S.trade=null;S.series=null;S.game=null;S.screen='draft';
