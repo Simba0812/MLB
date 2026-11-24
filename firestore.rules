@@ -128,6 +128,12 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.exp < request.time.toMillis();
     }
 
+    // Site notices (a cup's sign-up): anyone may read them; only the site owner writes them, in the console.
+    match /config/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Play statistics: stats/all and one document per day (dYYYYMMDD). Anyone may read them; a write may
     // only add one to counters, so the numbers can't be reset or inflated in one go.
     match /stats/{id} {

@@ -117,6 +117,10 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 @media (max-width:560px){h2.sbline{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);justify-content:stretch;font-size:19px;column-gap:8px}.sbline .ttlrow{gap:4px}.sbline .sbteam>span:first-child{word-break:keep-all}}
 .eyebrow .ttlrow{font-size:initial;letter-spacing:normal;text-transform:none}
 .ttl.tier{color:var(--tc);border-color:var(--tc)}
+.annbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin:0 0 14px;padding:10px 14px;border:2px solid var(--red);border-radius:3px;background:#fff6ec}
+.annbar .annt{font-weight:900;color:var(--red)}
+a.annbtn{display:inline-block;text-decoration:none;padding:8px 16px;background:var(--red);color:#fff;font-weight:900;border:2px solid var(--red);border-radius:3px;box-shadow:3px 3px 0 var(--navy)}
+a.annbtn:hover{filter:brightness(1.08)}
 .ttl.pk{color:#1f5a3a;border-color:#2f7d52;background:#eef6ef}
 .ttl.pk1{color:#173f75;border-color:#2b62a8;background:#eaf1fa}
 .ttl.pk2{color:#4a2373;border-color:#7a45b0;background:linear-gradient(135deg,#f4ecfb,#e6d6f5);box-shadow:0 0 0 1px #fff inset}
@@ -2938,6 +2942,7 @@ function seatParkTitle(i){
   return S.ai&&i!==S.ai.seat?shownParkTitle(PROF.doc):'';
 }
 // every screen that names the two teams fills in their titles once it is drawn
+{const f=window.renderHome;window.renderHome=function(){const r=f.apply(this,arguments);try{paintAnnounce()}catch(e){}return r}}
 ['renderGameShell','renderPick','renderRoom','renderDraft','renderTrade'].forEach(n=>{const f=window[n];window[n]=function(){const r=f.apply(this,arguments);try{paintTitles()}catch(e){}return r}});
 // a nickname's width: CJK and other wide characters count 2, the rest 1 (so 8 Chinese characters or 16 letters fit)
 const NAME_W=16,nameWidth=t=>[...String(t||'')].reduce((n,c)=>n+(/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|[\u{20000}-\u{3fffd}]/u.test(c)?2:1),0);
@@ -3462,7 +3467,7 @@ function enterRoom(code,seat,mm){
       const uid=await user.id(),cw=await user.can('data.write');
       if(!uid){NET.status='off';NET.msg=TR('請先登入 claude.ai 再使用線上對戰。','Sign in to claude.ai to play online.')}
       else if(cw===false){NET.status='off';NET.msg=TR('你目前只有檢視權限，沒辦法加入對戰。請房主從頁面的 Share 選單把你設為可以編輯（Editor）。','You only have view access. Ask the host to make you an Editor from the page\'s Share menu.')}
-      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink();countVisit().then(()=>{if(S.screen==='home'){statLine();histSync()}})}
+      else{Object.assign(NET,{status:'ready',db,user,uid});sweepRooms();inviteFromLink();loadAnnounce();countVisit().then(()=>{if(S.screen==='home'){statLine();histSync()}})}
     }
   }catch(e){NET.status='off';NET.msg=window.STANDALONE?TR(`Firebase 連線失敗，請確認設定正確、匿名登入已啟用。（${(e&&(e.code||e.message))||''}）`,`Couldn't connect to Firebase. Check the config and that anonymous sign-in is enabled. (${(e&&(e.code||e.message))||''})`):TR('線上功能暫時無法使用，請重新整理頁面。','Online play is unavailable right now. Reload the page.')}
   renderNetBox();
@@ -3526,12 +3531,48 @@ async function firebaseBackend(cfg){
 }
 
 /* ---------- home + room screens ---------- */
+/* ---------- an announcement (a cup's sign-up, say) kept in Firestore at config/announce, edited in the console ----------
+   fields: id (change it to show the pop-up again), title, body, link (https only), linkText, until (when it stops showing:
+   a timestamp, or text like "2026-12-01 23:59", Taiwan time), on (false hides it at once) */
+let ANN=null;
+function annUntil(u){if(u==null||u==='')return Infinity;if(typeof u==='number')return u;if(u.toMillis)return u.toMillis();
+  const t=String(u).trim(),m=t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+  if(m)return Date.UTC(+m[1],m[2]-1,+m[3],m[4]!=null?+m[4]:23,m[5]!=null?+m[5]:59)-8*3600000;   // Taiwan time; a date alone runs to 23:59
+  const d=Date.parse(t);return isNaN(d)?Infinity:d}
+const annLive=a=>!!(a&&a.on!==false&&a.title&&Date.now()<annUntil(a.until));
+const annLink=a=>/^https:\/\//.test(String(a.link||''))?String(a.link):'';
+async function loadAnnounce(){
+  try{const x=await NET.db.doc('config/announce').get();ANN=x.exists?x.data():null}catch(e){ANN=null}
+  paintAnnounce();
+  if(!annLive(ANN)||S.screen!=='home')return;
+  let hide=false;try{hide=localStorage.getItem('mlbAnnHide')===String(ANN.id||ANN.title)}catch(e){}
+  if(!hide&&!annShown){annShown=true;openAnnounce()}
+}
+let annShown=false;
+// the strip on the home page stays until the announcement ends; the pop-up has "don't show again"
+function paintAnnounce(){
+  const el=$('#annbox');if(!el)return;if(!annLive(ANN)){el.innerHTML='';return}
+  const L=annLink(ANN);
+  el.innerHTML=`<div class="annbar" role="region" aria-label="${TR('公告','Announcement')}"><span class="annt">📣 ${esc(ANN.title)}</span><span class="row" style="gap:8px">${L?`<a class="solid annbtn" href="${esc(L)}" target="_blank" rel="noopener">${esc(ANN.linkText||TR('前往報名','Sign up'))}</a>`:''}<button class="ghost" id="annmore">${TR('看說明','Details')}</button></span></div>`;
+  $('#annmore').onclick=openAnnounce;
+}
+function openAnnounce(){
+  if(!annLive(ANN))return;closeAcct();const L=annLink(ANN),w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('公告','Announcement')}" style="gap:12px">
+   <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📣 ${esc(ANN.title)}</h2>
+   ${ANN.body?`<p style="white-space:pre-line;margin:0">${esc(String(ANN.body).replace(/\\n/g,'\n'))}</p>`:''}
+   ${isFinite(annUntil(ANN.until))?`<p class="hint" style="margin:0">${TR('截止：','Closes: ')}${esc(new Date(annUntil(ANN.until)+8*3600000).toISOString().slice(0,16).replace('T',' '))}${TR('（台灣時間）',' (Taiwan time)')}</p>`:''}
+   <div class="row" style="gap:10px">${L?`<a class="solid annbtn" href="${esc(L)}" target="_blank" rel="noopener">${esc(ANN.linkText||TR('前往報名','Sign up'))}</a>`:''}<button class="ghost" id="annlater">${TR('稍後再說','Later')}</button><button class="ghost" id="annnever">${TR('不再顯示','Don\'t show again')}</button></div></div>`;
+  document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  $('#annlater').onclick=closeAcct;
+  $('#annnever').onclick=()=>{try{localStorage.setItem('mlbAnnHide',String(ANN.id||ANN.title))}catch(e){}closeAcct()};
+}
 function renderHome(){
   S.rankAI=null;
   const ticket=(stub,body)=>`<section class="ticket"><div class="stub">${stub}</div><div class="tbody">${body}</div></section>`;
   $('#app').innerHTML=`${header()}
   <p class="slogan">${TR('純粹好玩的粉絲作品 · 不賭博 · 不收費 · 不營利','A just-for-fun fan project · no gambling · free · non-profit')}</p>
-  ${window.OFFLINE?'':'<div class="hometop" id="rankbox" hidden></div>'}
+  ${window.OFFLINE?'':'<div id="annbox"></div><div class="hometop" id="rankbox" hidden></div>'}
   <div class="grid2 tickets">
    <section class="panel"><h2>${TR('單人對戰','Single player')}</h2><p class="hint" style="margin-top:6px">${TR('你和電腦競標、交易，再模擬對戰。電腦會依球員評價、缺的位置和剩下的預算出價。','Bid and trade against the computer, then play the games. The computer bids by rating, the positions it needs and the budget it has left.')}</p><button class="solid" id="solo" style="margin-top:14px">${TR('開始','Start')}</button></section>
    <section class="panel"><h2>${TR('同一台輪流玩','Same device')}</h2><p class="hint" style="margin-top:6px">${TR('兩個人用同一台電腦或手機，輪流出價、輪流選先發。','Two people share one computer or phone and take turns.')}</p><button class="solid" id="local" style="margin-top:14px">${TR('開始','Start')}</button></section>
