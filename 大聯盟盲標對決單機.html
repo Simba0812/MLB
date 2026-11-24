@@ -118,6 +118,10 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .pcard .ttl{margin:6px 0 0}
 .ttlrow{display:flex;flex-wrap:wrap;gap:6px;min-height:24px;margin-top:6px;align-items:center}
 .ttlrow .ttl{margin:0}
+.sbline{display:grid;grid-template-columns:minmax(0,max-content) auto minmax(0,max-content);justify-content:start;column-gap:14px;align-items:start}
+.sbteam{min-width:0}.sbat{padding-top:2px}
+@media (max-width:560px){h2.sbline{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);justify-content:stretch;font-size:19px;column-gap:8px}.sbline .ttlrow{gap:4px}.sbline .sbteam>span:first-child{word-break:keep-all}}
+.eyebrow .ttlrow{font-size:initial;letter-spacing:normal;text-transform:none}
 .ttl.tier{color:var(--tc);border-color:var(--tc)}
 .ttl.pk{color:#1f5a3a;border-color:#2f7d52;background:#eef6ef}
 .ttl.pk1{color:#173f75;border-color:#2b62a8;background:#eaf1fa}
@@ -1803,7 +1807,7 @@ function renderGameShell(){
   $('#app').innerHTML=`${header()}
   <section class="panel">
    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${title} · ${esc(res.park.n)}</div>
-    <h2 style="margin-top:4px"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span><span data-ttl="${1-G.homeIdx}"></span> @ <span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span><span data-ttl="${G.homeIdx}"></span></h2>
+    <h2 class="sbline" style="margin-top:4px"><span class="sbteam"><span class="${G.homeIdx?'ta':'tb'}">${esc(res.away.name)}</span><span data-ttl="${1-G.homeIdx}" data-row></span></span><span class="sbat">@</span><span class="sbteam"><span class="${G.homeIdx?'tb':'ta'}">${esc(res.home.name)}</span><span data-ttl="${G.homeIdx}" data-row></span></span></h2>
     <p class="hint">${coinText(G.gnum)}${S.mode!=='single'?` <span class="series">${TR('系列賽目前','Series')} ${tname(0)} ${w[0]}：${w[1]} ${tname(1)}</span>`:''}</p></div>
     <div class="row"><span class="eyebrow">${TR('播報速度','Speed')}</span><div class="seg" role="group" aria-label="${TR('播報速度','Speed')}">${[[TR('慢','Slow'),1400],[TR('中','Normal'),380],[TR('快','Fast'),90]].map(([l,v])=>`<button data-sp="${v}" aria-pressed="${S.speed===v}">${l}</button>`).join('')}</div><button class="ghost" id="skip">${TR('直接看結果','Skip ahead')}</button></div>
    </div>
@@ -2263,7 +2267,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='6e072e1cbd';
+const BUILD='413f2e6bbf';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3838,7 +3842,7 @@ function renderRoom(){
   const lgPend=lgPending(d);NET.lgPend=lgPend;
   const mine=me!=null?(su[me]||{name:'',park:me}):null;
   const opts=sel=>PARKS.map((p,j)=>`<option value="${j}" ${sel===j?'selected':''}>${esc(p.n)}</option>`).join('');
-  const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}<span data-ttl="${i}"></span></div>
+  const seat=i=>me===i?`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${TR('（你）',' (you)')}<span data-ttl="${i}" data-row></span></div>
      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
       <label for="tn">${TR('隊名','Team name')}</label><div class="row" style="flex-wrap:nowrap;margin-top:-8px"><input id="tn" maxlength="18" style="flex:1" placeholder="${TR('例：高雄海神','e.g. Kaohsiung Sea Kings')}" value="${esc(mine.name)}" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'readonly':''}><button type="button" class="ghost" id="rn" ${(d.cfg||{}).ranked||(d.cfg||{}).cup?'hidden':''}>🎲 ${TR('隨機取名','Random name')}</button></div>
       <label>${TR('主場','Home park')}<select id="pk" ${lgPend||((d.cfg||{}).ranked&&homeOf(PROF.doc,(d.cfg||{}).league||S.league)!=null)?'disabled':''}>${lgPend?`<option value="">${TR('（聯盟決定後套用：有設主場就用主場，沒有就抽選）','(set once the league is known: your home park, or a random one)')}</option>`:opts(Math.min(mine.park??i,PARKS.length-1))}</select></label><p class="hint" id="pkf"></p>${lgPend?`<p class="hint" style="margin-top:-6px">${TR('配到對手、決定聯盟後就能選主場（會先幫你隨機選一個）。','Pick your park once an opponent is found and the league is set (one is picked at random for you).')}</p>`:''}</div></section>`
@@ -3965,7 +3969,7 @@ function updateRoom(){
   if((cfg.mode||'single')!==S.mode){S.mode=cfg.mode||'single';return renderRoom()}
   if(cfg.slots&&JSON.stringify(cfg.slots)!==JSON.stringify(S.slots)){S.slots={...cfg.slots};return renderRoom()}
   [0,1].forEach(i=>{const el=$('#seat'+i);if(!el)return;const s=su[i]||{},joined=!!seats[i];
-    el.innerHTML=`<div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${NET.seat==null?'':TR('（對手）',' (opponent)')}<span data-ttl="${i}"></span></div>
+    el.innerHTML=`<div class="eyebrow ${i?'tb':'ta'}">${TR('玩家 ','Player ')}${i?'B':'A'}${NET.seat==null?'':TR('（對手）',' (opponent)')}<span data-ttl="${i}" data-row></span></div>
      <h2 style="margin-top:6px"></h2><p class="hint" style="margin-top:6px"></p>`;
     const cup=(d.cfg||{}).cup;
     el.querySelector('h2').textContent=joined?(oppMasked(d,i)?MASK_NAME():s.name||TR('（還沒取隊名）','(no name yet)')):cup?TR(`等待 ${(cup.names||[])[i]||''} 加入…`,`Waiting for ${(cup.names||[])[i]||''}…`):TR('等待朋友加入…','Waiting for your friend…');
