@@ -3538,7 +3538,7 @@ let ANN=null;
 // the announcement built into the page, used while config/announce doesn't exist (or can't be read)
 const ANN_DEFAULT={id:'cup-2026-11-28',title:'MLB 盃賽報名中！',linkText:'前往報名',until:'2026-11-27 20:00',
   link:'https://docs.google.com/forms/d/e/1FAIpQLSfAGTiyUFAGSeMZVs8k17c5X1K1chTAfCjN4_BgbteR2R9Mmg/viewform?usp=header',
-  body:'❗ 此為大聯盟 MLB 賽事，非中職，請玩家注意\n⚾ 比賽時間：2026/11/28（六）20:00（台灣時間 UTC+8）\n⏰ 報到時間：19:00–19:45 在 OpenChat 報到，逾時未報到視同棄權\n📝 報名截止：2026/11/27（五）20:00（台灣時間）\n🏆 賽制：單淘汰，每場 7 戰 4 勝，比照排位賽規則；對戰表截止後於 OpenChat 公布'};
+  body:'⚾ 比賽時間：2026/11/28（六）20:00（台灣時間）\n📝 報名截止：2026/11/27（五）20:00（台灣時間）'};
 function annUntil(u){if(u==null||u==='')return Infinity;if(typeof u==='number')return u;if(u.toMillis)return u.toMillis();
   const t=String(u).trim(),m=t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?$/);
   if(m)return Date.UTC(+m[1],m[2]-1,+m[3],m[4]!=null?+m[4]:23,m[5]!=null?+m[5]:59)-8*3600000;   // Taiwan time; a date alone runs to 23:59
@@ -3565,7 +3565,7 @@ function openAnnounce(){
   w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('公告','Announcement')}" style="gap:12px">
    <button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📣 ${esc(ANN.title)}</h2>
    ${ANN.body?`<p style="white-space:pre-line;margin:0">${esc(String(ANN.body).replace(/\\n/g,'\n'))}</p>`:''}
-   ${isFinite(annUntil(ANN.until))?`<p class="hint" style="margin:0">${TR('截止：','Closes: ')}${esc(new Date(annUntil(ANN.until)+8*3600000).toISOString().slice(0,16).replace('T',' '))}${TR('（台灣時間）',' (Taiwan time)')}</p>`:''}
+   ${!ANN.body&&isFinite(annUntil(ANN.until))?`<p class="hint" style="margin:0">${TR('截止：','Closes: ')}${esc(new Date(annUntil(ANN.until)+8*3600000).toISOString().slice(0,16).replace('T',' '))}${TR('（台灣時間）',' (Taiwan time)')}</p>`:''}
    <div class="row" style="gap:10px">${L?`<a class="solid annbtn" href="${esc(L)}" target="_blank" rel="noopener">${esc(ANN.linkText||TR('前往報名','Sign up'))}</a>`:''}<button class="ghost" id="annlater">${TR('稍後再說','Later')}</button><button class="ghost" id="annnever">${TR('不再顯示','Don\'t show again')}</button></div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   $('#annlater').onclick=closeAcct;
