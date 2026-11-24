@@ -110,6 +110,8 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .tbook li b{color:var(--dim);min-width:8.5em}.tbook li.got b{color:var(--red)}
 .ttl{display:inline-block;vertical-align:middle;margin-left:8px;font-family:var(--body);font-size:12px;font-weight:900;letter-spacing:.04em;line-height:1.5;color:var(--red);background:var(--paper);border:1.5px solid var(--red);border-radius:2px;padding:0 7px;white-space:nowrap}
 .pcard .ttl{margin:6px 0 0}
+.ttlrow{display:flex;flex-wrap:wrap;gap:6px;min-height:24px;margin-top:6px;align-items:center}
+.ttlrow .ttl{margin:0}
 .ttl.tier{color:var(--tc);border-color:var(--tc)}
 .ttl.pk{color:#1f5a3a;border-color:#2f7d52;background:#eef6ef}
 .ttl.pk1{color:#173f75;border-color:#2b62a8;background:#eaf1fa}
@@ -971,7 +973,7 @@ function teamPanel(i){
   const mr=minRemaining(t);
   return `<section class="panel teamcard ${i?'B':''}">
    <div class="eyebrow ${i?'tb':'ta'}">${S.ai?(S.ai.seat===i?TR('電腦','Computer'):TR('你','You')):TR('玩家 ','Player ')+(i?'B':'A')}${NET.on&&NET.seat===i?TR('（你）',' (you)'):''} · ${esc(parkOf(t.park).n)}</div>
-   <h2 style="margin-top:4px">${esc(t.name)}<span data-ttl="${i}"></span></h2>
+   <h2 style="margin-top:4px">${esc(t.name)}<span data-ttl="${i}" data-row></span></h2>
    <div class="row" style="justify-content:space-between;margin-top:6px"><div class="money ${i?'tb':'ta'}">$${t.budget}</div>
    <div class="need">${TR(`還差 ${mr} 個必要位置`,`${mr} required spot${mr===1?'':'s'} left`)}${t.done?`<br><b>${TR('已宣布完成','Roster done')}</b>`:''}</div></div>
    <div class="slots">${rows}</div>
@@ -1052,7 +1054,7 @@ function renderTrade(){
   const online=NET.on&&!S.ai,myDone=online&&T.done[pi],oppDone=online&&T.done[oi];
   // both sides done and nobody waiting on an answer: on to pregame (the last one to act moves everyone)
   if(online&&T.done[0]&&T.done[1]&&!T.pending&&NET.seat!=null){S.screen='pregame';sync();return render()}
-  const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}<span data-ttl="${i}"></span></h2>
+  const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}<span data-ttl="${i}" data-row></span></h2>
     <div role="radiogroup" aria-label="${esc(S.teams[i].name)} ${TR('球員','players')}" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]||!isMine(pi)||myDone?'disabled':''}><span class="mono" style="color:var(--dim);width:3.6em">${e.slot}${e.slot2?'+SP':''}</span><span class="spn">${esc(nm(e.p))}</span><span class="mono" style="color:var(--dim)">${TR('評價','Rating')} ${ovr(e.p)}</span>${e.traded?`<span style="color:var(--dim)">${TR('交易來','acquired')}</span>`:''}</label>`).join('')}</div></section>`;
   let status='';
   const both=T.sel[pi]!=null&&T.sel[oi]!=null;
@@ -1702,7 +1704,7 @@ function renderPick(){
     const rest=recentStarters(i,g),avail0=tm.sps.filter(p=>!rest.includes(sid(p.id))),avail=avail0.length?avail0:tm.sps;
     const sta=staminaMap(i,g),sv=p=>sta[sid(p.id)]??100;
     const mine=isMine(i),sent=NET.on&&picks[i]!=null;
-    const head=`<div class="eyebrow ${i?'tb':'ta'}">${i===homeIdx?TR('主隊','Home'):TR('客隊','Away')}${NET.on&&mine?TR('（你）',' (you)'):''}</div><h2>${esc(tm.name)}<span data-ttl="${i}"></span></h2>`;
+    const head=`<div class="eyebrow ${i?'tb':'ta'}">${i===homeIdx?TR('主隊','Home'):TR('客隊','Away')}${NET.on&&mine?TR('（你）',' (you)'):''}</div><h2>${esc(tm.name)}<span data-ttl="${i}" data-row"></span></h2>`;
     if(!mine) return `<section class="panel teamcard ${i?'B':''}">${head}
       <p style="margin-top:10px">${S.ai?TR('電腦會在開打時決定先發和打序，開打時揭曉。','The computer sets its starter and lineup at first pitch.'):sent?TR('✅ 已選好先發和打序，開打時揭曉。','✅ Starter and lineup set; revealed at first pitch.'):TR('對手正在調整先發和打序…','Your opponent is setting a starter and lineup…')}</p>${NET.on&&!sent?'<p class="hint" id="oppcd" style="margin-top:6px"></p>':''}</section>`;
     const sentSp=sent&&picks[i].sp!=null?pid(picks[i].sp):null;
@@ -2921,7 +2923,9 @@ function seatTier(i){
   return S.ai&&i!==S.ai.seat?preRating(PROF.doc):null;
 }
 const tierChip=r=>{if(r==null)return '';const T=TIERS[tierIdx(r)];return `<span class="ttl tier" style="--tc:${T[4]}" title="${TR('排位段位','Ranked tier')}">${T[1]} ${TR(T[2],T[3])}</span>`};
-function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{const i=+el.dataset.ttl;el.innerHTML=tierChip(seatTier(i))+titleChip(seatTitle(i))+parkChip(seatParkTitle(i))})}
+function paintTitles(){document.querySelectorAll('[data-ttl]').forEach(el=>{const i=+el.dataset.ttl;const tt=titleChip(seatTitle(i))+parkChip(seatParkTitle(i));
+  // a team's heading: tier beside the name, titles on a line of their own kept for both teams (so the two sides match)
+  el.innerHTML=tierChip(seatTier(i))+(el.hasAttribute('data-row')?`<span class="ttlrow">${tt}</span>`:tt)})}
 function seatParkTitle(i){
   if(NET.on){const d=NET.doc;return !d||oppMasked(d,i)?'':((NET.pt||{})[i]||'')}
   return S.ai&&i!==S.ai.seat?shownParkTitle(PROF.doc):'';
