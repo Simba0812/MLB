@@ -118,6 +118,9 @@ html[lang=en] .ticket .stub .sl,.ticket .stub .sl:lang(en){text-orientation:mixe
 .pcard .ttl{margin:6px 0 0}
 .ttl.tier{color:var(--tc);border-color:var(--tc)}
 .ttl.pk{color:#1f5a3a;border-color:#2f7d52;background:#eef6ef}
+.ttl.pk1{color:#173f75;border-color:#2b62a8;background:#eaf1fa}
+.ttl.pk2{color:#4a2373;border-color:#7a45b0;background:linear-gradient(135deg,#f4ecfb,#e6d6f5);box-shadow:0 0 0 1px #fff inset}
+.pkt0,.tbook li b.pkt0{color:#2f7d52}.pkt1,.tbook li b.pkt1{color:#2b62a8}.pkt2,.tbook li b.pkt2{color:#7a45b0}
 .ttl.gold{color:#5c3d00;background:linear-gradient(135deg,#fff3c4,#f2cf6b 45%,#fff0b8 60%,#e0b445);border:2px solid #b8860b;box-shadow:0 0 0 1px #fff8dc inset,0 1px 6px rgba(184,134,11,.55);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
@@ -2259,7 +2262,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='188c39ca45';
+const BUILD='2474bd99d7';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2896,11 +2899,13 @@ function ownedParkTitles(p){
 // the one on show: the player's pick if it still belongs to a home park, else (no pick) the best they have; '-' hides it
 function shownParkTitle(p){
   const own=ownedParkTitles(p);if(!own.length||(p&&p.ptitle==='-'))return '';
-  const pick=p&&p.ptitle&&own.find(o=>o.id===p.ptitle);if(pick)return pick.text;
+  const pick=p&&p.ptitle&&own.find(o=>o.id===p.ptitle);if(pick)return {text:pick.text,l:pick.l};
   if(p&&p.ptitle)return '';   // picked one whose park is no longer home: it can't be worn
-  return own.slice().sort((a,b)=>b.l-a.l)[0].text;
+  const b=own.slice().sort((a,b)=>b.l-a.l)[0];return {text:b.text,l:b.l};
 }
-const parkChip=t=>t?`<span class="ttl pk" title="${TR('球場稱號','Home-park title')}">🏟️ ${esc(t)}</span>`:'';
+// one colour per stage: green (3 wins), blue (15), purple (30)
+const PK_STAGE=['入門','中間','最終'];
+const parkChip=t=>t&&t.text?`<span class="ttl pk pk${t.l}" title="${TR(`球場稱號（${PK_STAGE[t.l]}）`,'Home-park title')}">🏟️ ${esc(t.text)}</span>`:'';
 const titleChip=t=>t?`<span class="ttl${t[0]===GOLD?' gold':''}">${esc(ttlText(t))}</span>`:'';
 async function saveTitle(t){await profRef().update({title:String(t||'').slice(0,40)});await loadProfile()}
 // the two seats' titles in an online room, read from their records (hidden while a ranked opponent is masked)
@@ -3750,7 +3755,7 @@ function openTitles(){
 // home parks: one per league, used in every ranked series; series won there earn that park's titles
 // a park's two titles as the player sees them: the first is public, the final one stays "???" until earned
 function parkTitleLine(p,lg,i){const T=PARK_TTL[lg==='CPBL'?'C':'M'][i],n=parkWins(p,lg,i);
-  return PW_NEED.map((k,l)=>n>=k?`✅ ${esc(T[l])}`:l===PW_NEED.length-1?`🔒 ？？？（${TR(`再贏 ${k-n} 場解鎖`,`${k-n} more wins to unlock`)}）`:`🔒 ${esc(T[l])}（${TR(`再贏 ${k-n} 場`,`${k-n} more wins`)}）`).join(' · ')}
+  return PW_NEED.map((k,l)=>n>=k?`✅ <b class="pkt${l}">${esc(T[l])}</b>`:l===PW_NEED.length-1?`🔒 ？？？（${TR(`再贏 ${k-n} 場解鎖`,`${k-n} more wins to unlock`)}）`:`🔒 ${esc(T[l])}（${TR(`再贏 ${k-n} 場`,`${k-n} more wins`)}）`).join(' · ')}
 function parkProg(p,lg){const h=homeOf(p,lg);
   if(h==null)return `<p class="hint">${TR('還沒設定主場：排位球場隨機，勝場不計入任何球場。','No home park yet: ranked parks are random and wins count for no park.')}</p>`;
   return `<p class="hint">${TR(`${esc(PARKSETS[lg][h].n)}　主場勝場 <b>${parkWins(p,lg,h)}</b>：`,`${esc(PARKSETS[lg][h].n)} · wins <b>${parkWins(p,lg,h)}</b> · `)}${parkTitleLine(p,lg,h)}</p>`}
