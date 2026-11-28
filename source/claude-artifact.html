@@ -618,11 +618,37 @@ const slotPickers=dis=>SLOT_KEYS.map(k=>{const [lo,hi]=slotRange(k);
 const lotsNeeded=()=>2*SLOTS.reduce((a,sl)=>a+slotMin(sl),0);   // two full rosters; fill-in lots cover any shortfall
 function slotCount(t,k){return t.roster.filter(r=>r.slot===k||(r.slot2===k)).length}
 function minRemaining(t){return SLOTS.reduce((s,sl)=>s+Math.max(0,slotMin(sl)-slotCount(t,sl.k)),0)}
+// the spots a hitter can take: his own position, the others he played, then DH, then the bench
+const hitSlots=p=>[...new Set([p.pos,...(p.alt||[]),'DH','BN'])];
+const slotFree=(t,k)=>slotCount(t,k)<slotMax(SLOTS.find(s=>s.k===k));
+// where a new hitter can go, moving hitters already on the roster to their other positions if that opens a spot
+// (a 2B/SS player sitting at SS steps over to 2B so a pure SS fits). Breadth first, so the fewest moves win;
+// each reachable open spot comes with the moves that free it. Two-way players never move.
+function slotPaths(t,p){
+  const out=[],seen=new Set(),q=[];
+  hitSlots(p).forEach(k=>{if(!seen.has(k)){seen.add(k);q.push({k,moves:[]})}});
+  while(q.length){const n=q.shift();
+    if(slotFree(t,n.k)){out.push(n);continue}
+    t.roster.filter(e=>e.slot===n.k&&e.p.type==='H'&&!e.p.twp).forEach(e=>
+      hitSlots(e.p).forEach(k2=>{if(!seen.has(k2)){seen.add(k2);q.push({k:k2,moves:[[e,n.k,k2],...n.moves],via:n.via||n.k})}}))}
+  return out;   // k: the open spot that ends up used; via: where the new player himself goes
+}
 function openSlotsFor(t,p,ignoreDone){
   if(t.done&&!ignoreDone) return [];
-  const ks = p.twp? ['DH','SP','BN'] : p.type==='H'? [...new Set([p.pos,...(p.alt||[]),'DH','BN'])] : [p.pos];   // own position first, then the others he played, then DH, then bench
-  return ks.filter(k=>slotCount(t,k)<slotMax(SLOTS.find(s=>s.k===k)));
+  if(p.twp||p.type!=='H') return (p.twp?['DH','SP','BN']:[p.pos]).filter(k=>slotFree(t,k));
+  return slotPaths(t,p).map(n=>n.k);   // the spots that would fill, so a required one counts as covered
 }
+// put a hitter on the roster: fill a required spot if any moves get there, else use the fewest moves.
+// Returns the players who moved, for the log (null if he doesn't fit).
+function placeHitter(t,e){
+  const req=k=>slotCount(t,k)<slotMin(SLOTS.find(s=>s.k===k));
+  const ps=slotPaths(t,e.p);if(!ps.length)return null;
+  const n=ps.slice().sort((x,y)=>(req(y.k)-req(x.k))||(x.moves.length-y.moves.length))[0];
+  n.moves.forEach(([x,,to])=>{x.slot=to});
+  t.roster.push({...e,slot:n.via||n.k});
+  return n.moves.map(([x,from,to])=>[x.p,from,to]);
+}
+const moveLog=mv=>mv&&mv.length?TR(`（${mv.map(([p,f,to])=>`${nm(p)} ${f}→${to}`).join('、')}）`,` (${mv.map(([p,f,to])=>`${nm(p)} ${f}→${to}`).join(', ')})`):'';
 function needsCovered(t,p,slots){ // how many required slots this player fills
   return slots.filter(k=>slotCount(t,k)<slotMin(SLOTS.find(s=>s.k===k))).length;
 }
@@ -634,7 +660,7 @@ function maxBid(t,p){
   return Math.max(0,t.budget-after);
 }
 function canMeetMin(t){return SLOTS.every(sl=>slotCount(t,sl.k)>=slotMin(sl))}
-// which slot a newly added player takes: his own position first, the bench if it's full; a two-way player also fills a rotation spot
+// which slot a newly added pitcher or two-way player takes (a two-way player also fills a rotation spot)
 function placeSlot(p,slots){
   if(!p.twp) return {slot:slots[0]};
   const main=slots.includes('DH')?'DH':slots.includes('BN')?'BN':'SP';
@@ -890,10 +916,11 @@ function pass(){
 function award(){
   const L=S.lot,t=S.teams[L.high],slots=openSlotsFor(t,L.p,true);
   t.budget-=L.price;
-  const entry={p:L.p,price:L.price,...placeSlot(L.p,slots)};
-  t.roster.push(entry);
-  S.log.unshift(TR(`⚾ <b>${esc(nm(L.p))}</b> 由 <b class="${L.high?'tb':'ta'}">${esc(t.name)}</b> 以 $${L.price} 得標${L.p.twp?`（二刀流：${slots.map(k=>POSZH[k]).join('＋')}）`:''}`,
-    `⚾ <b>${esc(nm(L.p))}</b> goes to <b class="${L.high?'tb':'ta'}">${esc(t.name)}</b> for $${L.price}${L.p.twp?` (two-way: ${slots.map(k=>POSZH[k]).join(' + ')})`:''}`));
+  let mv=null;
+  if(L.p.type==='H'&&!L.p.twp)mv=placeHitter(t,{p:L.p,price:L.price});
+  else t.roster.push({p:L.p,price:L.price,...placeSlot(L.p,slots)});
+  S.log.unshift(TR(`⚾ <b>${esc(nm(L.p))}</b> 由 <b class="${L.high?'tb':'ta'}">${esc(t.name)}</b> 以 $${L.price} 得標${L.p.twp?`（二刀流：${slots.map(k=>POSZH[k]).join('＋')}）`:''}${esc(moveLog(mv))}`,
+    `⚾ <b>${esc(nm(L.p))}</b> goes to <b class="${L.high?'tb':'ta'}">${esc(t.name)}</b> for $${L.price}${L.p.twp?` (two-way: ${slots.map(k=>POSZH[k]).join(' + ')})`:''}${esc(moveLog(mv))}`));
   S.lot=null;nextLot();
 }
 function unsold(){
@@ -1052,8 +1079,10 @@ function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[
 /* ---------- trades ---------- */
 function tradeResult(pi,ai,oi,bi){
   const A=S.teams[pi],B=S.teams[oi],xa=A.roster[ai],yb=B.roster[bi];
-  const ta={roster:A.roster.filter(e=>e!==xa)},tb={roster:B.roster.filter(e=>e!==yb)};
-  const put=(t,e)=>{const sl=openSlotsFor(t,e.p,true);if(!sl.length)return false;
+  // copies: trying a trade must not move anyone on the real rosters
+  const cp=r=>r.map(e=>({...e})),ta={roster:cp(A.roster.filter(e=>e!==xa))},tb={roster:cp(B.roster.filter(e=>e!==yb))};
+  const put=(t,e)=>{if(e.p.type==='H'&&!e.p.twp)return !!placeHitter(t,{p:e.p,price:e.price,traded:true});
+    const sl=openSlotsFor(t,e.p,true);if(!sl.length)return false;
     t.roster.push({p:e.p,price:e.price,...placeSlot(e.p,sl),traded:true});return true};
   if(!put(ta,yb)||!put(tb,xa)) return null;
   if(!canMeetMin(ta)||!canMeetMin(tb)) return null;
@@ -2265,7 +2294,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ca8ee4303c';
+const BUILD='ab9f8972ac';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
