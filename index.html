@@ -132,6 +132,7 @@ a.annbtn:hover{filter:brightness(1.08)}
 .ttl.pk2{color:#4a2373;border-color:#7a45b0;background:linear-gradient(135deg,#f4ecfb,#e6d6f5);box-shadow:0 0 0 1px #fff inset}
 .pkt0,.tbook li b.pkt0{color:#2f7d52}.pkt1,.tbook li b.pkt1{color:#2b62a8}.pkt2,.tbook li b.pkt2{color:#7a45b0}
 .ttl.gold{color:#5c3d00;background:linear-gradient(135deg,#fff3c4,#f2cf6b 45%,#fff0b8 60%,#e0b445);border:2px solid #b8860b;box-shadow:0 0 0 1px #fff8dc inset,0 1px 6px rgba(184,134,11,.55);text-shadow:0 1px 0 rgba(255,255,255,.6)}
+.mvb{padding:0 6px;font-size:12px;line-height:1.4;border:1.5px solid var(--line);background:transparent;color:var(--navy);border-radius:3px;cursor:pointer;vertical-align:1px}
 .ttl.silver{color:#33404d;background:linear-gradient(135deg,#f7f9fb,#c9d1d9 45%,#eef2f5 60%,#a7b1bb);border:2px solid #7d8894;box-shadow:0 0 0 1px #ffffff inset,0 1px 6px rgba(110,122,135,.5);text-shadow:0 1px 0 rgba(255,255,255,.7)}
 .ttl.bronze{color:#4a2410;background:linear-gradient(135deg,#f6dcc4,#d49a6a 45%,#f0cfb2 60%,#b8753f);border:2px solid #8c4f22;box-shadow:0 0 0 1px #fbe9da inset,0 1px 6px rgba(140,79,34,.5);text-shadow:0 1px 0 rgba(255,255,255,.5)}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
@@ -857,11 +858,14 @@ function aiAct(){
 }
 function aiTradeReply(){
   const T=S.trade,q=T&&T.pending;if(!S.ai||S.screen!=='trade'||!q||q.pi===S.ai.seat)return;
-  const ai=S.ai.seat,A=S.teams[q.pi],B=S.teams[ai],get=A.roster[q.a].p,give=B.roster[q.b].p;
-  const r=tradeResult(q.pi,q.a,ai,q.b),gain=ovr(get)-ovr(give);
-  if(r&&gain>=AI_LV[S.ai.level].accept){A.roster=r[0];B.roster=r[1];T.log.unshift(TR(`✅ 電腦接受：${esc(A.name)} 的 ${esc(nm(get))} ⇄ ${esc(B.name)} 的 ${esc(nm(give))}`,`✅ Computer accepts: ${esc(A.name)}'s ${esc(nm(get))} ⇄ ${esc(B.name)}'s ${esc(nm(give))}`))}
-  else T.log.unshift(TR(`❌ 電腦拒絕了 ${esc(nm(get))} ⇄ ${esc(nm(give))}，覺得不划算`,`❌ Computer turns down ${esc(nm(get))} ⇄ ${esc(nm(give))}: not worth it`));
-  T.pending=null;T.sel=[null,null];render();
+  const ai=S.ai.seat,A=S.teams[q.pi],B=S.teams[ai],get=tradeNames(A,q.a),give=tradeNames(B,q.b);
+  // a package is rated as the one player it is worth: one 90 beats two 70s (each counts as (rating-50)^1.6).
+  // One-for-one this is the plain rating difference, as before.
+  const eq=(t,ix)=>50+Math.pow(ix.reduce((s2,j)=>s2+Math.pow(Math.max(0,ovr(t.roster[j].p)-50),1.6),0),1/1.6);
+  const r=tradeResult(q.pi,q.a,ai,q.b),gain=eq(A,q.a)-eq(B,q.b);
+  if(r&&gain>=AI_LV[S.ai.level].accept){A.roster=r[0];B.roster=r[1];T.log.unshift(TR(`✅ 電腦接受：${esc(A.name)} 的 ${esc(get)} ⇄ ${esc(B.name)} 的 ${esc(give)}`,`✅ Computer accepts: ${esc(A.name)}'s ${esc(get)} ⇄ ${esc(B.name)}'s ${esc(give)}`))}
+  else T.log.unshift(TR(`❌ 電腦拒絕了 ${esc(get)} ⇄ ${esc(give)}，覺得不划算`,`❌ Computer turns down ${esc(get)} ⇄ ${esc(give)}: not worth it`));
+  T.pending=null;T.sel=[[],[]];render();
 }
 function aiPickSP(i){
   const g=S.series.games.length,tm=buildTeam(i),rest=recentStarters(i,g),sta=staminaMap(i,g);
@@ -1006,6 +1010,34 @@ function closeBrief(){const w=$('#pvwrap');if(w)w.remove()}
 // the roster panels are redrawn on every bid, so listen once at the document level
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-pv]');if(b){const [i,id]=b.dataset.pv.split(',');openBrief(+i,id)}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeBrief();closeAcct()}});
+/* ---------- moving a drafted hitter by hand: only to a spot he can play (his positions, DH, bench) ---------- */
+// online, only on your own turn to bid, so the move can't collide with the other player's bid
+const moveTurnOK=i=>!NET.on||!S.lot||S.lot.turn===i;
+const canMove=(i,e)=>S.screen==='draft'&&isMine(i)&&e.p.type==='H'&&!e.p.twp&&hitSlots(e.p).length>1;
+// where this hitter can go: an open spot he can play, or a swap with someone who can play his current spot
+function moveOpts(t,e){
+  const out=[];
+  hitSlots(e.p).filter(k=>k!==e.slot).forEach(k=>{
+    if(slotFree(t,k))out.push({k});
+    t.roster.filter(o=>o.slot===k&&o.p.type==='H'&&!o.p.twp&&hitSlots(o.p).includes(e.slot)).forEach(o=>out.push({k,o}))});
+  return out;
+}
+function openMove(i,j){
+  const t=S.teams[i],e=t.roster[j];if(!e||!canMove(i,e))return;
+  closeBrief();const w=document.createElement('div');w.id='pvwrap';const ok=moveTurnOK(i),opts=moveOpts(t,e);
+  w.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="${TR('換位置','Move a player')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button>
+   <h2>⇄ ${esc(nm(e.p))}</h2><p class="hint" style="color:var(--dim)">${TR(`現在在 ${e.slot}。他能守 ${hitSlots(e.p).join('、')}，只能換到這些格子。`,`Now at ${e.slot}. He can play ${hitSlots(e.p).join(', ')}, so only those spots are offered.`)}</p>
+   ${!ok?`<p class="hint" style="color:var(--red);font-weight:700">${TR('線上對戰要輪到你出價時才能換位置。','Online, you can move players only on your turn to bid.')}</p>`:''}
+   <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${opts.length?opts.map((x,n)=>`<button class="ghost" data-mvto="${n}" ${ok?'':'disabled'} style="text-align:left">${x.o?TR(`和 ${esc(nm(x.o.p))} 互換（他去 ${e.slot}，你去 ${x.k}）`,`Swap with ${esc(nm(x.o.p))} (he goes to ${e.slot}, this one to ${x.k})`):TR(`移到 ${x.k}（空位）`,`Move to ${x.k} (open)`)}</button>`).join(''):`<p class="hint">${TR('他能守的位置都滿了，而且那些位置上的人都不能守他現在的位置。','Every spot he can play is full, and nobody there can play his current spot.')}</p>`}</div></div>`;
+  document.body.appendChild(w);w.onclick=ev=>{if(ev.target===w||ev.target.id==='pvx')closeBrief()};
+  w.querySelectorAll('[data-mvto]').forEach(b=>b.onclick=()=>{
+    const x=opts[+b.dataset.mvto];if(!moveTurnOK(i)||!t.roster.includes(e))return closeBrief();
+    const from=e.slot;if(x.o)x.o.slot=from;e.slot=x.k;
+    S.log.unshift(x.o?TR(`🔄 <b class="${i?'tb':'ta'}">${esc(t.name)}</b> 把 ${esc(nm(e.p))}（${from}→${x.k}）和 ${esc(nm(x.o.p))}（${x.k}→${from}）互換`,`🔄 <b class="${i?'tb':'ta'}">${esc(t.name)}</b> swap ${esc(nm(e.p))} (${from}→${x.k}) and ${esc(nm(x.o.p))} (${x.k}→${from})`)
+      :TR(`🔄 <b class="${i?'tb':'ta'}">${esc(t.name)}</b> 把 ${esc(nm(e.p))} 從 ${from} 移到 ${x.k}`,`🔄 <b class="${i?'tb':'ta'}">${esc(t.name)}</b> move ${esc(nm(e.p))} from ${from} to ${x.k}`));
+    closeBrief();sync();render()});
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-mv]');if(b){const [i,j]=b.dataset.mv.split(',');openMove(+i,+j)}});
 function teamPanel(i){
   const t=S.teams[i];
   const rows=SLOTS.map(sl=>{
@@ -1013,7 +1045,7 @@ function teamPanel(i){
     const lines=[];
     for(let n=0;n<slotMax(sl);n++){
       const r=got[n];
-      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v"><button class="pv" data-pv="${i},${esc(r.p.id)}" title="${TR('看球員簡介','Player summary')}">${esc(nm(r.p))}</button>${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
+      if(r) lines.push(`<span class="k">${sl.k}</span><span class="v"><button class="pv" data-pv="${i},${esc(r.p.id)}" title="${TR('看球員簡介','Player summary')}">${esc(nm(r.p))}</button>${canMove(i,r)?` <button class="mvb" data-mv="${i},${t.roster.indexOf(r)}" title="${TR('換位置','Move')}" aria-label="${TR(`把 ${esc(nm(r.p))} 換到別的位置`,`Move ${esc(nm(r.p))}`)}">⇄</button>`:''}${r.p.type==='H'&&FIELDPOS.includes(sl.k)&&r.p.pos!==sl.k?` <small class="mono">(${r.p.pos})</small>`:''}</span><span class="p">${r.slot2===sl.k?TR('二刀流','two-way'):'$'+r.price}</span>`);
       else if(n<slotMin(sl)) lines.push(`<span class="k">${sl.k}</span><span class="v empty">${TR('（必填）','(required)')}</span><span class="p"></span>`);
     }
     return lines.join('');
@@ -1084,20 +1116,30 @@ function renderDraft(){
   document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{declareDone(+b.dataset.done);sync()});
   scheduleAI();afkWatch();
 }
-function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[null,null],pending:null,log:[],t0:Date.now()};render()}
+function endDraft(){S.lot=null;S.screen='trade';S.trade={left:[3,3],prop:0,sel:[[],[]],pending:null,log:[],t0:Date.now()};render()}
 
 /* ---------- trades ---------- */
+// a trade of up to three players each way: both rosters must still fit every position limit and minimum.
+// Pitchers and two-way players go in first (their spots are fixed), then hitters with the fewest positions.
+const TRADE_MAX=3;
 function tradeResult(pi,ai,oi,bi){
-  const A=S.teams[pi],B=S.teams[oi],xa=A.roster[ai],yb=B.roster[bi];
+  const A=S.teams[pi],B=S.teams[oi],xa=ai.map(j=>A.roster[j]),yb=bi.map(j=>B.roster[j]);
+  if(!xa.length||!yb.length||xa.length>TRADE_MAX||yb.length>TRADE_MAX||xa.some(e=>!e)||yb.some(e=>!e))return null;
   // copies: trying a trade must not move anyone on the real rosters
-  const cp=r=>r.map(e=>({...e})),ta={roster:cp(A.roster.filter(e=>e!==xa))},tb={roster:cp(B.roster.filter(e=>e!==yb))};
+  const cp=r=>r.map(e=>({...e})),ta={roster:cp(A.roster.filter(e=>!xa.includes(e)))},tb={roster:cp(B.roster.filter(e=>!yb.includes(e)))};
   const put=(t,e)=>{if(e.p.type==='H'&&!e.p.twp)return !!placeHitter(t,{p:e.p,price:e.price,traded:true});
     const sl=openSlotsFor(t,e.p,true);if(!sl.length)return false;
     t.roster.push({p:e.p,price:e.price,...placeSlot(e.p,sl),traded:true});return true};
-  if(!put(ta,yb)||!put(tb,xa)) return null;
+  const order=l=>l.slice().sort((x,y)=>((x.p.type==='H'&&!x.p.twp)-(y.p.type==='H'&&!y.p.twp))||(hitSlots(x.p).length-hitSlots(y.p).length));
+  if(!order(yb).every(e=>put(ta,e))||!order(xa).every(e=>put(tb,e))) return null;
   if(!canMeetMin(ta)||!canMeetMin(tb)) return null;
   return [ta.roster,tb.roster];
 }
+// the order players are listed in: by the spot they hold, the bench by position, best first within a spot
+const LIST_ORDER=['C','1B','2B','3B','SS','LF','CF','RF','DH','BN','SP','RP','CL'];
+const rosterOrder=t=>t.roster.map((e,j)=>j).sort((x,y)=>{const a=t.roster[x],b=t.roster[y],k=e=>LIST_ORDER.indexOf(e.slot)*20+(e.slot==='BN'?LIST_ORDER.indexOf(e.p.pos):0);
+  return k(a)-k(b)||ovr(b.p)-ovr(a.p)});
+const tradeNames=(t,ix)=>ix.map(j=>nm(t.roster[j].p)).join(TR('、',', '));
 function renderTrade(){
   const T=S.trade,pi=NET.on&&NET.seat!=null?NET.seat:T.prop,oi=1-pi,P=S.teams[pi],O=S.teams[oi];
   T.done=T.done||[false,false];
@@ -1105,22 +1147,22 @@ function renderTrade(){
   // both sides done and nobody waiting on an answer: on to pregame (the last one to act moves everyone)
   if(online&&T.done[0]&&T.done[1]&&!T.pending&&NET.seat!=null){S.screen='pregame';sync();return render()}
   const list=(i,lab)=>`<section class="panel teamcard ${i?'B':''}"><div class="eyebrow ${i?'tb':'ta'}">${lab}</div><h2>${esc(S.teams[i].name)}<span data-ttl="${i}" data-row></span></h2>
-    <div role="radiogroup" aria-label="${esc(S.teams[i].name)} ${TR('球員','players')}" style="margin-top:10px">${S.teams[i].roster.map((e,j)=>`<label class="spopt"><input type="radio" name="tr${i}" value="${j}" ${T.sel[i]===j?'checked':''} ${T.pending||!T.left[pi]||!isMine(pi)||myDone?'disabled':''}><span class="mono" style="color:var(--dim);width:3.6em">${e.slot}${e.slot2?'+SP':''}</span><span class="spn">${esc(nm(e.p))}</span><span class="mono" style="color:var(--dim)">${TR('評價','Rating')} ${ovr(e.p)}</span>${e.traded?`<span style="color:var(--dim)">${TR('交易來','acquired')}</span>`:''}</label>`).join('')}</div></section>`;
+    <div role="group" aria-label="${esc(S.teams[i].name)} ${TR('球員','players')}" style="margin-top:10px">${rosterOrder(S.teams[i]).map(j=>{const e=S.teams[i].roster[j],on=T.sel[i].includes(j);return `<label class="spopt"><input type="checkbox" name="tr${i}" value="${j}" ${on?'checked':''} ${T.pending||!T.left[pi]||!isMine(pi)||myDone||(!on&&T.sel[i].length>=TRADE_MAX)?'disabled':''}><span class="mono" style="color:var(--dim);width:3.6em">${e.slot}${e.slot2?'+SP':''}</span><span class="spn">${esc(nm(e.p))}</span><span class="mono" style="color:var(--dim)">${TR('評價','Rating')} ${ovr(e.p)}</span>${e.traded?`<span style="color:var(--dim)">${TR('交易來','acquired')}</span>`:''}</label>`}).join('')}</div></section>`;
   let status='';
-  const both=T.sel[pi]!=null&&T.sel[oi]!=null;
+  const both=T.sel[pi].length>0&&T.sel[oi].length>0;
   const valid=both&&tradeResult(pi,T.sel[pi],oi,T.sel[oi]);
   if(!T.left[pi]) status=TR(`${esc(P.name)} 的 3 次提案機會已用完。`,`${esc(P.name)} has used all 3 trade proposals.`);
-  else if(!both) status=TR('在左右兩邊各選一位球員，一換一。','Pick one player on each side for a one-for-one trade.');
+  else if(!both) status=TR(`兩邊各勾 1～${TRADE_MAX} 位球員，人數不用一樣。`,`Tick 1 to ${TRADE_MAX} players on each side; the numbers needn't match.`);
   else if(!valid) status=TR('這筆交易不成立：交易後會有隊伍缺少必要位置，或超出位置上限。','This trade doesn\'t work: a team would be missing a required position or over a position limit.');
-  else status=`${esc(nm(P.roster[T.sel[pi]].p))} ⇄ ${esc(nm(O.roster[T.sel[oi]].p))}${TR('，位置符合規定。',': positions check out.')}`;
+  else status=`${esc(tradeNames(P,T.sel[pi]))} ⇄ ${esc(tradeNames(O,T.sel[oi]))}${TR('，位置符合規定。',': positions check out.')}`;
   const pend=T.pending?`<section class="reveal"><div class="eyebrow">${TR('交易提案','Trade proposal')}</div>
-     <p style="font-size:18px;margin:8px 0">${TR(`<b class="${T.pending.pi?'tb':'ta'}">${esc(S.teams[T.pending.pi].name)}</b> 想用 <b>${esc(nm(S.teams[T.pending.pi].roster[T.pending.a].p))}</b> 換 <b class="${T.pending.pi?'ta':'tb'}">${esc(S.teams[1-T.pending.pi].name)}</b> 的 <b>${esc(nm(S.teams[1-T.pending.pi].roster[T.pending.b].p))}</b>。`,
-    `<b class="${T.pending.pi?'tb':'ta'}">${esc(S.teams[T.pending.pi].name)}</b> offers <b>${esc(nm(S.teams[T.pending.pi].roster[T.pending.a].p))}</b> for <b class="${T.pending.pi?'ta':'tb'}">${esc(S.teams[1-T.pending.pi].name)}</b>'s <b>${esc(nm(S.teams[1-T.pending.pi].roster[T.pending.b].p))}</b>.`)}</p>
+     <p style="font-size:18px;margin:8px 0">${TR(`<b class="${T.pending.pi?'tb':'ta'}">${esc(S.teams[T.pending.pi].name)}</b> 想用 <b>${esc(tradeNames(S.teams[T.pending.pi],T.pending.a))}</b> 換 <b class="${T.pending.pi?'ta':'tb'}">${esc(S.teams[1-T.pending.pi].name)}</b> 的 <b>${esc(tradeNames(S.teams[1-T.pending.pi],T.pending.b))}</b>。`,
+    `<b class="${T.pending.pi?'tb':'ta'}">${esc(S.teams[T.pending.pi].name)}</b> offers <b>${esc(tradeNames(S.teams[T.pending.pi],T.pending.a))}</b> for <b class="${T.pending.pi?'ta':'tb'}">${esc(S.teams[1-T.pending.pi].name)}</b>'s <b>${esc(tradeNames(S.teams[1-T.pending.pi],T.pending.b))}</b>.`)}</p>
      <p class="hint">${TR(`請 ${esc(S.teams[1-T.pending.pi].name)} 決定是否接受。`,`${esc(S.teams[1-T.pending.pi].name)}, accept or decline?`)}</p>
      ${isMine(1-T.pending.pi)?`<div class="row" style="justify-content:center;margin-top:12px"><button class="${T.pending.pi?'a':'b'} solid" id="tacc">${TR('接受','Accept')}</button><button class="ghost" id="trej">${TR('拒絕','Decline')}</button></div>`:`<p class="waiting" style="margin-top:8px">${TR('等待對方回覆…','Waiting for a reply…')}</p>`}</section>`:'';
   $('#app').innerHTML=`${header()}
   <section class="panel"><h2>${TR('球員交易','Trades')}</h2>
-   <p class="hint" style="margin-top:6px">${TR('選秀結束。雙方各有 3 次提案機會，一次一換一，對方同意才成交；不管成交與否都會用掉一次。交易後雙方陣容仍要符合位置規定。','The draft is over. Each team gets 3 trade proposals, one player for one, and the other side must agree. A proposal is used up either way. Rosters must still meet the position rules after a trade.')}</p>
+   <p class="hint" style="margin-top:6px">${TR('選秀結束。雙方各有 3 次提案機會，每次兩邊各出 1～3 人（人數可以不一樣），對方同意才成交；不管成交與否都會用掉一次。交易後雙方陣容仍要符合位置規定，系統會自動把球員移到他能守的位置。','The draft is over. Each team gets 3 trade proposals of 1 to 3 players each way (the numbers can differ), and the other side must agree. A proposal is used up either way. Rosters must still meet the position rules after a trade; players are moved to other positions they can play where needed.')}</p>
    <div class="row" style="margin-top:12px">${NET.on||S.ai?`<span class="eyebrow">${TR('提案次數','Proposals left')}</span><span>${S.ai?TR(`你還有 ${T.left[pi]} 次。電腦只回覆你的提案，不會主動提出交易。`,`You have ${T.left[pi]}. The computer only answers your proposals; it never makes its own.`):NET.seat==null?`${esc(S.teams[0].name)} ${T.left[0]} · ${esc(S.teams[1].name)} ${T.left[1]}`:TR(`你還有 ${T.left[pi]} 次，對手還有 ${T.left[1-pi]} 次`,`You: ${T.left[pi]} · opponent: ${T.left[1-pi]}`)}</span>`:`<span class="eyebrow">${TR('提案方','Proposing team')}</span><div class="seg" role="group" aria-label="${TR('提案方','Proposing team')}">${[0,1].map(i=>`<button data-tp="${i}" aria-pressed="${pi===i}" ${T.pending?'disabled':''}>${esc(S.teams[i].name)}${TR(`（剩 ${T.left[i]} 次）`,` (${T.left[i]} left)`)}</button>`).join('')}</div>`}</div></section>
   ${pend}
   <div class="grid2">${list(pi,TR('送出（提案方）','You give'))}${list(oi,TR('換來（對手）','You get'))}</div>
@@ -1131,14 +1173,14 @@ function renderTrade(){
     :`<button id="tdone" ${T.pending?'disabled':''}>${TR('交易結束，進入賽前準備','Done trading, go to pregame')}</button>`}</div>
    ${online?'<p class="hint" id="trcd" style="margin-top:8px"></p>':''}
    <div class="log" style="margin-top:12px">${T.log.map(l=>`<div>${l}</div>`).join('')}</div></section>`;
-  document.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{T.prop=+b.dataset.tp;T.sel=[null,null];render()});
-  [0,1].forEach(i=>document.querySelectorAll(`input[name="tr${i}"]`).forEach(r=>r.onchange=()=>{T.sel[i]=+r.value;render()}));
-  $('#tprop').onclick=()=>{T.left[pi]--;T.pending={pi,a:T.sel[pi],b:T.sel[oi],at:Date.now()};sync();render()};
+  document.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{T.prop=+b.dataset.tp;T.sel=[[],[]];render()});
+  [0,1].forEach(i=>document.querySelectorAll(`input[name="tr${i}"]`).forEach(r=>r.onchange=()=>{const j=+r.value;T.sel[i]=r.checked?[...T.sel[i].filter(x=>x!==j),j].slice(0,TRADE_MAX):T.sel[i].filter(x=>x!==j);render()}));
+  $('#tprop').onclick=()=>{T.left[pi]--;T.pending={pi,a:T.sel[pi].slice(),b:T.sel[oi].slice(),at:Date.now()};sync();render()};
   $('#tdone').onclick=online?()=>{T.done[pi]=true;T.log.unshift(TR(`🤝 ${esc(P.name)} 交易完了`,`🤝 ${esc(P.name)} is done trading`));sync();render()}
     :()=>{S.screen='pregame';sync();render();window.scrollTo(0,0)};
   if(T.pending&&$('#tacc')){
-    const q=T.pending,A=S.teams[q.pi],B=S.teams[1-q.pi],an=nm(A.roster[q.a].p),bn=nm(B.roster[q.b].p);
-    $('#tacc').onclick=()=>{const r=tradeResult(q.pi,q.a,1-q.pi,q.b);if(r){A.roster=r[0];B.roster=r[1];T.log.unshift(TR(`✅ 成交：${esc(A.name)} 的 ${esc(an)} ⇄ ${esc(B.name)} 的 ${esc(bn)}`,`✅ Done deal: ${esc(A.name)}'s ${esc(an)} ⇄ ${esc(B.name)}'s ${esc(bn)}`))}T.pending=null;T.sel=[null,null];sync();render()};
+    const q=T.pending,A=S.teams[q.pi],B=S.teams[1-q.pi],an=tradeNames(A,q.a),bn=tradeNames(B,q.b);
+    $('#tacc').onclick=()=>{const r=tradeResult(q.pi,q.a,1-q.pi,q.b);if(r){A.roster=r[0];B.roster=r[1];T.log.unshift(TR(`✅ 成交：${esc(A.name)} 的 ${esc(an)} ⇄ ${esc(B.name)} 的 ${esc(bn)}`,`✅ Done deal: ${esc(A.name)}'s ${esc(an)} ⇄ ${esc(B.name)}'s ${esc(bn)}`))}T.pending=null;T.sel=[[],[]];sync();render()};
     $('#trej').onclick=()=>{T.log.unshift(TR(`❌ ${esc(B.name)} 拒絕了 ${esc(an)} ⇄ ${esc(bn)}`,`❌ ${esc(B.name)} declines ${esc(an)} ⇄ ${esc(bn)}`));T.pending=null;sync();render()};
   }
   if(S.ai&&T.pending&&T.pending.pi!==S.ai.seat){clearTimeout(aiTimer);aiTimer=setTimeout(aiTradeReply,S.aiFast?0:1100)}
@@ -2304,7 +2346,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='ab9f8972ac';
+const BUILD='0e722ecfc0';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2381,7 +2423,7 @@ function hydrate(o){
   if(((NET.doc&&NET.doc.cfg)||{}).ranked)S.mode=RANKED.mode;   // ranked is always best of seven, whatever a page sent
   S.teams=o.teams.map(t=>({name:t.name,park:t.park,budget:t.budget,done:t.done,roster:t.roster.map(e=>({p:BYID.get(e.id),price:e.price,slot:e.slot,slot2:e.slot2||undefined,traded:e.traded}))}));
   S.deckKey=o.deckKey;S.tail=(o.deckTail||[]).slice();S.deck=deckFrom(o);S.lotNo=o.lotNo;S.lot=o.lot?{...o.lot,p:BYID.get(o.lot.p)}:null;
-  S.log=o.log||[];S.trade=o.trade?{...o.trade,sel:prevSel||[null,null]}:null;
+  S.log=o.log||[];S.trade=o.trade?{...o.trade,sel:prevSel||[[],[]]}:null;
   S.series=o.series;S.game={gnum:o.gnum||0};S.rev=o.rev;S.seq=o.seq||0;
 }
 function onRoom(snap){
