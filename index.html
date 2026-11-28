@@ -132,6 +132,8 @@ a.annbtn:hover{filter:brightness(1.08)}
 .ttl.pk2{color:#4a2373;border-color:#7a45b0;background:linear-gradient(135deg,#f4ecfb,#e6d6f5);box-shadow:0 0 0 1px #fff inset}
 .pkt0,.tbook li b.pkt0{color:#2f7d52}.pkt1,.tbook li b.pkt1{color:#2b62a8}.pkt2,.tbook li b.pkt2{color:#7a45b0}
 .ttl.gold{color:#5c3d00;background:linear-gradient(135deg,#fff3c4,#f2cf6b 45%,#fff0b8 60%,#e0b445);border:2px solid #b8860b;box-shadow:0 0 0 1px #fff8dc inset,0 1px 6px rgba(184,134,11,.55);text-shadow:0 1px 0 rgba(255,255,255,.6)}
+.ttl.silver{color:#33404d;background:linear-gradient(135deg,#f7f9fb,#c9d1d9 45%,#eef2f5 60%,#a7b1bb);border:2px solid #7d8894;box-shadow:0 0 0 1px #ffffff inset,0 1px 6px rgba(110,122,135,.5);text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.ttl.bronze{color:#4a2410;background:linear-gradient(135deg,#f6dcc4,#d49a6a 45%,#f0cfb2 60%,#b8753f);border:2px solid #8c4f22;box-shadow:0 0 0 1px #fbe9da inset,0 1px 6px rgba(140,79,34,.5);text-shadow:0 1px 0 rgba(255,255,255,.5)}
 .offday{border:2px solid var(--good);background:color-mix(in srgb,var(--good) 9%,transparent);color:var(--good);font-weight:700;padding:10px 14px;margin-top:12px;text-align:left}
 .livebar{border:2px solid var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);padding:10px 12px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.livebar p{margin:0;flex:1 1 220px;font-weight:700;color:var(--red)}
 .thbtn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:2px solid #101010;background:#101010;color:#fff;font-weight:900;text-decoration:none;border-radius:2px;box-shadow:3px 3px 0 var(--navy)}
@@ -2273,7 +2275,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='79d63a7e5a';
+const BUILD='a59686c2ca';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -2873,8 +2875,10 @@ function ownedTitles(p){
   if(!p)return [];const t=[],hs=p.hist||{};
   (Array.isArray(p.ctitles)?p.ctitles:[]).forEach(x=>{if(typeof x!=='string'||!x.trim())return;x=x.trim();
     // a gold frame: written "金:" in front in the console, or a creator's title
-    const g=/^金[:：]/.test(x);if(g)x=x.replace(/^金[:：]\s*/,'');
-    if(x)t.push((g||/創作者|開發者|創辦人/.test(x)?GOLD:'')+x.slice(0,TTL_MAX))});
+    // a frame: written "金:" / "銀:" / "銅:" in front in the console (a creator's title is always gold)
+    const m=/^([金銀銅])[:：]\s*/.exec(x);if(m)x=x.slice(m[0].length);
+    const mk=m?FRAME_MARK[m[1]]:/創作者|開發者|創辦人/.test(x)?GOLD:'';
+    if(x)t.push(mk+x.slice(0,TTL_MAX))});
   Object.keys(hs).filter(k=>+k>=1).sort((a,b)=>b-a).forEach(k=>{const i=tierIdx((hs[k]||{}).r||0);if(i>=3)t.push(`${TIERS[i][1]} S${k} ${TIERS[i][2]}`)});
   const x=titleFacts(p);TITLE_DEFS.forEach(d=>{if(d.ok(x))t.push(d.t)});
   return [...new Set(t)];
@@ -2887,7 +2891,8 @@ function titleBook(p){
 }
 const shownTitle=p=>p&&p.title&&ownedTitles(p).includes(p.title)?p.title:'';
 // a title kept with this mark in front shows in a gold frame (only the site owner can hand those out)
-const GOLD='\u0001',ttlText=t=>String(t||'').replace(GOLD,'');
+const GOLD='\u0001',FRAME_MARK={'金':GOLD,'銀':'\u0002','銅':'\u0003'},FRAME_CLS={'\u0001':'gold','\u0002':'silver','\u0003':'bronze'};
+const ttlText=t=>String(t||'').replace(/^[\u0001-\u0003]/,'');
 /* ---------- home parks: each player sets one MLB and one CPBL home park; ranked series won there earn its titles ---------- */
 // [3-win, 15-win, 30-win titles], in the order of PARKS_MLB / PARKS_CPBL (null: no titles, not offered as a home)
 const PARK_TTL={
@@ -2920,7 +2925,7 @@ function shownParkTitle(p){
 // one colour per stage: green (3 wins), blue (15), purple (30)
 const PK_STAGE=['入門','中間','最終'];
 const parkChip=t=>t&&t.text?`<span class="ttl pk pk${t.l}" title="${TR(`球場稱號（${PK_STAGE[t.l]}）`,'Home-park title')}">🏟️ ${esc(t.text)}</span>`:'';
-const titleChip=t=>t?`<span class="ttl${t[0]===GOLD?' gold':''}">${esc(ttlText(t))}</span>`:'';
+const titleChip=t=>t?`<span class="ttl${FRAME_CLS[t[0]]?' '+FRAME_CLS[t[0]]:''}">${esc(ttlText(t))}</span>`:'';
 async function saveTitle(t){await profRef().update({title:String(t||'').slice(0,40)});await loadProfile()}
 // the two seats' titles in an online room, read from their records (hidden while a ranked opponent is masked)
 const TTL_CACHE=new Map();
@@ -3789,7 +3794,7 @@ function openTitles(){
    <p id="amsg" role="status" style="font-weight:700;color:var(--good);min-height:1.4em;margin:0"></p>
    <div id="tabA" style="display:flex;flex-direction:column;gap:10px">
    <p class="hint" style="color:var(--dim)">${TR('選一個顯示在暱稱旁邊：球員卡、排行榜和線上比賽中，對手都看得到。','Pick one to show beside your nickname: on your card, the leaderboard, and to opponents in online games.')}</p>
-   <label style="color:var(--chalk)">${TR('顯示的稱號','Title shown')}<select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option value="${esc(t)}" ${t===cur?'selected':''}>${esc(ttlText(t))}${t[0]===GOLD?' ✨':''}</option>`).join('')}</select></label>
+   <label style="color:var(--chalk)">${TR('顯示的稱號','Title shown')}<select id="attl" style="width:100%" ${own.length?'':'disabled'}><option value="">${own.length?TR('不顯示','None'):TR('還沒有稱號','No titles yet')}</option>${own.map(t=>`<option value="${esc(t)}" ${t===cur?'selected':''}>${esc(ttlText(t))}${FRAME_CLS[t[0]]?' ✨':''}</option>`).join('')}</select></label>
    ${titleBook(p).replace('<details class="tbook">','<details class="tbook" open>')}
    </div><div id="tabB" style="display:none;flex-direction:column;gap:10px">
    <p class="hint" style="color:var(--dim)">${TR('在主場贏「真人」排位系列賽得到的稱號，會顯示在你選的稱號旁邊。只能掛目前主場的。<b>打電腦的排位不計入。</b>','Earned by winning ranked series against people at your home parks; shown beside your title. Only your current home parks\' titles can be worn. <b>Ranked games against the computer do not count.</b>')}</p>
