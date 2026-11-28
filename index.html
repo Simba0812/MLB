@@ -200,6 +200,7 @@ button.ghost{border-color:var(--rule);color:var(--navy);font-weight:500;backgrou
 .lbcard .lbhd th .lbwl2{font-weight:700}
 .lbwl2{display:none}
 @media (max-width:560px){.lbcard .lbwl{display:none}.lbwl2{display:block;font-size:12px;color:var(--dim);white-space:nowrap}}
+.cupbd+.cupbd{margin-top:14px}.cuprk0{background:rgba(242,207,107,.28)}
 .lbn .lbnm{max-width:11em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pvwrap .pvx{position:sticky;top:0;z-index:2;box-shadow:0 2px 0 var(--paper);align-self:flex-end;background:var(--navy);color:var(--paper);border:0;border-radius:3px;padding:4px 10px;cursor:pointer}
 .need{font-size:12px;color:var(--dim);margin-top:8px}
@@ -2272,7 +2273,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='e4128c1073';
+const BUILD='79d63a7e5a';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3724,7 +3725,7 @@ function renderRankBox(){
     PROF.live='';busy($('#rkgo'),async()=>{if(await winPending())return;await quickMatch('ranked')})};
   if($('#rkhome'))$('#rkhome').onclick=openHome;
   if($('#rklive'))$('#rklive').onclick=()=>busy($('#rklive'),()=>rejoinLive(PROF.live));
-  if($('#lb'))$('#lb').onclick=openBoard;
+  if($('#lb'))$('#lb').onclick=()=>openBoard();
   if($('#rkshare'))$('#rkshare').onclick=()=>{const q=PROF.doc;if(!q)return;const t=TIERS[tierIdx(q.rating)];
     shareImage($('#rkshare'),tierCard(q),TR(`我在大聯盟盲標對決排位到了 ${t[1]} ${t[2]}（${q.rating} 分），來挑戰我！`,`I'm ${t[1]} ${t[3]} (${q.rating}) in MLB Blind Auction ranked. Come take me on!`),'blind-auction-tier.png')};
   if($('#acct'))$('#acct').onclick=()=>openAcct();
@@ -3854,10 +3855,26 @@ function openHome(){
     x.disabled=false};
 }
 function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()}   // never the "stopped" boxes (#afkwrap, #gonewrap)
-async function openBoard(){
-  closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';
-  w.innerHTML=`<div class="card lbcard" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${TR('排位排行榜','Ranked leaderboard')}</span></h2><div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
+/* ---------- cup leaderboard: each finished cup's top three, entered by hand (cup rooms expire after 3 days) ---------- */
+// newest first; top: [champion, runner-up, third] as account ids, so a later rename still shows
+const CUPS=[
+  {name:'第一屆盲標盃',date:'2026/11/28',lg:'MLB',n:26,top:['zUdXbE86oUbhkX7aB34MmBm3yDC2','gtguLm7Rs6Yol1F5Gx7XzzIhgIq1','3g8ayHqcSvgYoUoaf8ERggHI0b33']}];
+async function lbCup(me){
+  const ids=[...new Set(CUPS.flatMap(c=>c.top))],recs={};
+  await Promise.all(ids.map(u=>NET.db.doc('players/'+u).get().then(x=>{recs[u]=x.exists?x.data():{}},()=>{recs[u]={}})));
+  const L=[TR('🏆 冠軍','🏆 Champion'),TR('🥈 亞軍','🥈 Runner-up'),TR('🥉 季軍','🥉 Third')];
+  $('#lbl').innerHTML=CUPS.map(c=>`<div class="cupbd"><div class="eyebrow">${esc(c.name)} · ${c.date} · ${c.lg==='CPBL'?TR('中職','CPBL'):'MLB'} · ${c.n} ${TR('人參賽','players')}</div>
+   <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:4px"><tbody>${c.top.map((u,k)=>{const p=recs[u]||{},nm=p.name||'—';
+    return `<tr class="cuprk${k}" style="border-top:1px solid #c9c2a8;${u===me?'font-weight:900':''}"><td style="padding:6px;white-space:nowrap;font-weight:900">${L[k]}</td><td style="padding:6px;width:100%"><div class="lbn"><span class="lbnm" title="${esc(nm)}">${esc(nm)}</span>${shownTitle(p)||shownParkTitle(p)?`<div class="lbt">${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`).join('');
+}
+async function openBoard(tab){
+  closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';const cup=tab==='cup';
+  w.innerHTML=`<div class="card lbcard" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${cup?TR('盃賽排行榜','Cup leaderboard'):TR('排位排行榜','Ranked leaderboard')}</span></h2>
+   <div class="seg" role="group" style="margin:4px 0 8px"><button data-lbtab="rk" aria-pressed="${!cup}">${TR('排位','Ranked')}</button><button data-lbtab="cup" aria-pressed="${cup}">🏆 ${TR('盃賽','Cups')}</button></div>
+   <div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
+  w.querySelectorAll('[data-lbtab]').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-pressed')!=='true')openBoard(b.dataset.lbtab)});
+  if(cup){try{await lbCup((acctUser()||{}).uid)}catch(e){$('#lbl').textContent=TR('排行榜載入失敗。','The leaderboard did not load.')}return}
   try{
     const me=(acctUser()||{}).uid,SN=curSeason(),P=NET.db.collection('players');
     // a player's record moves to the new season only when they next sign in, so a plain "highest ratings"
