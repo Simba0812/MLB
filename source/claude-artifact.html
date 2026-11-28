@@ -2265,7 +2265,7 @@ async function sweepRooms(){
 }
 // which build of the game this page is; build.py stamps it. Online play replays the same moves on both
 // phones, so both must run the same code: a player on an older page is told to reload.
-const BUILD='a59686c2ca';
+const BUILD='ca8ee4303c';
 function verWarn(){
   const d=NET.doc;if(!d||NET.seat==null)return '';
   const o=1-NET.seat,seated=(d.seats||{})[o]!=null,ov=((d.setup||{})[o]||{}).ver;
@@ -3853,19 +3853,19 @@ function closeAcct(){const w=document.querySelector('#pvwrap');if(w)w.remove()} 
 /* ---------- cup leaderboard: each finished cup's top three, entered by hand (cup rooms expire after 3 days) ---------- */
 // newest first; top: [champion, runner-up, third] as account ids, so a later rename still shows
 const CUPS=[
-  {name:'第一屆盲標盃',date:'2026/11/28',lg:'MLB',n:26,top:['zUdXbE86oUbhkX7aB34MmBm3yDC2','gtguLm7Rs6Yol1F5Gx7XzzIhgIq1','3g8ayHqcSvgYoUoaf8ERggHI0b33']}];
+  {name:'第一屆盲標盃',date:'2026/11/28',lg:'MLB',top:['zUdXbE86oUbhkX7aB34MmBm3yDC2','gtguLm7Rs6Yol1F5Gx7XzzIhgIq1','3g8ayHqcSvgYoUoaf8ERggHI0b33']}];
 async function lbCup(me){
   const ids=[...new Set(CUPS.flatMap(c=>c.top))],recs={};
   await Promise.all(ids.map(u=>NET.db.doc('players/'+u).get().then(x=>{recs[u]=x.exists?x.data():{}},()=>{recs[u]={}})));
   const L=[TR('🏆 冠軍','🏆 Champion'),TR('🥈 亞軍','🥈 Runner-up'),TR('🥉 季軍','🥉 Third')];
-  $('#lbl').innerHTML=CUPS.map(c=>`<div class="cupbd"><div class="eyebrow">${esc(c.name)} · ${c.date} · ${c.lg==='CPBL'?TR('中職','CPBL'):'MLB'} · ${c.n} ${TR('人參賽','players')}</div>
+  $('#lbl').innerHTML=CUPS.map(c=>`<div class="cupbd"><div class="eyebrow">${esc(c.name)} · ${c.date} · ${c.lg==='CPBL'?TR('中職','CPBL'):'MLB'}</div>
    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:4px"><tbody>${c.top.map((u,k)=>{const p=recs[u]||{},nm=p.name||'—';
     return `<tr class="cuprk${k}" style="border-top:1px solid #c9c2a8;${u===me?'font-weight:900':''}"><td style="padding:6px;white-space:nowrap;font-weight:900">${L[k]}</td><td style="padding:6px;width:100%"><div class="lbn"><span class="lbnm" title="${esc(nm)}">${esc(nm)}</span>${shownTitle(p)||shownParkTitle(p)?`<div class="lbt">${titleChip(shownTitle(p))}${parkChip(shownParkTitle(p))}</div>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`).join('');
 }
 async function openBoard(tab){
   closeAcct();const w=document.createElement('div');w.id='pvwrap';w.className='acctwrap';const cup=tab==='cup';
   w.innerHTML=`<div class="card lbcard" role="dialog" aria-modal="true" aria-label="${TR('排行榜','Leaderboard')}"><button class="pvx" id="pvx">${TR('關閉 ✕','Close ✕')}</button><h2>📊 <span id="lbt">${cup?TR('盃賽排行榜','Cup leaderboard'):TR('排位排行榜','Ranked leaderboard')}</span></h2>
-   <div class="seg" role="group" style="margin:4px 0 8px"><button data-lbtab="rk" aria-pressed="${!cup}">${TR('排位','Ranked')}</button><button data-lbtab="cup" aria-pressed="${cup}">🏆 ${TR('盃賽','Cups')}</button></div>
+   <div class="seg" role="group" style="margin:4px 0 8px;align-self:flex-start"><button data-lbtab="rk" aria-pressed="${!cup}">${TR('排位','Ranked')}</button><button data-lbtab="cup" aria-pressed="${cup}">🏆 ${TR('盃賽','Cups')}</button></div>
    <div id="lbl" style="color:#10261d">${TR('載入中…','Loading…')}</div></div>`;
   document.body.appendChild(w);w.onclick=e=>{if(e.target===w||e.target.id==='pvx')closeAcct()};
   w.querySelectorAll('[data-lbtab]').forEach(b=>b.onclick=()=>{if(b.getAttribute('aria-pressed')!=='true')openBoard(b.dataset.lbtab)});
